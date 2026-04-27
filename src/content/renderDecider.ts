@@ -1,4 +1,4 @@
-import type { RenderMode, UnitCategory } from "@/shared/types";
+import type { RenderMode, UnitCategory } from "../shared/types";
 
 export function decideRenderMode(category: UnitCategory, root: HTMLElement, text: string): RenderMode {
   if (category === "attribute") return "replace-attribute";

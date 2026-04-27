@@ -2,7 +2,7 @@ import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { renderTranslation } from "./renderEngine";
 import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
-import type { RestoreRecord, TranslationUnit } from "@/shared/types";
+import type { RestoreRecord, TranslationUnit } from "../shared/types";
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };

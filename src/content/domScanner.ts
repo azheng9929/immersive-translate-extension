@@ -1,6 +1,6 @@
-import { normalizeVisibleText } from "@/shared/normalize";
-import { isMeaningfulText, isSkippableElement } from "@/shared/skipRules";
-import type { TranslatableAttribute, TranslatableAttributeName, UnitCategory } from "@/shared/types";
+import { normalizeVisibleText } from "../shared/normalize";
+import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
+import type { TranslatableAttribute, TranslatableAttributeName, UnitCategory } from "../shared/types";
 import { isVisibleElement } from "./visibility";
 
 export type ScannedText = {

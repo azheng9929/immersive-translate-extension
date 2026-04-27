@@ -1,4 +1,4 @@
-import type { RestoreRecord, TranslationUnit } from "@/shared/types";
+import type { RestoreRecord, TranslationUnit } from "../shared/types";
 import { ensureRuntimeStyle } from "./style";
 
 export function renderTranslation(unit: TranslationUnit, translatedText: string): RestoreRecord[] {

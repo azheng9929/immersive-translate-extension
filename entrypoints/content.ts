@@ -1,4 +1,4 @@
-import { PageController } from "@/content/pageController";
+import { PageController } from "../src/content/pageController";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -9,7 +9,7 @@ export default defineContentScript({
       translateBatch: async (items) =>
         items.map((item) => ({
           id: item.id,
-          text: `译:${item.text}`,
+          text: `[zh-Hans] ${item.text}`,
           status: "ok" as const,
         })),
     });

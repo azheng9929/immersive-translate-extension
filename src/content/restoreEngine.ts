@@ -1,4 +1,4 @@
-import type { RestoreRecord } from "@/shared/types";
+import type { RestoreRecord } from "../shared/types";
 
 export function restoreAll(records: RestoreRecord[]): void {
   for (const record of [...records].reverse()) {

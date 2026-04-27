@@ -1,7 +1,7 @@
 import type { ScannedText } from "./domScanner";
-import { normalizeForCache, normalizeVisibleText } from "@/shared/normalize";
-import { isSkippableElement } from "@/shared/skipRules";
-import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "@/shared/types";
+import { normalizeForCache, normalizeVisibleText } from "../shared/normalize";
+import { isSkippableElement } from "../shared/skipRules";
+import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
 import { decideRenderMode } from "./renderDecider";
 import { isVisibleElement } from "./visibility";
 
