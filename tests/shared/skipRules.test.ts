@@ -35,4 +35,8 @@ describe("isMeaningfulText", () => {
   it("rejects short content text outside UI", () => {
     expect(isMeaningfulText("OK", "content-block")).toBe(false);
   });
+
+  it("keeps prose that resembles hexadecimal text", () => {
+    expect(isMeaningfulText("defaced", "content-block")).toBe(true);
+  });
 });

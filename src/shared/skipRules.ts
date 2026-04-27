@@ -45,7 +45,7 @@ export function isMeaningfulText(value: string, category: UnitCategory): boolean
   if (/^https?:\/\//i.test(text)) return false;
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return false;
   if (/^v?\d+(\.\d+){1,4}$/i.test(text)) return false;
-  if (/^[#$]?[a-f0-9]{7,}$/i.test(text)) return false;
+  if (/^(?:[#$][a-f0-9]{7,}|0x[a-f0-9]{7,})$/i.test(text)) return false;
   if (text.length < 3 && !UI_CATEGORIES.has(category)) return false;
   return true;
 }
