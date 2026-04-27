@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { PageController } from "@/content/pageController";
+import type { TranslationCache, TranslationCacheLookup, TranslationCacheWrite } from "@/shared/translationCache";
+
+class MemoryTranslationCache implements TranslationCache {
+  private readonly values = new Map<string, string>();
+
+  async getMany(lookups: TranslationCacheLookup[]): Promise<Map<string, string>> {
+    return new Map(
+      lookups.flatMap((lookup) => {
+        const value = this.values.get(lookup.key);
+        return value ? [[lookup.key, value] as const] : [];
+      }),
+    );
+  }
+
+  async putMany(entries: TranslationCacheWrite[]): Promise<void> {
+    for (const entry of entries) {
+      this.values.set(entry.key, entry.translatedText);
+    }
+  }
+}
 
 describe("PageController", () => {
   it("translates and restores a mixed page using fake translation", async () => {
@@ -13,14 +33,15 @@ describe("PageController", () => {
 
     const controller = new PageController({
       targetLang: "zh-Hans",
-      translateBatch: async (items) => items.map((item) => ({ id: item.id, text: `译:${item.text}`, status: "ok" as const })),
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
     });
 
     await controller.translatePage();
 
-    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("译:Hello world.");
-    expect(document.querySelector("button")?.textContent).toBe("译:Submit");
-    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("译:Search docs");
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("[zh-Hans] Search docs");
 
     controller.restorePage();
     expect(document.querySelector(".imt-translation-block")).toBeNull();
@@ -45,10 +66,53 @@ describe("PageController", () => {
     const translatePromise = controller.translatePage();
     await Promise.resolve();
     controller.restorePage();
-    resolveBatch?.(capturedItems.map((item) => ({ id: item.id, text: `译:${item.text}`, status: "ok" })));
+    resolveBatch?.(capturedItems.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" })));
     await translatePromise;
 
     expect(document.querySelector(".imt-translation-block")).toBeNull();
     expect(document.querySelector("p")?.textContent).toBe("Hello world.");
+  });
+
+  it("uses cached translations instead of requesting the same text twice", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
+    const cache = new MemoryTranslationCache();
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      providerId: "mock",
+      cache,
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    await controller.translatePage();
+
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+  });
+
+  it("does not cache failed translation results", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const cache = new MemoryTranslationCache();
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      providerId: "mock",
+      cache,
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) => ({ id: item.id, text: "", status: "failed" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    await controller.translatePage();
+
+    expect(batchCalls).toBe(2);
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
 });

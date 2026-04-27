@@ -2,6 +2,7 @@ import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { renderTranslation } from "./renderEngine";
 import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
+import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RestoreRecord, TranslationUnit } from "../shared/types";
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
@@ -9,6 +10,8 @@ type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "faile
 
 type ControllerOptions = {
   targetLang: string;
+  providerId?: string;
+  cache?: TranslationCache;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -35,7 +38,22 @@ export class PageController {
       targetLang: this.options.targetLang,
     });
 
-    const batch = this.units.map((unit) => ({
+    const lookupByUnitId = this.buildCacheLookups(this.units);
+    const cacheHits = await this.readCache([...lookupByUnitId.values()]);
+    if (revision !== this.revision) return;
+
+    const missingUnits: TranslationUnit[] = [];
+    for (const unit of this.units) {
+      const lookup = lookupByUnitId.get(unit.id);
+      const cachedText = lookup ? cacheHits.get(lookup.key) : undefined;
+      if (cachedText !== undefined) {
+        this.applyTranslation(unit, cachedText);
+      } else {
+        missingUnits.push(unit);
+      }
+    }
+
+    const batch = missingUnits.map((unit) => ({
       id: unit.id,
       text: unit.originalText,
       category: unit.category,
@@ -48,15 +66,19 @@ export class PageController {
 
     const resultById = new Map(results.map((result) => [result.id, result]));
 
-    for (const unit of this.units) {
+    const cacheWrites: TranslationCacheWrite[] = [];
+    for (const unit of missingUnits) {
       const result = resultById.get(unit.id);
       if (!result || result.status !== "ok") {
         unit.state = "failed";
         continue;
       }
-      this.records.push(...renderTranslation(unit, result.text));
-      unit.state = "translated";
+      this.applyTranslation(unit, result.text);
+      const lookup = lookupByUnitId.get(unit.id);
+      if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
     }
+
+    await this.writeCache(cacheWrites);
   }
 
   restorePage(): void {
@@ -64,6 +86,46 @@ export class PageController {
     this.records = [];
     this.units = [];
     this.revision += 1;
+  }
+
+  private buildCacheLookups(units: TranslationUnit[]): Map<string, TranslationCacheLookup> {
+    const provider = this.options.providerId ?? "default";
+    return new Map(
+      units.map((unit) => [
+        unit.id,
+        createTranslationCacheLookup({
+          provider,
+          sourceLang: unit.sourceLang ?? "auto",
+          targetLang: unit.targetLang,
+          normalizedText: unit.normalizedText,
+        }),
+      ]),
+    );
+  }
+
+  private async readCache(lookups: TranslationCacheLookup[]): Promise<Map<string, string>> {
+    if (!this.options.cache) return new Map();
+    try {
+      return await this.options.cache.getMany(lookups);
+    } catch (error) {
+      console.warn("Failed to read translation cache", error);
+      return new Map();
+    }
+  }
+
+  private async writeCache(entries: TranslationCacheWrite[]): Promise<void> {
+    if (!this.options.cache || entries.length === 0) return;
+    try {
+      await this.options.cache.putMany(entries);
+    } catch (error) {
+      console.warn("Failed to write translation cache", error);
+    }
+  }
+
+  private applyTranslation(unit: TranslationUnit, translatedText: string): void {
+    this.records.push(...renderTranslation(unit, translatedText));
+    unit.translatedText = translatedText;
+    unit.state = "translated";
   }
 }
 

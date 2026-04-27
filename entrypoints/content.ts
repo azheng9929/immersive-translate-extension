@@ -1,4 +1,5 @@
 import { PageController } from "../src/content/pageController";
+import { IndexedDbTranslationCache } from "../src/shared/translationCache";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -6,6 +7,8 @@ export default defineContentScript({
   main() {
     const controller = new PageController({
       targetLang: "zh-Hans",
+      providerId: "fake-local",
+      cache: new IndexedDbTranslationCache(),
       translateBatch: async (items) =>
         items.map((item) => ({
           id: item.id,
