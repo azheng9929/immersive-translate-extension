@@ -1,7 +1,8 @@
 import type { ScannedText } from "./domScanner";
 import { normalizeForCache, normalizeVisibleText } from "@/shared/normalize";
 import { isSkippableElement } from "@/shared/skipRules";
-import type { RenderMode, TranslatableAttribute, TranslationUnit, UnitCategory } from "@/shared/types";
+import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "@/shared/types";
+import { decideRenderMode } from "./renderDecider";
 import { isVisibleElement } from "./visibility";
 
 type BuildInput = {
@@ -43,7 +44,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       normalizedText: normalizeForCache(originalText),
       targetLang: input.targetLang,
       category,
-      renderMode: defaultRenderMode(category),
+      renderMode: decideRenderMode(category, root, originalText),
       priority: priorityForCategory(category),
       state: "pending",
     });
@@ -117,13 +118,6 @@ function classifyRoot(root: HTMLElement): UnitCategory {
   if (HEADING_TAGS.has(root.tagName)) return "heading";
   if (CONTENT_TAGS.has(root.tagName)) return "content-block";
   return "fallback";
-}
-
-function defaultRenderMode(category: UnitCategory): RenderMode {
-  if (category === "attribute") return "replace-attribute";
-  if (category === "content-block" || category === "list-item" || category === "comment") return "bilingual-inside";
-  if (category === "heading" || category === "table-cell" || category === "card-text") return "compact-bilingual";
-  return "replace-text";
 }
 
 function priorityForCategory(category: UnitCategory): number {
