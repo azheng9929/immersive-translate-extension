@@ -33,10 +33,15 @@ const UI_CATEGORIES = new Set<UnitCategory>([
 export function isSkippableElement(element: Element): boolean {
   if (element.closest('[data-imt-managed="true"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
-  if (element.closest("[contenteditable='true'], [contenteditable='']")) return true;
 
   let current: Element | null = element;
   while (current) {
+    if (
+      current.hasAttribute("contenteditable") &&
+      current.getAttribute("contenteditable")?.trim().toLowerCase() !== "false"
+    ) {
+      return true;
+    }
     if (SKIP_TAGS.has(current.tagName)) return true;
     current = current.parentElement;
   }

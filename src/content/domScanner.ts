@@ -1,6 +1,6 @@
 import { normalizeVisibleText } from "@/shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "@/shared/skipRules";
-import type { TranslatableAttribute, TranslatableAttributeName } from "@/shared/types";
+import type { TranslatableAttribute, TranslatableAttributeName, UnitCategory } from "@/shared/types";
 import { isVisibleElement } from "./visibility";
 
 export type ScannedText = {
@@ -11,6 +11,15 @@ export type ScannedText = {
 
 const ATTRIBUTE_NAMES: TranslatableAttributeName[] = ["placeholder", "title", "alt", "aria-label"];
 
+function getScannerCategory(element: HTMLElement): UnitCategory {
+  if (element.closest("button")) return "button";
+  if (element.closest("nav")) return "nav";
+  if (element.closest("menu")) return "menu";
+  if (element.closest("label")) return "label";
+  if (element.closest("td, th")) return "table-cell";
+  return "fallback";
+}
+
 export function scanDocumentText(root: ParentNode): ScannedText[] {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -19,7 +28,7 @@ export function scanDocumentText(root: ParentNode): ScannedText[] {
       if (isSkippableElement(parent)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
       const text = normalizeVisibleText(node.textContent ?? "");
-      if (!isMeaningfulText(text, "fallback")) return NodeFilter.FILTER_REJECT;
+      if (!isMeaningfulText(text, getScannerCategory(parent))) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
@@ -42,7 +51,9 @@ export function scanDocumentText(root: ParentNode): ScannedText[] {
 }
 
 export function scanTranslatableAttributes(root: ParentNode): TranslatableAttribute[] {
-  const elements = Array.from(root.querySelectorAll<HTMLElement>("*"));
+  const elements = root instanceof HTMLElement
+    ? [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))]
+    : Array.from(root.querySelectorAll<HTMLElement>("*"));
   const attrs: TranslatableAttribute[] = [];
 
   for (const element of elements) {

@@ -61,6 +61,30 @@ describe("scanDocumentText", () => {
     expect(texts).toContain("Visible text");
     expect(texts).not.toContain("const value = 1");
   });
+
+  it("keeps short button and navigation text", () => {
+    mountFixture(`
+      <button>OK</button>
+      <nav><a href="/start">Go</a></nav>
+    `);
+
+    const texts = scanDocumentText(document.body).map((item) => item.text);
+
+    expect(texts).toContain("OK");
+    expect(texts).toContain("Go");
+  });
+
+  it("skips plaintext-only editable regions", () => {
+    mountFixture(`
+      <p>Visible text</p>
+      <div contenteditable="plaintext-only">Editable text</div>
+    `);
+
+    const texts = scanDocumentText(document.body).map((item) => item.text);
+
+    expect(texts).toContain("Visible text");
+    expect(texts).not.toContain("Editable text");
+  });
 });
 
 describe("scanTranslatableAttributes", () => {
@@ -87,6 +111,18 @@ describe("scanTranslatableAttributes", () => {
     `);
 
     const attrs = scanTranslatableAttributes(document.body);
+
+    expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
+      "placeholder:Search docs",
+    ]);
+  });
+
+  it("finds attributes on the root element", () => {
+    mountFixture("");
+    const input = document.createElement("input");
+    input.setAttribute("placeholder", "Search docs");
+
+    const attrs = scanTranslatableAttributes(input);
 
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
       "placeholder:Search docs",
