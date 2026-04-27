@@ -7,14 +7,22 @@ export default defineContentScript({
   main() {
     const controller = new PageController({
       targetLang: "zh-Hans",
-      providerId: "fake-local",
+      providerId: "microsoft",
       cache: new IndexedDbTranslationCache(),
-      translateBatch: async (items) =>
-        items.map((item) => ({
-          id: item.id,
-          text: `[zh-Hans] ${item.text}`,
-          status: "ok" as const,
-        })),
+      translateBatch: async (items) => {
+        const response = await chrome.runtime.sendMessage({
+          type: "IMT_TRANSLATE_BATCH",
+          request: {
+            provider: "microsoft",
+            sourceLang: "auto",
+            targetLang: "zh-Hans",
+            items,
+          },
+        });
+        if (response?.ok && Array.isArray(response.items)) return response.items;
+        const error = response?.error ?? "Translation failed";
+        return items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error }));
+      },
     });
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
