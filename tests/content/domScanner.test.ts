@@ -37,6 +37,30 @@ describe("scanDocumentText", () => {
     expect(texts).not.toContain("const value = 1");
     expect(texts).not.toContain("Managed translation");
   });
+
+  it("skips text inside hidden ancestors", () => {
+    mountFixture(`
+      <p>Visible text</p>
+      <div hidden><p>Hidden text</p></div>
+    `);
+
+    const texts = scanDocumentText(document.body).map((item) => item.text);
+
+    expect(texts).toContain("Visible text");
+    expect(texts).not.toContain("Hidden text");
+  });
+
+  it("skips text inside nested code regions", () => {
+    mountFixture(`
+      <p>Visible text</p>
+      <pre><span>const value = 1</span></pre>
+    `);
+
+    const texts = scanDocumentText(document.body).map((item) => item.text);
+
+    expect(texts).toContain("Visible text");
+    expect(texts).not.toContain("const value = 1");
+  });
 });
 
 describe("scanTranslatableAttributes", () => {
@@ -53,6 +77,19 @@ describe("scanTranslatableAttributes", () => {
       "aria-label:Search input",
       "alt:Product photo",
       "title:Open settings",
+    ]);
+  });
+
+  it("skips attributes inside nested code regions", () => {
+    mountFixture(`
+      <input placeholder="Search docs" />
+      <pre><span title="Code title">x</span></pre>
+    `);
+
+    const attrs = scanTranslatableAttributes(document.body);
+
+    expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
+      "placeholder:Search docs",
     ]);
   });
 });

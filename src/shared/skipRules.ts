@@ -34,7 +34,14 @@ export function isSkippableElement(element: Element): boolean {
   if (element.closest('[data-imt-managed="true"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
   if (element.closest("[contenteditable='true'], [contenteditable='']")) return true;
-  return SKIP_TAGS.has(element.tagName);
+
+  let current: Element | null = element;
+  while (current) {
+    if (SKIP_TAGS.has(current.tagName)) return true;
+    current = current.parentElement;
+  }
+
+  return false;
 }
 
 export function isMeaningfulText(value: string, category: UnitCategory): boolean {
