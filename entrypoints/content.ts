@@ -1,5 +1,6 @@
 import { FloatingTranslationControl } from "../src/content/floatingControl";
 import { InputTranslator } from "../src/content/inputTranslator";
+import { shouldMountOriginalTextTooltip } from "../src/content/interactionPolicy";
 import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { PageTranslationSession } from "../src/content/pageTranslationSession";
@@ -15,7 +16,7 @@ export default defineContentScript({
     let pageSession = createPageSession(config);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = createInputTranslator(config);
-    const originalTextTooltip = new OriginalTextTooltip();
+    const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => pageSession.translatePage(),
       restorePage: () => pageSession.restorePage(),
@@ -25,7 +26,7 @@ export default defineContentScript({
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
     inputTranslator.mount();
-    originalTextTooltip.mount();
+    originalTextTooltip?.mount();
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "IMT_TRANSLATE_PAGE") {
