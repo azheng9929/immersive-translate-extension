@@ -1,6 +1,10 @@
+import { normalizeGlossaryEntries, type GlossaryEntry } from "./glossary";
+
 export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini";
+export type FallbackProvider = "none" | ExtensionProvider;
 export type DisplayMode = "smart" | "bilingual" | "translation-only";
 export type DynamicMode = "off" | "conservative" | "normal";
+export type RequestProfile = "stable" | "balanced" | "fast" | "high-dynamic";
 export type SiteDynamicModeOverrides = Record<string, DynamicMode>;
 
 export const DEFAULT_OPENAI_SYSTEM_PROMPT =
@@ -11,8 +15,10 @@ export const DEFAULT_GEMINI_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
 export type ExtensionConfig = {
   targetLang: string;
   provider: ExtensionProvider;
+  fallbackProvider: FallbackProvider;
   displayMode: DisplayMode;
   dynamicMode: DynamicMode;
+  requestProfile: RequestProfile;
   openaiEndpoint: string;
   openaiApiKey: string;
   openaiModel: string;
@@ -29,6 +35,7 @@ export type ExtensionConfig = {
   geminiMaxBatchChars: number;
   geminiRequestTimeoutMs: number;
   geminiSystemPrompt: string;
+  glossary: GlossaryEntry[];
   siteDynamicModes: SiteDynamicModeOverrides;
   showFloatingBall: boolean;
   useCache: boolean;
@@ -39,8 +46,10 @@ export type ExtensionConfigPatch = Partial<ExtensionConfig>;
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   targetLang: "zh-Hans",
   provider: "microsoft",
+  fallbackProvider: "none",
   displayMode: "smart",
   dynamicMode: "normal",
+  requestProfile: "balanced",
   openaiEndpoint: "https://api.openai.com/v1/chat/completions",
   openaiApiKey: "",
   openaiModel: "gpt-4o-mini",
@@ -57,14 +66,54 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   geminiMaxBatchChars: 6000,
   geminiRequestTimeoutMs: 45000,
   geminiSystemPrompt: DEFAULT_GEMINI_SYSTEM_PROMPT,
+  glossary: [],
   siteDynamicModes: {},
   showFloatingBall: true,
   useCache: true,
 };
 
 const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>(["fake", "microsoft", "openai-compatible", "gemini"]);
+const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>(["none", "fake", "microsoft", "openai-compatible", "gemini"]);
 const SUPPORTED_DISPLAY_MODES = new Set<DisplayMode>(["smart", "bilingual", "translation-only"]);
 const SUPPORTED_DYNAMIC_MODES = new Set<DynamicMode>(["off", "conservative", "normal"]);
+const SUPPORTED_REQUEST_PROFILES = new Set<RequestProfile>(["stable", "balanced", "fast", "high-dynamic"]);
+
+const REQUEST_PROFILE_PRESETS: Record<RequestProfile, {
+  dynamicMode: DynamicMode;
+  maxConcurrentRequests: number;
+  maxBatchItems: number;
+  maxBatchChars: number;
+  requestTimeoutMs: number;
+}> = {
+  stable: {
+    dynamicMode: "conservative",
+    maxConcurrentRequests: 1,
+    maxBatchItems: 8,
+    maxBatchChars: 3000,
+    requestTimeoutMs: 60000,
+  },
+  balanced: {
+    dynamicMode: "normal",
+    maxConcurrentRequests: 2,
+    maxBatchItems: 16,
+    maxBatchChars: 6000,
+    requestTimeoutMs: 45000,
+  },
+  fast: {
+    dynamicMode: "normal",
+    maxConcurrentRequests: 3,
+    maxBatchItems: 24,
+    maxBatchChars: 9000,
+    requestTimeoutMs: 45000,
+  },
+  "high-dynamic": {
+    dynamicMode: "conservative",
+    maxConcurrentRequests: 1,
+    maxBatchItems: 6,
+    maxBatchChars: 2500,
+    requestTimeoutMs: 60000,
+  },
+};
 
 export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
   const input = isRecord(value) ? value : {};
@@ -72,8 +121,10 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
   return {
     targetLang: normalizeTargetLang(input.targetLang),
     provider: normalizeProvider(input.provider),
+    fallbackProvider: normalizeFallbackProvider(input.fallbackProvider),
     displayMode: normalizeDisplayMode(input.displayMode),
     dynamicMode: normalizeDynamicMode(input.dynamicMode),
+    requestProfile: normalizeRequestProfile(input.requestProfile),
     openaiEndpoint: normalizeString(input.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint),
     openaiApiKey: normalizeString(input.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey),
     openaiModel: normalizeString(input.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel),
@@ -90,6 +141,7 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     geminiMaxBatchChars: normalizeInteger(input.geminiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.geminiMaxBatchChars, 500, 30000),
     geminiRequestTimeoutMs: normalizeInteger(input.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000),
     geminiSystemPrompt: normalizeString(input.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt),
+    glossary: normalizeGlossaryEntries(input.glossary),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
     showFloatingBall: normalizeBoolean(input.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall),
     useCache: normalizeBoolean(input.useCache, DEFAULT_EXTENSION_CONFIG.useCache),
@@ -102,8 +154,10 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   const patch: ExtensionConfigPatch = {};
   if ("targetLang" in value) patch.targetLang = normalizeTargetLang(value.targetLang);
   if ("provider" in value) patch.provider = normalizeProvider(value.provider);
+  if ("fallbackProvider" in value) patch.fallbackProvider = normalizeFallbackProvider(value.fallbackProvider);
   if ("displayMode" in value) patch.displayMode = normalizeDisplayMode(value.displayMode);
   if ("dynamicMode" in value) patch.dynamicMode = normalizeDynamicMode(value.dynamicMode);
+  if ("requestProfile" in value) patch.requestProfile = normalizeRequestProfile(value.requestProfile);
   if ("openaiEndpoint" in value) patch.openaiEndpoint = normalizeString(value.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint);
   if ("openaiApiKey" in value) patch.openaiApiKey = normalizeString(value.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey);
   if ("openaiModel" in value) patch.openaiModel = normalizeString(value.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel);
@@ -120,10 +174,28 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("geminiMaxBatchChars" in value) patch.geminiMaxBatchChars = normalizeInteger(value.geminiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.geminiMaxBatchChars, 500, 30000);
   if ("geminiRequestTimeoutMs" in value) patch.geminiRequestTimeoutMs = normalizeInteger(value.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000);
   if ("geminiSystemPrompt" in value) patch.geminiSystemPrompt = normalizeString(value.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt);
+  if ("glossary" in value) patch.glossary = normalizeGlossaryEntries(value.glossary);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
   if ("showFloatingBall" in value) patch.showFloatingBall = normalizeBoolean(value.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall);
   if ("useCache" in value) patch.useCache = normalizeBoolean(value.useCache, DEFAULT_EXTENSION_CONFIG.useCache);
   return patch;
+}
+
+export function requestProfilePatch(value: unknown): ExtensionConfigPatch {
+  const requestProfile = normalizeRequestProfile(value);
+  const preset = REQUEST_PROFILE_PRESETS[requestProfile];
+  return {
+    requestProfile,
+    dynamicMode: preset.dynamicMode,
+    openaiMaxConcurrentRequests: preset.maxConcurrentRequests,
+    openaiMaxBatchItems: preset.maxBatchItems,
+    openaiMaxBatchChars: preset.maxBatchChars,
+    openaiRequestTimeoutMs: preset.requestTimeoutMs,
+    geminiMaxConcurrentRequests: preset.maxConcurrentRequests,
+    geminiMaxBatchItems: preset.maxBatchItems,
+    geminiMaxBatchChars: preset.maxBatchChars,
+    geminiRequestTimeoutMs: preset.requestTimeoutMs,
+  };
 }
 
 export function setSiteDynamicModeOverride(
@@ -168,6 +240,12 @@ function normalizeProvider(value: unknown): ExtensionProvider {
     : DEFAULT_EXTENSION_CONFIG.provider;
 }
 
+function normalizeFallbackProvider(value: unknown): FallbackProvider {
+  return typeof value === "string" && SUPPORTED_FALLBACK_PROVIDERS.has(value as FallbackProvider)
+    ? (value as FallbackProvider)
+    : DEFAULT_EXTENSION_CONFIG.fallbackProvider;
+}
+
 function normalizeDisplayMode(value: unknown): DisplayMode {
   return typeof value === "string" && SUPPORTED_DISPLAY_MODES.has(value as DisplayMode)
     ? (value as DisplayMode)
@@ -178,6 +256,12 @@ function normalizeDynamicMode(value: unknown): DynamicMode {
   return typeof value === "string" && SUPPORTED_DYNAMIC_MODES.has(value as DynamicMode)
     ? (value as DynamicMode)
     : DEFAULT_EXTENSION_CONFIG.dynamicMode;
+}
+
+function normalizeRequestProfile(value: unknown): RequestProfile {
+  return typeof value === "string" && SUPPORTED_REQUEST_PROFILES.has(value as RequestProfile)
+    ? (value as RequestProfile)
+    : DEFAULT_EXTENSION_CONFIG.requestProfile;
 }
 
 function normalizeSiteDynamicModes(value: unknown): SiteDynamicModeOverrides {

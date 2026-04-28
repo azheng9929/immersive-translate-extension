@@ -25,6 +25,14 @@ export async function sendToActiveTab(message: ContentMessage): Promise<MessageR
   }
 }
 
+export async function toggleActiveTabTranslation(): Promise<MessageResponse> {
+  const status = await sendToActiveTab({ type: "IMT_GET_PAGE_STATUS" });
+  if (status.ok && "status" in status && isTranslatedPhase(status.status.phase)) {
+    return sendToActiveTab({ type: "IMT_RESTORE_PAGE" });
+  }
+  return sendToActiveTab({ type: "IMT_TRANSLATE_PAGE" });
+}
+
 export async function handleBackgroundMessage(message: BackgroundMessage): Promise<MessageResponse> {
   if (message.type === "IMT_POPUP_TRANSLATE_ACTIVE_TAB") {
     return sendToActiveTab({ type: "IMT_TRANSLATE_PAGE" });
@@ -48,6 +56,10 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
     return { ok: true, config };
   }
   return { ok: false, error: "Unknown background message" };
+}
+
+function isTranslatedPhase(phase: string): boolean {
+  return phase === "translated" || phase === "partial" || phase === "updating";
 }
 
 async function notifyActiveTab(message: ContentMessage): Promise<void> {

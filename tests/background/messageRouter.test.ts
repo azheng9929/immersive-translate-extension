@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleBackgroundMessage } from "@/background/messageRouter";
+import { handleBackgroundMessage, toggleActiveTabTranslation } from "@/background/messageRouter";
 
 describe("handleBackgroundMessage", () => {
   it("runs translation batch messages through the selected provider", async () => {
@@ -90,6 +90,42 @@ describe("handleBackgroundMessage", () => {
 
     expect(response).toMatchObject({ ok: true, status: { phase: "translated" } });
     expect(sendMessage).toHaveBeenCalledWith(12, { type: "IMT_GET_PAGE_STATUS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("toggles the active tab between translation and restore for keyboard shortcuts", async () => {
+    const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
+    const sendMessage = vi.fn(async (_tabId, message) => {
+      if (message.type === "IMT_GET_PAGE_STATUS") {
+        return {
+          ok: true,
+          status: {
+            phase: "translated",
+            observation: "observing",
+            pendingRoots: 0,
+            observedRoots: 0,
+            total: 1,
+            translated: 1,
+            failed: 0,
+            skipped: 0,
+            dynamicRuns: 0,
+            lastError: undefined,
+          },
+        };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", {
+      tabs: {
+        query: tabsQuery,
+        sendMessage,
+      },
+    });
+
+    await expect(toggleActiveTabTranslation()).resolves.toEqual({ ok: true });
+
+    expect(sendMessage).toHaveBeenCalledWith(12, { type: "IMT_GET_PAGE_STATUS" });
+    expect(sendMessage).toHaveBeenCalledWith(12, { type: "IMT_RESTORE_PAGE" });
     vi.unstubAllGlobals();
   });
 });

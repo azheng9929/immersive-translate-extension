@@ -2,16 +2,21 @@
 import { onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
+  requestProfilePatch,
   type DynamicMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
+  type FallbackProvider,
+  type RequestProfile,
 } from "../../src/shared/config";
+import { glossaryEntriesToText, glossaryTextToEntries } from "../../src/shared/glossary";
 import type { MessageResponse } from "../../src/shared/messages";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
 const savedAt = ref("");
+const glossaryText = ref("");
 
 const updateConfig = async (patch: ExtensionConfigPatch) => {
   Object.assign(config, patch);
@@ -27,8 +32,16 @@ const setProvider = (event: Event) => {
   void updateConfig({ provider: (event.target as HTMLSelectElement).value as ExtensionProvider });
 };
 
+const setFallbackProvider = (event: Event) => {
+  void updateConfig({ fallbackProvider: (event.target as HTMLSelectElement).value as FallbackProvider });
+};
+
 const setDynamicMode = (dynamicMode: DynamicMode) => {
   void updateConfig({ dynamicMode });
+};
+
+const setRequestProfile = (requestProfile: RequestProfile) => {
+  void updateConfig(requestProfilePatch(requestProfile));
 };
 
 const setOpenAIEndpoint = (event: Event) => {
@@ -95,10 +108,16 @@ const setGeminiSystemPrompt = (event: Event) => {
   void updateConfig({ geminiSystemPrompt: (event.target as HTMLTextAreaElement).value });
 };
 
+const setGlossaryText = (event: Event) => {
+  glossaryText.value = (event.target as HTMLTextAreaElement).value;
+  void updateConfig({ glossary: glossaryTextToEntries(glossaryText.value) });
+};
+
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
   if (!response.ok) console.warn(response.error);
+  glossaryText.value = glossaryEntriesToText(config.glossary);
   isLoading.value = false;
 });
 
@@ -129,6 +148,17 @@ function numberInputValue(event: Event): number {
       <label class="field">
         <span>Provider</span>
         <select :value="config.provider" @change="setProvider">
+          <option value="microsoft">Microsoft</option>
+          <option value="openai-compatible">OpenAI API</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="fake">Local test</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Fallback provider</span>
+        <select data-testid="fallback-provider" :value="config.fallbackProvider" @change="setFallbackProvider">
+          <option value="none">None</option>
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
@@ -347,12 +377,51 @@ function numberInputValue(event: Event): number {
       </div>
     </section>
 
+    <section class="panel" aria-label="Personalization settings" :aria-busy="isLoading">
+      <div class="panel-heading">
+        <div>
+          <h2>Personalization</h2>
+          <p>Keep product names, technical terms, and preferred translations consistent.</p>
+        </div>
+      </div>
+
+      <label class="field prompt-field">
+        <span>Glossary</span>
+        <textarea
+          data-testid="glossary-text"
+          spellcheck="false"
+          placeholder="OpenAI = OpenAI&#10;prompt = 提示词 # LLM term"
+          :value="glossaryText"
+          @input="setGlossaryText"
+        />
+      </label>
+    </section>
+
     <section class="panel" aria-label="Dynamic translation settings" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
           <h2>Dynamic updates</h2>
           <p>Control how the extension translates new content on feeds, comments, and infinite-scroll pages.</p>
         </div>
+      </div>
+
+      <div class="profile-grid" role="group" aria-label="Request profile">
+        <button data-testid="request-profile-stable" type="button" :class="{ active: config.requestProfile === 'stable' }" @click="setRequestProfile('stable')">
+          <strong>Stable</strong>
+          <span>Smaller batches with the lowest pressure on dynamic pages.</span>
+        </button>
+        <button data-testid="request-profile-balanced" type="button" :class="{ active: config.requestProfile === 'balanced' }" @click="setRequestProfile('balanced')">
+          <strong>Balanced</strong>
+          <span>Default batching for most pages and providers.</span>
+        </button>
+        <button data-testid="request-profile-fast" type="button" :class="{ active: config.requestProfile === 'fast' }" @click="setRequestProfile('fast')">
+          <strong>Fast</strong>
+          <span>Higher concurrency for long static pages.</span>
+        </button>
+        <button data-testid="request-profile-high-dynamic" type="button" :class="{ active: config.requestProfile === 'high-dynamic' }" @click="setRequestProfile('high-dynamic')">
+          <strong>High dynamic</strong>
+          <span>Conservative updates for feeds and live comment pages.</span>
+        </button>
       </div>
 
       <div class="mode-grid" role="group" aria-label="Dynamic translation mode">
@@ -520,7 +589,14 @@ textarea {
   gap: 10px;
 }
 
-.mode-grid button {
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mode-grid button,
+.profile-grid button {
   min-height: 118px;
   padding: 14px;
   border: 1px solid rgba(15, 42, 95, 0.12);
@@ -532,19 +608,22 @@ textarea {
   font: inherit;
 }
 
-.mode-grid button.active {
+.mode-grid button.active,
+.profile-grid button.active {
   border-color: #1758db;
   background: #eef5ff;
   box-shadow: inset 0 0 0 1px #1758db;
 }
 
-.mode-grid strong {
+.mode-grid strong,
+.profile-grid strong {
   display: block;
   margin-bottom: 8px;
   font-size: 15px;
 }
 
-.mode-grid span {
+.mode-grid span,
+.profile-grid span {
   display: block;
   color: #52627a;
   line-height: 1.45;
@@ -560,6 +639,7 @@ textarea {
   .openai-settings,
   .gemini-settings,
   .tuning-grid,
+  .profile-grid,
   .mode-grid {
     grid-template-columns: 1fr;
   }

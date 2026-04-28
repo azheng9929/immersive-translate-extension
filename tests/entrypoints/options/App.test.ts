@@ -173,4 +173,71 @@ describe("options App", () => {
       patch: { geminiSystemPrompt: "Gemini custom prompt" },
     });
   });
+
+  it("applies request presets and saves fallback provider", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find("[data-testid='request-profile-high-dynamic']").trigger("click");
+    await wrapper.find<HTMLSelectElement>("[data-testid='fallback-provider']").setValue("microsoft");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: expect.objectContaining({
+        requestProfile: "high-dynamic",
+        dynamicMode: "conservative",
+        openaiMaxConcurrentRequests: 1,
+        openaiMaxBatchItems: 6,
+        openaiMaxBatchChars: 2500,
+        geminiMaxConcurrentRequests: 1,
+        geminiMaxBatchItems: 6,
+        geminiMaxBatchChars: 2500,
+      }),
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { fallbackProvider: "microsoft" },
+    });
+  });
+
+  it("saves glossary entries from editable text", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find<HTMLTextAreaElement>("[data-testid='glossary-text']").setValue("OpenAI = OpenAI\nprompt => 提示词 # LLM term");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: {
+        glossary: [
+          { source: "OpenAI", target: "OpenAI" },
+          { source: "prompt", target: "提示词", note: "LLM term" },
+        ],
+      },
+    });
+  });
 });

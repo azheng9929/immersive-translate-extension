@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig } from "@/shared/config";
+import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, requestProfilePatch } from "@/shared/config";
 
 describe("normalizeExtensionConfig", () => {
   it("returns the default config for missing input", () => {
@@ -13,6 +13,8 @@ describe("normalizeExtensionConfig", () => {
         provider: "fake",
         displayMode: "translation-only",
         dynamicMode: "conservative",
+        requestProfile: "fast",
+        fallbackProvider: "gemini",
         openaiEndpoint: " https://api.example.test/v1/chat/completions ",
         openaiApiKey: " sk-test ",
         openaiModel: " gpt-test ",
@@ -29,6 +31,10 @@ describe("normalizeExtensionConfig", () => {
         geminiMaxBatchChars: "8000",
         geminiRequestTimeoutMs: "65000",
         geminiSystemPrompt: " Gemini prompt ",
+        glossary: [
+          { source: " OpenAI ", target: "OpenAI" },
+          { source: " prompt ", target: "提示词", note: " LLM term " },
+        ],
         siteDynamicModes: {
           "youtube.com": "normal",
           "x.com": "off",
@@ -42,6 +48,8 @@ describe("normalizeExtensionConfig", () => {
       provider: "fake",
       displayMode: "translation-only",
       dynamicMode: "conservative",
+      requestProfile: "fast",
+      fallbackProvider: "gemini",
       openaiEndpoint: "https://api.example.test/v1/chat/completions",
       openaiApiKey: "sk-test",
       openaiModel: "gpt-test",
@@ -58,6 +66,10 @@ describe("normalizeExtensionConfig", () => {
       geminiMaxBatchChars: 8000,
       geminiRequestTimeoutMs: 65000,
       geminiSystemPrompt: "Gemini prompt",
+      glossary: [
+        { source: "OpenAI", target: "OpenAI" },
+        { source: "prompt", target: "提示词", note: "LLM term" },
+      ],
       siteDynamicModes: {
         "youtube.com": "normal",
         "x.com": "off",
@@ -74,6 +86,8 @@ describe("normalizeExtensionConfig", () => {
         provider: "unknown",
         displayMode: "raw",
         dynamicMode: "aggressive",
+        requestProfile: "turbo",
+        fallbackProvider: "unknown",
         siteDynamicModes: "youtube.com",
         showFloatingBall: "yes",
         useCache: "no",
@@ -110,6 +124,25 @@ describe("normalizeExtensionConfig", () => {
       geminiMaxBatchItems: 1,
       geminiMaxBatchChars: 500,
       geminiRequestTimeoutMs: 180000,
+    });
+  });
+
+  it("builds request profile patches for both AI providers", () => {
+    expect(requestProfilePatch("high-dynamic")).toMatchObject({
+      requestProfile: "high-dynamic",
+      dynamicMode: "conservative",
+      openaiMaxConcurrentRequests: 1,
+      openaiMaxBatchItems: 6,
+      openaiMaxBatchChars: 2500,
+      geminiMaxConcurrentRequests: 1,
+      geminiMaxBatchItems: 6,
+      geminiMaxBatchChars: 2500,
+    });
+    expect(requestProfilePatch("fast")).toMatchObject({
+      requestProfile: "fast",
+      dynamicMode: "normal",
+      openaiMaxConcurrentRequests: 3,
+      geminiMaxConcurrentRequests: 3,
     });
   });
 });

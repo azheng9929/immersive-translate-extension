@@ -4,9 +4,21 @@ import { shouldMountOriginalTextTooltip } from "../src/content/interactionPolicy
 import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { PageTranslationSession } from "../src/content/pageTranslationSession";
+import {
+  providerChainId,
+  translateBatchWithProviderFallback,
+  type TranslationBatchItem,
+  type TranslationBatchResult,
+} from "../src/content/providerFallback";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
 import { resolveSitePolicy, resolveSitePolicyKey, type SitePolicy } from "../src/content/sitePolicy";
-import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, type ExtensionConfig } from "../src/shared/config";
+import {
+  DEFAULT_EXTENSION_CONFIG,
+  normalizeExtensionConfig,
+  type ExtensionConfig,
+  type ExtensionProvider,
+} from "../src/shared/config";
+import { buildGlossarySystemPrompt } from "../src/shared/glossary";
 import { IndexedDbTranslationCache } from "../src/shared/translationCache";
 
 export default defineContentScript({
@@ -72,25 +84,15 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
   const options: ConstructorParameters<typeof PageController>[0] = {
     targetLang: config.targetLang,
     hostname: window.location.hostname,
-    providerId: config.provider,
+    providerId: providerChainId(config),
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
     retry: { maxAttempts: 3, delayMs: 800 },
-    translateBatch: async (items) => {
-      const response = await chrome.runtime.sendMessage({
-        type: "IMT_TRANSLATE_BATCH",
-        request: {
-          provider: config.provider,
-          ...providerRequestOptions(config),
-          sourceLang: "auto",
-          targetLang: config.targetLang,
-          items,
-        },
-      });
-      if (response?.ok && Array.isArray(response.items)) return response.items;
-      const error = response?.error ?? "Translation failed";
-      return items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error }));
-    },
+    translateBatch: (items) => translateBatchWithProviderFallback(
+      config,
+      items,
+      (provider, batch) => sendProviderBatch(config, provider, batch),
+    ),
   };
 
   return new PageController(config.useCache ? { ...options, cache: new IndexedDbTranslationCache() } : options);
@@ -143,30 +145,42 @@ function createInputTranslator(config: ExtensionConfig): InputTranslator {
 }
 
 async function translateSingleText(config: ExtensionConfig, scope: "selection" | "input", text: string): Promise<string> {
-  const response = await chrome.runtime.sendMessage({
-    type: "IMT_TRANSLATE_BATCH",
-    request: {
-      provider: config.provider,
-      ...providerRequestOptions(config),
-      sourceLang: "auto",
-      targetLang: config.targetLang,
-      items: [{ id: `${scope}-${Date.now()}`, text, category: "fallback" }],
-    },
-  });
+  const results = await translateBatchWithProviderFallback(
+    config,
+    [{ id: `${scope}-${Date.now()}`, text, category: "fallback" }],
+    (provider, batch) => sendProviderBatch(config, provider, batch),
+  );
 
-  if (!response?.ok || !("items" in response) || !Array.isArray(response.items)) {
-    throw new Error(response?.error ?? "Translation failed");
-  }
-
-  const result = response.items[0];
+  const result = results[0];
   if (!result || result.status !== "ok") {
     throw new Error(result?.error ?? "Translation failed");
   }
   return result.text;
 }
 
-function providerRequestOptions(config: ExtensionConfig) {
-  if (config.provider === "gemini") {
+async function sendProviderBatch(
+  config: ExtensionConfig,
+  provider: ExtensionProvider,
+  items: TranslationBatchItem[],
+): Promise<TranslationBatchResult[]> {
+  const response = await chrome.runtime.sendMessage({
+    type: "IMT_TRANSLATE_BATCH",
+    request: {
+      provider,
+      ...providerRequestOptions(config, provider),
+      sourceLang: "auto",
+      targetLang: config.targetLang,
+      items,
+    },
+  });
+
+  if (response?.ok && "items" in response && Array.isArray(response.items)) return response.items;
+  const error = response?.error ?? "Translation failed";
+  return items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error }));
+}
+
+function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProvider) {
+  if (provider === "gemini") {
     return {
       endpoint: config.geminiEndpoint,
       apiKey: config.geminiApiKey,
@@ -175,9 +189,11 @@ function providerRequestOptions(config: ExtensionConfig) {
       maxBatchItems: config.geminiMaxBatchItems,
       maxBatchChars: config.geminiMaxBatchChars,
       requestTimeoutMs: config.geminiRequestTimeoutMs,
-      systemPrompt: config.geminiSystemPrompt,
+      systemPrompt: buildGlossarySystemPrompt(config.geminiSystemPrompt, config.glossary),
     };
   }
+
+  if (provider === "microsoft" || provider === "fake") return {};
 
   return {
     endpoint: config.openaiEndpoint,
@@ -187,7 +203,7 @@ function providerRequestOptions(config: ExtensionConfig) {
     maxBatchItems: config.openaiMaxBatchItems,
     maxBatchChars: config.openaiMaxBatchChars,
     requestTimeoutMs: config.openaiRequestTimeoutMs,
-    systemPrompt: config.openaiSystemPrompt,
+    systemPrompt: buildGlossarySystemPrompt(config.openaiSystemPrompt, config.glossary),
   };
 }
 

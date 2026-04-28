@@ -1,4 +1,4 @@
-import { handleBackgroundMessage, sendToActiveTab } from "../src/background/messageRouter";
+import { handleBackgroundMessage, sendToActiveTab, toggleActiveTabTranslation } from "../src/background/messageRouter";
 import type { BackgroundMessage } from "../src/shared/messages";
 
 export default defineBackground(() => {
@@ -26,7 +26,7 @@ export default defineBackground(() => {
 
   chrome.commands.onCommand.addListener((command) => {
     if (command === "toggle-page-translation") {
-      void sendToActiveTab({ type: "IMT_TRANSLATE_PAGE" });
+      void toggleActiveTabTranslation();
     }
   });
 
