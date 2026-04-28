@@ -281,4 +281,49 @@ describe("PageController", () => {
       skipped: 0,
     });
   });
+
+  it("uses safe attribute translation by default", async () => {
+    document.body.innerHTML = `
+      <main>
+        <input placeholder="Search docs" title="Tooltip label" aria-label="Search input" />
+        <img alt="Diagram description" title="Image hover text" />
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Search docs", "Diagram description"]);
+    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("[zh-Hans] Search docs");
+    expect(document.querySelector("img")?.getAttribute("alt")).toBe("[zh-Hans] Diagram description");
+    expect(document.querySelector("input")?.getAttribute("title")).toBe("Tooltip label");
+    expect(document.querySelector("input")?.getAttribute("aria-label")).toBe("Search input");
+    expect(document.querySelector("img")?.getAttribute("title")).toBe("Image hover text");
+  });
+
+  it("can translate title and aria-label attributes when explicitly enabled", async () => {
+    document.body.innerHTML = `<main><input title="Tooltip label" aria-label="Search input" /></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      attributeNames: ["title", "aria-label"],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Tooltip label", "Search input"]);
+    expect(document.querySelector("input")?.getAttribute("title")).toBe("[zh-Hans] Tooltip label");
+    expect(document.querySelector("input")?.getAttribute("aria-label")).toBe("[zh-Hans] Search input");
+  });
 });

@@ -9,7 +9,13 @@ export type ScannedText = {
   text: string;
 };
 
-const ATTRIBUTE_NAMES: TranslatableAttributeName[] = ["placeholder", "title", "alt", "aria-label"];
+export const SAFE_TRANSLATABLE_ATTRIBUTES: readonly TranslatableAttributeName[] = ["placeholder", "alt"];
+export const ALL_TRANSLATABLE_ATTRIBUTES: readonly TranslatableAttributeName[] = [
+  "placeholder",
+  "alt",
+  "title",
+  "aria-label",
+];
 
 function getScannerCategory(element: HTMLElement): UnitCategory {
   if (element.closest("button")) return "button";
@@ -50,7 +56,10 @@ export function scanDocumentText(root: ParentNode): ScannedText[] {
   return results;
 }
 
-export function scanTranslatableAttributes(root: ParentNode): TranslatableAttribute[] {
+export function scanTranslatableAttributes(
+  root: ParentNode,
+  attributeNames: readonly TranslatableAttributeName[] = SAFE_TRANSLATABLE_ATTRIBUTES,
+): TranslatableAttribute[] {
   const elements = root instanceof HTMLElement
     ? [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))]
     : Array.from(root.querySelectorAll<HTMLElement>("*"));
@@ -58,7 +67,7 @@ export function scanTranslatableAttributes(root: ParentNode): TranslatableAttrib
 
   for (const element of elements) {
     if (isSkippableElement(element) || !isVisibleElement(element)) continue;
-    for (const name of ATTRIBUTE_NAMES) {
+    for (const name of attributeNames) {
       const value = element.getAttribute(name);
       if (!value) continue;
       const text = normalizeVisibleText(value);

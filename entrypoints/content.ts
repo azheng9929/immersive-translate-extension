@@ -5,6 +5,7 @@ import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { PageTranslationSession } from "../src/content/pageTranslationSession";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
+import { resolveSitePolicy, type SitePolicy } from "../src/content/sitePolicy";
 import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, type ExtensionConfig } from "../src/shared/config";
 import { IndexedDbTranslationCache } from "../src/shared/translationCache";
 
@@ -64,11 +65,12 @@ async function loadConfig(): Promise<ExtensionConfig> {
   return response?.ok && "config" in response ? normalizeExtensionConfig(response.config) : DEFAULT_EXTENSION_CONFIG;
 }
 
-function createController(config: ExtensionConfig): PageController {
+function createController(config: ExtensionConfig, sitePolicy: SitePolicy): PageController {
   const options: ConstructorParameters<typeof PageController>[0] = {
     targetLang: config.targetLang,
     providerId: config.provider,
     displayMode: config.displayMode,
+    attributeNames: sitePolicy.attributeNames,
     retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: async (items) => {
       const response = await chrome.runtime.sendMessage({
@@ -90,12 +92,20 @@ function createController(config: ExtensionConfig): PageController {
 }
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  return new PageTranslationSession(createController(config), {
+  const sitePolicy = resolveSitePolicy(window.location.hostname);
+  return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
-    debounceMs: 250,
+    debounceMs: sitePolicy.debounceMs,
     lazy: true,
-    lazyRootMargin: "200px",
-    lazyThreshold: 0.1,
+    lazyRootMargin: sitePolicy.lazyRootMargin,
+    lazyThreshold: sitePolicy.lazyThreshold,
+    dynamicMode: sitePolicy.dynamicMode,
+    excludedDynamicSelectors: sitePolicy.excludedDynamicSelectors,
+    maxQueueSize: sitePolicy.maxQueueSize,
+    maxRootsPerFlush: sitePolicy.maxRootsPerFlush,
+    maxObservedRoots: sitePolicy.maxObservedRoots,
+    maxMutationNodesPerWindow: sitePolicy.maxMutationNodesPerWindow,
+    mutationWindowMs: sitePolicy.mutationWindowMs,
   });
 }
 

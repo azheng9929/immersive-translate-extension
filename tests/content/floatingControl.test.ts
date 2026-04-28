@@ -59,11 +59,66 @@ describe("FloatingTranslationControl", () => {
     control.mount(document.body);
     document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
 
-    listener?.({ phase: "updating", total: 2, translated: 1, failed: 0, skipped: 0, dynamicRuns: 1, lastError: undefined });
+    listener?.({
+      phase: "updating",
+      observation: "observing",
+      pendingRoots: 0,
+      observedRoots: 0,
+      total: 2,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+      dynamicRuns: 1,
+      lastError: undefined,
+    });
 
     expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Updating");
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 / 2 translated");
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 dynamic update");
+  });
+
+  it("shows paused and suspended dynamic status", () => {
+    let listener: ((status: PageTranslationStatus) => void) | undefined;
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      subscribeStatus: (next) => {
+        listener = next;
+        return () => undefined;
+      },
+    });
+    control.mount(document.body);
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    listener?.({
+      phase: "translated",
+      observation: "paused",
+      pendingRoots: 0,
+      observedRoots: 0,
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+      dynamicRuns: 0,
+      lastError: undefined,
+    });
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Paused");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("dynamic updates paused");
+
+    listener?.({
+      phase: "translated",
+      observation: "suspended",
+      pendingRoots: 0,
+      observedRoots: 0,
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+      dynamicRuns: 0,
+      lastError: "Dynamic translation paused because this page is changing too quickly.",
+    });
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Suspended");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("changing too quickly");
   });
 
   it("runs restore and returns to ready state", async () => {

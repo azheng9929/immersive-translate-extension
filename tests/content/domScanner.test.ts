@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scanDocumentText, scanTranslatableAttributes } from "@/content/domScanner";
+import { ALL_TRANSLATABLE_ATTRIBUTES, scanDocumentText, scanTranslatableAttributes } from "@/content/domScanner";
 import { mountFixture } from "@/test/domFixtures";
 
 describe("scanDocumentText", () => {
@@ -88,7 +88,7 @@ describe("scanDocumentText", () => {
 });
 
 describe("scanTranslatableAttributes", () => {
-  it("finds placeholder title alt and aria-label", () => {
+  it("finds safe attributes by default", () => {
     mountFixture(`
       <input placeholder="Search docs" aria-label="Search input" />
       <img alt="Product photo" />
@@ -96,6 +96,20 @@ describe("scanTranslatableAttributes", () => {
     `);
 
     const attrs = scanTranslatableAttributes(document.body);
+    expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
+      "placeholder:Search docs",
+      "alt:Product photo",
+    ]);
+  });
+
+  it("finds title and aria-label when explicitly enabled", () => {
+    mountFixture(`
+      <input placeholder="Search docs" aria-label="Search input" />
+      <img alt="Product photo" />
+      <button title="Open settings">Settings</button>
+    `);
+
+    const attrs = scanTranslatableAttributes(document.body, ALL_TRANSLATABLE_ATTRIBUTES);
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
       "placeholder:Search docs",
       "aria-label:Search input",

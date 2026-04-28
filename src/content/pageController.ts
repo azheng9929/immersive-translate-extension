@@ -4,7 +4,7 @@ import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
 import type { DisplayMode } from "../shared/config";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
-import type { RenderMode, RestoreRecord, TranslationUnit, UnitCategory } from "../shared/types";
+import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
@@ -19,6 +19,7 @@ type ControllerOptions = {
   displayMode?: DisplayMode;
   cache?: TranslationCache;
   retry?: TranslationRetryOptions;
+  attributeNames?: readonly TranslatableAttributeName[];
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -125,7 +126,7 @@ export class PageController {
 
   private buildUnits(root: ParentNode, revision: number): TranslationUnit[] {
     const scannedTexts = scanDocumentText(root);
-    const attributes = scanTranslatableAttributes(root);
+    const attributes = scanTranslatableAttributes(root, this.options.attributeNames);
     return buildTranslationUnits({
       scannedTexts,
       attributes,

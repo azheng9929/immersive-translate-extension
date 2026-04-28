@@ -74,6 +74,183 @@ describe("PageTranslationSession", () => {
     ]);
   });
 
+  it("does not dynamically translate tooltips, buttons, or extension UI", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
+
+    await session.translatePage();
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.textContent = "218 likes. Like";
+    document.body.append(tooltip);
+    const button = document.createElement("button");
+    button.textContent = "New button";
+    document.body.append(button);
+    const extensionUi = document.createElement("div");
+    extensionUi.dataset.imtManaged = "true";
+    extensionUi.textContent = "Plugin panel";
+    document.body.append(extensionUi);
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(lateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
+    expect(tooltip.querySelector(".imt-translation-block")).toBeNull();
+    expect(button.textContent).toBe("New button");
+    expect(extensionUi.textContent).toBe("Plugin panel");
+    expect(session.getStatus()).toMatchObject({ dynamicRuns: 1, observation: "observing" });
+  });
+
+  it("keeps dynamic translation off when the site policy disables it", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      dynamicMode: "off",
+    });
+
+    await session.translatePage();
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(lateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world."]);
+    expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "inactive" });
+  });
+
+  it("pauses dynamic translation while the page is hidden and catches up when visible again", async () => {
+    vi.useFakeTimers();
+    setVisibilityState("hidden");
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
+
+    await session.translatePage();
+    expect(session.getStatus().observation).toBe("paused");
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(lateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(requestedTexts).toEqual(["Hello world."]);
+
+    setVisibilityState("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
+    expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "observing", dynamicRuns: 1 });
+  });
+
+  it("suspends dynamic translation after a burst of page changes", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      maxMutationNodesPerWindow: 2,
+      mutationWindowMs: 1000,
+    });
+
+    await session.translatePage();
+    const fragment = document.createDocumentFragment();
+    for (const text of ["One new paragraph.", "Two new paragraph.", "Three new paragraph."]) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = text;
+      fragment.append(paragraph);
+    }
+    document.querySelector("main")?.append(fragment);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world."]);
+    expect(session.getStatus()).toMatchObject({
+      phase: "translated",
+      observation: "suspended",
+      lastError: "Dynamic translation paused because this page is changing too quickly.",
+    });
+  });
+
+  it("queues content added while a dynamic update is already translating", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    let resolveFirstDynamicBatch: (() => void) | undefined;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        if (items.some((item) => item.text === "Late content.")) {
+          return new Promise((resolve) => {
+            resolveFirstDynamicBatch = () => {
+              resolve(items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })));
+            };
+          });
+        }
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
+
+    await session.translatePage();
+    const firstLateParagraph = document.createElement("p");
+    firstLateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(firstLateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    await Promise.resolve();
+    expect(session.getStatus().phase).toBe("updating");
+
+    const secondLateParagraph = document.createElement("p");
+    secondLateParagraph.textContent = "Second late content.";
+    document.querySelector("main")?.append(secondLateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    resolveFirstDynamicBatch?.();
+    await vi.advanceTimersByTimeAsync(20);
+    await waitFor(() => requestedTexts.includes("Second late content."));
+
+    expect(requestedTexts).toEqual(["Hello world.", "Late content.", "Second late content."]);
+    expect(session.getStatus()).toMatchObject({ phase: "translated", dynamicRuns: 2 });
+  });
+
   it("stops dynamic translation after restore", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
@@ -198,6 +375,13 @@ function createFakeIntersectionObserver() {
   }
 
   return FakeIntersectionObserver;
+}
+
+function setVisibilityState(state: DocumentVisibilityState): void {
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: state,
+  });
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {

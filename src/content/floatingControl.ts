@@ -1,7 +1,7 @@
 import type { TranslationPageSummary } from "./pageController";
 import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
 
-type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
+type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed" | "paused" | "suspended";
 type FloatingStatus = TranslationPageSummary | PageTranslationStatus;
 
 type FloatingTranslationControlOptions = {
@@ -66,6 +66,12 @@ const STYLE_TEXT = `
   background: #f59e0b;
 }
 .imt-floating-root[data-state="failed"] .imt-floating-dot {
+  background: #ef4444;
+}
+.imt-floating-root[data-state="paused"] .imt-floating-dot {
+  background: #94a3b8;
+}
+.imt-floating-root[data-state="suspended"] .imt-floating-dot {
   background: #ef4444;
 }
 .imt-floating-panel {
@@ -286,9 +292,15 @@ export class FloatingTranslationControl {
   private applyStatus(status: FloatingStatus): void {
     this.summary = status;
     this.error = "lastError" in status ? status.lastError : undefined;
-    this.state = "phase" in status ? floatingStateFromPhase(status.phase) : stateFromSummary(status);
+    this.state = "phase" in status ? floatingStateFromStatus(status) : stateFromSummary(status);
     this.render();
   }
+}
+
+function floatingStateFromStatus(status: PageTranslationStatus): FloatingState {
+  if (status.observation === "suspended") return "suspended";
+  if (status.observation === "paused") return "paused";
+  return floatingStateFromPhase(status.phase);
 }
 
 function floatingStateFromPhase(phase: PageTranslationPhase): FloatingState {
@@ -312,6 +324,8 @@ function statusLabel(state: FloatingState): string {
   if (state === "translated") return "Translated";
   if (state === "partial") return "Partial";
   if (state === "failed") return "Failed";
+  if (state === "paused") return "Paused";
+  if (state === "suspended") return "Suspended";
   return "Ready";
 }
 
@@ -324,6 +338,12 @@ function summaryLabel(summary: FloatingStatus | undefined): string {
   if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
   if ("dynamicRuns" in summary && summary.dynamicRuns > 0) {
     parts.push(`${summary.dynamicRuns} dynamic ${summary.dynamicRuns === 1 ? "update" : "updates"}`);
+  }
+  if ("observation" in summary && summary.observation === "paused") {
+    parts.push("dynamic updates paused");
+  }
+  if ("observation" in summary && summary.observation === "suspended") {
+    parts.push("dynamic updates suspended");
   }
   return parts.join(", ");
 }

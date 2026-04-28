@@ -1,9 +1,14 @@
 import type { PageController, TranslationPageSummary } from "./pageController";
+import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicTranslationMode } from "./sitePolicy";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
+export type DynamicObservationState = "inactive" | "observing" | "queued" | "paused" | "suspended";
 
 export type PageTranslationStatus = TranslationPageSummary & {
   phase: PageTranslationPhase;
+  observation: DynamicObservationState;
+  pendingRoots: number;
+  observedRoots: number;
   dynamicRuns: number;
   lastError: string | undefined;
 };
@@ -14,6 +19,13 @@ type PageTranslationSessionOptions = {
   lazy?: boolean;
   lazyRootMargin?: string;
   lazyThreshold?: number;
+  dynamicMode?: DynamicTranslationMode;
+  excludedDynamicSelectors?: readonly string[];
+  maxQueueSize?: number;
+  maxRootsPerFlush?: number;
+  maxObservedRoots?: number;
+  maxMutationNodesPerWindow?: number;
+  mutationWindowMs?: number;
 };
 
 type StatusListener = (status: PageTranslationStatus) => void;
@@ -25,8 +37,18 @@ const EMPTY_SUMMARY: TranslationPageSummary = {
   skipped: 0,
 };
 
+const SUSPENDED_MESSAGE = "Dynamic translation paused because this page is changing too quickly.";
+
 export class PageTranslationSession {
-  private status: PageTranslationStatus = { ...EMPTY_SUMMARY, phase: "idle", dynamicRuns: 0, lastError: undefined };
+  private status: PageTranslationStatus = {
+    ...EMPTY_SUMMARY,
+    phase: "idle",
+    observation: "inactive",
+    pendingRoots: 0,
+    observedRoots: 0,
+    dynamicRuns: 0,
+    lastError: undefined,
+  };
   private readonly listeners = new Set<StatusListener>();
   private readonly pendingRoots = new Set<ParentNode>();
   private observer: MutationObserver | undefined;
@@ -38,6 +60,11 @@ export class PageTranslationSession {
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private operationId = 0;
   private flushing = false;
+  private dynamicSuspended = false;
+  private mutationWindowStartedAt = 0;
+  private mutationNodesInWindow = 0;
+  private listeningForVisibility = false;
+  private readonly handleVisibilityChangeBound = () => this.handleVisibilityChange();
 
   constructor(
     private readonly controller: PageController,
@@ -59,24 +86,45 @@ export class PageTranslationSession {
     this.pendingRoots.clear();
     this.pendingVisibleLazyRoots.clear();
     this.pendingVisibleLazyDynamicRun = false;
-    this.setStatus({ ...EMPTY_SUMMARY, phase: "translating", dynamicRuns: 0, lastError: undefined });
+    this.dynamicSuspended = false;
+    this.resetMutationWindow();
+    this.setStatus({
+      ...EMPTY_SUMMARY,
+      phase: "translating",
+      observation: "inactive",
+      dynamicRuns: 0,
+      lastError: undefined,
+    });
 
     try {
       if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
         this.controller.restorePage();
-        this.setStatus({ ...EMPTY_SUMMARY, phase: "translated", dynamicRuns: 0, lastError: undefined });
         this.observeLazyRoots(this.controller.collectTranslatableRoots(root), false);
-        this.startObserver();
+        const observation = this.activateDynamicObserver("translated");
+        this.setStatus({
+          ...EMPTY_SUMMARY,
+          phase: "translated",
+          observation,
+          dynamicRuns: 0,
+          lastError: undefined,
+        });
         return this.getStatus();
       }
 
       const summary = await this.controller.translatePage(root);
       if (operationId !== this.operationId) return this.getStatus();
-      this.setStatus({ ...summary, phase: phaseFromSummary(summary), dynamicRuns: 0, lastError: undefined });
-      this.startObserver();
+      const phase = phaseFromSummary(summary);
+      const observation = this.activateDynamicObserver(phase);
+      this.setStatus({ ...summary, phase, observation, dynamicRuns: 0, lastError: undefined });
     } catch (error) {
       if (operationId !== this.operationId) return this.getStatus();
-      this.setStatus({ ...EMPTY_SUMMARY, phase: "failed", dynamicRuns: 0, lastError: errorMessage(error) });
+      this.setStatus({
+        ...EMPTY_SUMMARY,
+        phase: "failed",
+        observation: "inactive",
+        dynamicRuns: 0,
+        lastError: errorMessage(error),
+      });
     }
 
     return this.getStatus();
@@ -88,8 +136,16 @@ export class PageTranslationSession {
     this.pendingRoots.clear();
     this.pendingVisibleLazyRoots.clear();
     this.pendingVisibleLazyDynamicRun = false;
+    this.dynamicSuspended = false;
+    this.resetMutationWindow();
     this.controller.restorePage();
-    this.setStatus({ ...EMPTY_SUMMARY, phase: "idle", dynamicRuns: 0, lastError: undefined });
+    this.setStatus({
+      ...EMPTY_SUMMARY,
+      phase: "idle",
+      observation: "inactive",
+      dynamicRuns: 0,
+      lastError: undefined,
+    });
   }
 
   dispose(): void {
@@ -100,17 +156,37 @@ export class PageTranslationSession {
     this.pendingVisibleLazyDynamicRun = false;
   }
 
-  private startObserver(): void {
+  private activateDynamicObserver(phase: PageTranslationPhase = this.status.phase): DynamicObservationState {
+    this.disconnectMutationObserver();
+    if (this.dynamicSuspended) return "suspended";
+    if (!canSupplement(phase) || this.dynamicMode() === "off") {
+      this.removeVisibilityListener();
+      return "inactive";
+    }
+    this.addVisibilityListener();
+    if (!this.isPageVisible()) return "paused";
+    if (!this.connectMutationObserver()) return "inactive";
+    return this.pendingRoots.size > 0 ? "queued" : "observing";
+  }
+
+  private connectMutationObserver(): boolean {
     const root = this.options.observeRoot ?? document.body;
-    if (!root || typeof MutationObserver === "undefined") return;
+    if (!root || typeof MutationObserver === "undefined") return false;
 
     this.observer = new MutationObserver((mutations) => this.handleMutations(mutations));
     this.observer.observe(root, { childList: true, subtree: true });
+    return true;
+  }
+
+  private disconnectMutationObserver(): void {
+    this.observer?.disconnect();
+    this.observer?.takeRecords();
+    this.observer = undefined;
   }
 
   private stopObserver(): void {
-    this.observer?.disconnect();
-    this.observer = undefined;
+    this.disconnectMutationObserver();
+    this.removeVisibilityListener();
     this.lazyObserver?.disconnect();
     this.lazyObserver = undefined;
     this.lazyObservedRoots.clear();
@@ -123,40 +199,104 @@ export class PageTranslationSession {
   }
 
   private handleMutations(mutations: MutationRecord[]): void {
-    if (!canSupplement(this.status.phase)) return;
+    if (!this.canHandleDynamicMutations()) return;
 
+    const roots: HTMLElement[] = [];
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         const root = rootFromAddedNode(node);
-        if (!root || !root.isConnected || shouldIgnoreRoot(root)) continue;
-        this.addPendingRoot(root);
+        if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
+        roots.push(root);
       }
     }
 
+    if (roots.length === 0) return;
+    if (!this.recordMutationVolume(roots.length)) return;
+
+    for (const root of roots) {
+      if (!this.addPendingRoot(root, false)) return;
+    }
+
     if (this.pendingRoots.size === 0) return;
+    this.scheduleFlush();
+  }
+
+  private handleVisibilityChange(): void {
+    if (this.dynamicSuspended || !canSupplement(this.status.phase) || this.dynamicMode() === "off") return;
+
+    if (!this.isPageVisible()) {
+      this.disconnectMutationObserver();
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = undefined;
+      }
+      this.setStatus({ ...this.status, observation: "paused" });
+      return;
+    }
+
+    const root = this.options.observeRoot ?? document.body;
+    if (root instanceof HTMLElement && root.isConnected) this.addPendingRoot(root, false);
+    const observation = this.activateDynamicObserver(this.status.phase);
+    if (this.pendingRoots.size > 0) this.scheduleFlush();
+    else this.setStatus({ ...this.status, observation });
+  }
+
+  private addPendingRoot(root: HTMLElement, notify = true): boolean {
+    if (this.dynamicSuspended || this.shouldIgnoreRoot(root)) return true;
+
+    for (const pending of [...this.pendingRoots]) {
+      if (pending instanceof Node && pending.contains(root)) return true;
+      if (root.contains(pending as Node)) this.pendingRoots.delete(pending);
+    }
+    this.pendingRoots.add(root);
+
+    if (this.pendingRoots.size > this.maxQueueSize()) {
+      this.suspendDynamicTranslation();
+      return false;
+    }
+
+    if (notify) this.setStatus({ ...this.status, observation: "queued" });
+    return true;
+  }
+
+  private scheduleFlush(): void {
+    if (this.dynamicSuspended) return;
+    if (!this.isPageVisible()) {
+      this.setStatus({ ...this.status, observation: "paused" });
+      return;
+    }
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.setStatus({ ...this.status, observation: "queued" });
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
       void this.flushPendingRoots();
     }, this.options.debounceMs ?? 250);
   }
 
-  private addPendingRoot(root: HTMLElement): void {
-    for (const pending of [...this.pendingRoots]) {
-      if (pending instanceof Node && pending.contains(root)) return;
-      if (root.contains(pending as Node)) this.pendingRoots.delete(pending);
-    }
-    this.pendingRoots.add(root);
-  }
-
   private async flushPendingRoots(): Promise<void> {
-    if (this.flushing || this.pendingRoots.size === 0 || !canSupplement(this.status.phase)) return;
-    const roots = [...this.pendingRoots].filter((root): root is HTMLElement => root instanceof HTMLElement && root.isConnected && !shouldIgnoreRoot(root));
+    if (this.flushing || this.pendingRoots.size === 0 || !this.canHandleDynamicMutations()) return;
+    if (!this.isPageVisible()) {
+      this.setStatus({ ...this.status, observation: "paused" });
+      return;
+    }
+
+    const allRoots = [...this.pendingRoots].filter(
+      (root): root is HTMLElement => root instanceof HTMLElement && root.isConnected && !this.shouldIgnoreRoot(root),
+    );
     this.pendingRoots.clear();
 
-    if (roots.length === 0) return;
+    const roots = allRoots.slice(0, this.maxRootsPerFlush());
+    for (const overflowRoot of allRoots.slice(this.maxRootsPerFlush())) this.addPendingRoot(overflowRoot, false);
+
+    if (roots.length === 0) {
+      this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
+      return;
+    }
+
     if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
       this.observeLazyRoots(roots, true);
+      if (this.pendingRoots.size > 0) this.scheduleFlush();
+      else this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
       return;
     }
 
@@ -174,7 +314,11 @@ export class PageTranslationSession {
     }
 
     for (const root of roots) {
-      if (!root.isConnected || shouldIgnoreRoot(root) || this.lazyObservedRoots.has(root)) continue;
+      if (!root.isConnected || this.shouldIgnoreRoot(root) || this.lazyObservedRoots.has(root)) continue;
+      if (this.lazyObservedRoots.size >= this.maxObservedRoots()) {
+        this.addPendingRoot(root, false);
+        continue;
+      }
       if (countDynamicRun) this.dynamicLazyRoots.add(root);
       this.lazyObservedRoots.add(root);
       this.lazyObserver.observe(root);
@@ -190,7 +334,7 @@ export class PageTranslationSession {
       const root = entry.target;
       this.lazyObserver?.unobserve(root);
       this.lazyObservedRoots.delete(root);
-      if (shouldIgnoreRoot(root)) continue;
+      if (this.shouldIgnoreRoot(root)) continue;
       if (this.dynamicLazyRoots.has(root)) countDynamicRun = true;
       visibleRoots.push(root);
     }
@@ -204,7 +348,7 @@ export class PageTranslationSession {
         for (const root of roots) this.pendingVisibleLazyRoots.add(root);
         this.pendingVisibleLazyDynamicRun = this.pendingVisibleLazyDynamicRun || countDynamicRun;
       } else {
-        for (const root of roots) this.pendingRoots.add(root);
+        for (const root of roots) this.addPendingRoot(root, false);
       }
       return;
     }
@@ -212,7 +356,7 @@ export class PageTranslationSession {
     this.flushing = true;
     const operationId = this.operationId;
     const previousPhase = this.status.phase;
-    this.setStatus({ ...this.status, phase: "updating", lastError: undefined });
+    this.setStatus({ ...this.status, phase: "updating", observation: "observing", lastError: undefined });
 
     try {
       let dynamicSummary: TranslationPageSummary = { ...EMPTY_SUMMARY };
@@ -224,12 +368,21 @@ export class PageTranslationSession {
       if (operationId !== this.operationId) return;
       const summary = mergeSummary(this.status, dynamicSummary);
       const dynamicRuns = countDynamicRun && dynamicSummary.total > 0 ? this.status.dynamicRuns + 1 : this.status.dynamicRuns;
-      this.setStatus({ ...summary, phase: phaseFromSummary(summary), dynamicRuns, lastError: undefined });
+      const phase = phaseFromSummary(summary);
+      this.setStatus({
+        ...summary,
+        phase,
+        observation: this.activateDynamicObserver(phase),
+        dynamicRuns,
+        lastError: undefined,
+      });
     } catch (error) {
       if (operationId !== this.operationId) return;
+      const phase = this.status.translated > 0 ? "partial" : "failed";
       this.setStatus({
         ...this.status,
-        phase: this.status.translated > 0 ? "partial" : "failed",
+        phase,
+        observation: this.activateDynamicObserver(phase),
         lastError: errorMessage(error),
       });
     } finally {
@@ -237,30 +390,109 @@ export class PageTranslationSession {
       if (operationId !== this.operationId) return;
 
       const pendingVisibleRoots = [...this.pendingVisibleLazyRoots].filter(
-        (root) => root.isConnected && !shouldIgnoreRoot(root),
+        (root) => root.isConnected && !this.shouldIgnoreRoot(root),
       );
       const pendingVisibleDynamicRun = this.pendingVisibleLazyDynamicRun;
       this.pendingVisibleLazyRoots.clear();
       this.pendingVisibleLazyDynamicRun = false;
 
-      if (pendingVisibleRoots.length > 0 && canSupplement(this.status.phase)) {
+      if (pendingVisibleRoots.length > 0 && this.canHandleDynamicMutations()) {
         void this.translateRoots(pendingVisibleRoots, pendingVisibleDynamicRun);
         return;
       }
 
-      if (this.pendingRoots.size > 0 && canSupplement(this.status.phase)) {
-        this.debounceTimer = setTimeout(() => {
-          this.debounceTimer = undefined;
-          void this.flushPendingRoots();
-        }, this.options.debounceMs ?? 250);
+      if (this.pendingRoots.size > 0 && this.canHandleDynamicMutations()) {
+        this.scheduleFlush();
       } else if (this.status.phase === "updating") {
-        this.setStatus({ ...this.status, phase: previousPhase });
+        this.setStatus({ ...this.status, phase: previousPhase, observation: this.activateDynamicObserver(previousPhase) });
       }
     }
   }
 
-  private setStatus(status: PageTranslationStatus): void {
-    this.status = status;
+  private canHandleDynamicMutations(): boolean {
+    return (canSupplement(this.status.phase) || this.status.phase === "updating") &&
+      this.dynamicMode() !== "off" &&
+      !this.dynamicSuspended;
+  }
+
+  private recordMutationVolume(count: number): boolean {
+    const windowMs = this.options.mutationWindowMs ?? 5000;
+    const now = Date.now();
+    if (this.mutationWindowStartedAt === 0 || now - this.mutationWindowStartedAt > windowMs) {
+      this.mutationWindowStartedAt = now;
+      this.mutationNodesInWindow = 0;
+    }
+
+    this.mutationNodesInWindow += count;
+    if (this.mutationNodesInWindow <= this.maxMutationNodesPerWindow()) return true;
+
+    this.suspendDynamicTranslation();
+    return false;
+  }
+
+  private suspendDynamicTranslation(): void {
+    this.dynamicSuspended = true;
+    this.pendingRoots.clear();
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
+    this.disconnectMutationObserver();
+    this.removeVisibilityListener();
+    this.setStatus({ ...this.status, observation: "suspended", lastError: SUSPENDED_MESSAGE });
+  }
+
+  private resetMutationWindow(): void {
+    this.mutationWindowStartedAt = 0;
+    this.mutationNodesInWindow = 0;
+  }
+
+  private shouldIgnoreRoot(root: HTMLElement): boolean {
+    return shouldIgnoreDynamicRoot(root, this.options.excludedDynamicSelectors ?? DEFAULT_EXCLUDED_DYNAMIC_SELECTORS);
+  }
+
+  private dynamicMode(): DynamicTranslationMode {
+    return this.options.dynamicMode ?? "normal";
+  }
+
+  private maxQueueSize(): number {
+    return this.options.maxQueueSize ?? (this.dynamicMode() === "conservative" ? 80 : 300);
+  }
+
+  private maxRootsPerFlush(): number {
+    return this.options.maxRootsPerFlush ?? (this.dynamicMode() === "conservative" ? 6 : 20);
+  }
+
+  private maxObservedRoots(): number {
+    return this.options.maxObservedRoots ?? (this.dynamicMode() === "conservative" ? 80 : 300);
+  }
+
+  private maxMutationNodesPerWindow(): number {
+    return this.options.maxMutationNodesPerWindow ?? (this.dynamicMode() === "conservative" ? 240 : 1000);
+  }
+
+  private isPageVisible(): boolean {
+    return document.visibilityState !== "hidden";
+  }
+
+  private addVisibilityListener(): void {
+    if (this.listeningForVisibility) return;
+    document.addEventListener("visibilitychange", this.handleVisibilityChangeBound, false);
+    this.listeningForVisibility = true;
+  }
+
+  private removeVisibilityListener(): void {
+    if (!this.listeningForVisibility) return;
+    document.removeEventListener("visibilitychange", this.handleVisibilityChangeBound, false);
+    this.listeningForVisibility = false;
+  }
+
+  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots">): void {
+    this.status = {
+      ...status,
+      pendingRoots: this.pendingRoots.size,
+      observedRoots: this.lazyObservedRoots.size,
+    };
     for (const listener of this.listeners) listener(this.getStatus());
   }
 }
@@ -290,8 +522,15 @@ function rootFromAddedNode(node: Node): HTMLElement | null {
   return parent instanceof HTMLElement ? parent : null;
 }
 
-function shouldIgnoreRoot(root: HTMLElement): boolean {
-  return Boolean(root.closest('[data-imt-managed="true"], [data-imt-state="translated"], script, style, template, noscript'));
+function shouldIgnoreDynamicRoot(root: HTMLElement, selectors: readonly string[]): boolean {
+  for (const selector of selectors) {
+    try {
+      if (root.closest(selector)) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 function errorMessage(error: unknown): string {
