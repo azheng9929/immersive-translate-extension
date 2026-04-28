@@ -226,4 +226,59 @@ describe("PageController", () => {
     expect(batchCalls).toBe(1);
     expect(document.querySelectorAll(".imt-translation-block")).toHaveLength(1);
   });
+
+  it("retries failed translation units before marking them failed", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      retry: { maxAttempts: 2, delayMs: 0 },
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) =>
+          batchCalls === 1
+            ? { id: item.id, text: "", status: "failed" as const, error: "temporary failure" }
+            : { id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const },
+        );
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(batchCalls).toBe(2);
+    expect(result).toEqual({
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+  });
+
+  it("only retries the units that failed in a mixed batch", async () => {
+    document.body.innerHTML = `<main><p>First paragraph.</p><p>Second paragraph.</p></main>`;
+    const requestedTextsByCall: string[][] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      retry: { maxAttempts: 2, delayMs: 0 },
+      translateBatch: async (items) => {
+        requestedTextsByCall.push(items.map((item) => item.text));
+        return items.map((item) =>
+          item.text === "Second paragraph." && requestedTextsByCall.length === 1
+            ? { id: item.id, text: "", status: "failed" as const, error: "temporary failure" }
+            : { id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const },
+        );
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(requestedTextsByCall).toEqual([["First paragraph.", "Second paragraph."], ["Second paragraph."]]);
+    expect(result).toEqual({
+      total: 2,
+      translated: 2,
+      failed: 0,
+      skipped: 0,
+    });
+  });
 });

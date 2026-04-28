@@ -68,6 +68,7 @@ function createController(config: ExtensionConfig): PageController {
     targetLang: config.targetLang,
     providerId: config.provider,
     displayMode: config.displayMode,
+    retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: async (items) => {
       const response = await chrome.runtime.sendMessage({
         type: "IMT_TRANSLATE_BATCH",
@@ -88,7 +89,13 @@ function createController(config: ExtensionConfig): PageController {
 }
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  return new PageTranslationSession(createController(config), { observeRoot: document.body, debounceMs: 250 });
+  return new PageTranslationSession(createController(config), {
+    observeRoot: document.body,
+    debounceMs: 250,
+    lazy: true,
+    lazyRootMargin: "200px",
+    lazyThreshold: 0.1,
+  });
 }
 
 function createSelectionTranslator(config: ExtensionConfig): SelectionTranslator {

@@ -8,12 +8,17 @@ import type { RenderMode, RestoreRecord, TranslationUnit, UnitCategory } from ".
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
+type TranslationRetryOptions = {
+  maxAttempts: number;
+  delayMs: number;
+};
 
 type ControllerOptions = {
   targetLang: string;
   providerId?: string;
   displayMode?: DisplayMode;
   cache?: TranslationCache;
+  retry?: TranslationRetryOptions;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -41,19 +46,25 @@ export class PageController {
     return this.translateRoot(root);
   }
 
+  collectTranslatableRoots(root: ParentNode = document.body): HTMLElement[] {
+    const units = this.buildUnits(root, this.revision + 1);
+    const seen = new Set<HTMLElement>();
+    const roots: HTMLElement[] = [];
+
+    for (const unit of units) {
+      if (seen.has(unit.root)) continue;
+      seen.add(unit.root);
+      roots.push(unit.root);
+    }
+
+    return roots;
+  }
+
   private async translateRoot(root: ParentNode): Promise<TranslationPageSummary> {
     const revision = this.revision + 1;
     this.revision = revision;
 
-    const scannedTexts = scanDocumentText(root);
-    const attributes = scanTranslatableAttributes(root);
-    const units = buildTranslationUnits({
-      scannedTexts,
-      attributes,
-      sessionId: this.sessionId,
-      revision: this.revision,
-      targetLang: this.options.targetLang,
-    });
+    const units = this.buildUnits(root, this.revision);
     this.applyDisplayMode(units);
     this.units.push(...units);
 
@@ -88,7 +99,7 @@ export class PageController {
 
     if (batch.length === 0) return summary;
 
-    const results = await this.options.translateBatch(batch);
+    const results = await this.translateBatchWithRetries(batch);
     if (revision !== this.revision) return summary;
 
     const resultById = new Map(results.map((result) => [result.id, result]));
@@ -110,6 +121,18 @@ export class PageController {
 
     await this.writeCache(cacheWrites);
     return summary;
+  }
+
+  private buildUnits(root: ParentNode, revision: number): TranslationUnit[] {
+    const scannedTexts = scanDocumentText(root);
+    const attributes = scanTranslatableAttributes(root);
+    return buildTranslationUnits({
+      scannedTexts,
+      attributes,
+      sessionId: this.sessionId,
+      revision,
+      targetLang: this.options.targetLang,
+    });
   }
 
   restorePage(): void {
@@ -153,6 +176,48 @@ export class PageController {
     }
   }
 
+  private async translateBatchWithRetries(batch: BatchItem[]): Promise<BatchResult[]> {
+    const maxAttempts = Math.max(1, this.options.retry?.maxAttempts ?? 1);
+    const delayMs = Math.max(0, this.options.retry?.delayMs ?? 0);
+    const resultById = new Map<string, BatchResult>();
+    let remaining = batch;
+
+    for (let attempt = 1; attempt <= maxAttempts && remaining.length > 0; attempt += 1) {
+      const attemptResults = await this.runTranslateBatch(remaining);
+      const attemptResultById = new Map(attemptResults.map((result) => [result.id, result]));
+
+      for (const item of remaining) {
+        const result = attemptResultById.get(item.id) ?? {
+          id: item.id,
+          text: "",
+          status: "failed" as const,
+          error: "Missing provider result",
+        };
+        resultById.set(item.id, result);
+      }
+
+      if (attempt >= maxAttempts) break;
+      remaining = remaining.filter((item) => resultById.get(item.id)?.status === "failed");
+      if (remaining.length > 0 && delayMs > 0) await sleep(delayMs);
+    }
+
+    return batch.map((item) => resultById.get(item.id) ?? {
+      id: item.id,
+      text: "",
+      status: "failed" as const,
+      error: "Missing provider result",
+    });
+  }
+
+  private async runTranslateBatch(batch: BatchItem[]): Promise<BatchResult[]> {
+    try {
+      return await this.options.translateBatch(batch);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return batch.map((item) => ({ id: item.id, text: "", status: "failed" as const, error: message }));
+    }
+  }
+
   private applyTranslation(unit: TranslationUnit, translatedText: string): void {
     this.records.push(...renderTranslation(unit, translatedText));
     unit.translatedText = translatedText;
@@ -186,4 +251,8 @@ function isFragileCategory(category: UnitCategory): boolean {
 
 function createSessionId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `imt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function sleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
