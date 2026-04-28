@@ -12,6 +12,7 @@ describe("normalizeExtensionConfig", () => {
         targetLang: "ja",
         provider: "fake",
         displayMode: "translation-only",
+        dynamicMode: "conservative",
         showFloatingBall: false,
         useCache: false,
       }),
@@ -19,6 +20,7 @@ describe("normalizeExtensionConfig", () => {
       targetLang: "ja",
       provider: "fake",
       displayMode: "translation-only",
+      dynamicMode: "conservative",
       showFloatingBall: false,
       useCache: false,
     });
@@ -30,6 +32,7 @@ describe("normalizeExtensionConfig", () => {
         targetLang: "",
         provider: "unknown",
         displayMode: "raw",
+        dynamicMode: "aggressive",
         showFloatingBall: "yes",
         useCache: "no",
       }),

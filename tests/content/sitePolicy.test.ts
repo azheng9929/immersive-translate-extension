@@ -25,6 +25,24 @@ describe("sitePolicy", () => {
     }
   });
 
+  it("turns dynamic translation off when the user chooses off", () => {
+    expect(resolveSitePolicy("example.com", "off").dynamicMode).toBe("off");
+    expect(resolveSitePolicy("x.com", "off").dynamicMode).toBe("off");
+  });
+
+  it("uses conservative limits when the user chooses conservative on normal sites", () => {
+    const normal = resolveSitePolicy("example.com", "normal");
+    const conservative = resolveSitePolicy("example.com", "conservative");
+
+    expect(conservative.dynamicMode).toBe("conservative");
+    expect(conservative.maxQueueSize).toBeLessThan(normal.maxQueueSize);
+    expect(conservative.debounceMs).toBeGreaterThan(normal.debounceMs);
+  });
+
+  it("keeps Twitter conservative even when the user chooses normal", () => {
+    expect(resolveSitePolicy("x.com", "normal").dynamicMode).toBe("conservative");
+  });
+
   it("keeps the complete attribute list available for explicit opt-in", () => {
     expect(ALL_TRANSLATABLE_ATTRIBUTES).toEqual(["placeholder", "alt", "title", "aria-label"]);
   });

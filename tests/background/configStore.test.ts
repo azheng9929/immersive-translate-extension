@@ -9,6 +9,7 @@ describe("createConfigStore", () => {
       targetLang: "zh-Hans",
       provider: "microsoft",
       displayMode: "smart",
+      dynamicMode: "normal",
       showFloatingBall: true,
       useCache: true,
     });
@@ -18,10 +19,10 @@ describe("createConfigStore", () => {
     const area = new MemoryStorageArea();
     const store = createConfigStore(area);
 
-    const updated = await store.update({ targetLang: "ja", showFloatingBall: false });
+    const updated = await store.update({ targetLang: "ja", dynamicMode: "off", showFloatingBall: false });
     const stored = await store.load();
 
-    expect(updated).toMatchObject({ targetLang: "ja", showFloatingBall: false });
+    expect(updated).toMatchObject({ targetLang: "ja", dynamicMode: "off", showFloatingBall: false });
     expect(stored).toEqual(updated);
   });
 });

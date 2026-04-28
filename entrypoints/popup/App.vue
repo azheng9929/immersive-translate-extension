@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
-import { DEFAULT_EXTENSION_CONFIG, type DisplayMode, type ExtensionConfig, type ExtensionConfigPatch, type ExtensionProvider } from "../../src/shared/config";
+import { DEFAULT_EXTENSION_CONFIG, type DisplayMode, type DynamicMode, type ExtensionConfig, type ExtensionConfigPatch, type ExtensionProvider } from "../../src/shared/config";
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
@@ -30,6 +30,14 @@ const setDisplayMode = (displayMode: DisplayMode) => {
   void updateConfig({ displayMode });
 };
 
+const setDynamicMode = (dynamicMode: DynamicMode) => {
+  void updateConfig({ dynamicMode });
+};
+
+const openOptions = () => {
+  void chrome.runtime.openOptionsPage();
+};
+
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
@@ -44,22 +52,22 @@ onMounted(async () => {
       <img src="/icons/icon-48.png" alt="" class="popup-icon" />
       <div>
         <h1>Immersive Translate Lab</h1>
-        <p>Current page</p>
+        <p>当前页面</p>
       </div>
     </header>
 
-    <section class="actions" aria-label="Current page actions">
+    <section class="actions" aria-label="当前页面操作">
       <button class="primary-action" type="button" @click="send({ type: 'IMT_POPUP_TRANSLATE_ACTIVE_TAB' })">
-        Translate
+        翻译当前页
       </button>
       <button class="secondary-action" type="button" @click="send({ type: 'IMT_POPUP_RESTORE_ACTIVE_TAB' })">
-        Restore
+        还原原文
       </button>
     </section>
 
-    <section class="settings" aria-label="Basic settings" :aria-busy="isLoading">
+    <section class="settings" aria-label="基础设置" :aria-busy="isLoading">
       <label class="field">
-        <span>Language</span>
+        <span>目标语言</span>
         <select :value="config.targetLang" @change="setTargetLang">
           <option value="zh-Hans">简体中文</option>
           <option value="zh-Hant">繁體中文</option>
@@ -70,31 +78,42 @@ onMounted(async () => {
       </label>
 
       <label class="field">
-        <span>Service</span>
+        <span>翻译服务</span>
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
-          <option value="fake">Local test</option>
+          <option value="fake">本地测试</option>
         </select>
       </label>
 
       <div class="field">
-        <span>Display</span>
-        <div class="segmented" role="group" aria-label="Display mode">
-          <button type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">Smart</button>
-          <button type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">Dual</button>
-          <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">Text</button>
+        <span>显示方式</span>
+        <div class="segmented" role="group" aria-label="显示方式">
+          <button type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">智能</button>
+          <button type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">双语</button>
+          <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">译文</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>动态补翻</span>
+        <div class="segmented" role="group" aria-label="动态补翻模式">
+          <button data-testid="dynamic-mode-off" type="button" :class="{ active: config.dynamicMode === 'off' }" @click="setDynamicMode('off')">关闭</button>
+          <button data-testid="dynamic-mode-conservative" type="button" :class="{ active: config.dynamicMode === 'conservative' }" @click="setDynamicMode('conservative')">保守</button>
+          <button data-testid="dynamic-mode-normal" type="button" :class="{ active: config.dynamicMode === 'normal' }" @click="setDynamicMode('normal')">正常</button>
         </div>
       </div>
 
       <label class="toggle-row">
-        <span>Floating ball</span>
+        <span>悬浮球</span>
         <input type="checkbox" :checked="config.showFloatingBall" @change="updateConfig({ showFloatingBall: ($event.target as HTMLInputElement).checked })" />
       </label>
 
       <label class="toggle-row">
-        <span>Cache</span>
+        <span>缓存</span>
         <input type="checkbox" :checked="config.useCache" @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })" />
       </label>
+
+      <button class="settings-link" type="button" @click="openOptions">打开设置</button>
     </section>
   </main>
 </template>
@@ -159,13 +178,15 @@ button {
   background: linear-gradient(135deg, #164fc3 0%, #129887 100%);
 }
 
-.secondary-action {
+.secondary-action,
+.settings-link {
   border: 1px solid rgba(15, 42, 95, 0.14);
   color: #102a5f;
   background: #ffffff;
 }
 
-.secondary-action:hover {
+.secondary-action:hover,
+.settings-link:hover {
   background: #f2f7fb;
 }
 
@@ -236,5 +257,12 @@ input[type="checkbox"] {
   width: 36px;
   height: 20px;
   accent-color: #14a896;
+}
+
+.settings-link {
+  min-height: 32px;
+  border-radius: 9px;
+  box-shadow: none;
+  font-size: 12px;
 }
 </style>

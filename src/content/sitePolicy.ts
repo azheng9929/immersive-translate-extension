@@ -1,7 +1,8 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
+import type { DynamicMode } from "../shared/config";
 import type { TranslatableAttributeName } from "../shared/types";
 
-export type DynamicTranslationMode = "off" | "conservative" | "normal";
+export type DynamicTranslationMode = DynamicMode;
 
 export type SitePolicy = {
   dynamicMode: DynamicTranslationMode;
@@ -64,20 +65,27 @@ const DEFAULT_SITE_POLICY: SitePolicy = {
   excludedDynamicSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
 };
 
-const TWITTER_SITE_POLICY: SitePolicy = {
-  ...DEFAULT_SITE_POLICY,
+const CONSERVATIVE_DYNAMIC_LIMITS = {
   dynamicMode: "conservative",
-  attributeNames: [],
   debounceMs: 3000,
   lazyRootMargin: "120px",
   maxQueueSize: 80,
   maxRootsPerFlush: 6,
   maxObservedRoots: 80,
   maxMutationNodesPerWindow: 240,
+} satisfies Partial<SitePolicy>;
+
+const TWITTER_SITE_POLICY: SitePolicy = {
+  ...DEFAULT_SITE_POLICY,
+  ...CONSERVATIVE_DYNAMIC_LIMITS,
+  attributeNames: [],
   excludedDynamicSelectors: TWITTER_EXCLUDED_DYNAMIC_SELECTORS,
 };
 
-export function resolveSitePolicy(hostname: string = globalThis.location?.hostname ?? ""): SitePolicy {
+export function resolveSitePolicy(
+  hostname: string = globalThis.location?.hostname ?? "",
+  preferredDynamicMode: DynamicMode = "normal",
+): SitePolicy {
   const normalizedHostname = hostname.toLowerCase();
   if (
     normalizedHostname === "x.com" ||
@@ -85,7 +93,13 @@ export function resolveSitePolicy(hostname: string = globalThis.location?.hostna
     normalizedHostname === "twitter.com" ||
     normalizedHostname.endsWith(".twitter.com")
   ) {
-    return TWITTER_SITE_POLICY;
+    return applyDynamicPreference(TWITTER_SITE_POLICY, preferredDynamicMode);
   }
-  return DEFAULT_SITE_POLICY;
+  return applyDynamicPreference(DEFAULT_SITE_POLICY, preferredDynamicMode);
+}
+
+function applyDynamicPreference(policy: SitePolicy, preferredDynamicMode: DynamicMode): SitePolicy {
+  if (preferredDynamicMode === "off") return { ...policy, dynamicMode: "off" };
+  if (preferredDynamicMode === "conservative") return { ...policy, ...CONSERVATIVE_DYNAMIC_LIMITS };
+  return policy;
 }

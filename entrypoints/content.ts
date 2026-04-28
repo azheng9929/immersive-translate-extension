@@ -92,7 +92,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
 }
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  const sitePolicy = resolveSitePolicy(window.location.hostname);
+  const sitePolicy = resolveSitePolicy(window.location.hostname, config.dynamicMode);
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,
