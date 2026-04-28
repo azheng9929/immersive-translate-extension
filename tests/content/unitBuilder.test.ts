@@ -117,4 +117,23 @@ describe("buildTranslationUnits", () => {
       root: document.querySelector("[data-testid='post-title']"),
     });
   });
+
+  it("skips a whole Chinese-dominant unit even when English terms are split into inline nodes", () => {
+    mountFixture(`
+      <p>这篇文章介绍 <strong>React Server Components</strong> 的 <span>streaming</span> 策略。</p>
+      <p>React Server Components stream UI from the server.</p>
+    `);
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, { targetLang: "zh-Hans" }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    });
+
+    expect(units.map((unit) => unit.originalText)).toEqual([
+      "React Server Components stream UI from the server.",
+    ]);
+  });
 });

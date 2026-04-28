@@ -1,8 +1,9 @@
 import type { ScannedText } from "./domScanner";
 import { normalizeForCache, normalizeVisibleText } from "../shared/normalize";
+import { shouldSkipForTargetLanguage } from "../shared/languageHeuristics";
 import { isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
-import { resolveTextGranularity } from "./granularityPolicy";
+import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
 import { isVisibleElement } from "./visibility";
 
@@ -39,7 +40,10 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   let index = 0;
 
   for (const [root, textNodes] of rootToTexts) {
-    const originalText = collectUnitText(root, textNodes, input.hostname);
+    const originalText = collectUnitText(root, textNodes, {
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      targetLang: input.targetLang,
+    });
     if (!originalText) continue;
     const category = categoryFromScanned(rootToCategories.get(root)) ?? classifyRoot(root);
     units.push({
@@ -79,27 +83,32 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   return sortUnitsByDocumentOrder(dedupeNestedUnits(units));
 }
 
-function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[], hostname?: string): string {
+function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[], options: GranularityOptions): string {
+  let rawText = "";
   let text = "";
-  const scanOptions = hostname ? { hostname } : {};
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
       if (isSkippableElement(parent)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
-      const nodeText = normalizeVisibleText(node.textContent ?? "");
-      if (resolveTextGranularity(parent, nodeText, scanOptions).skip) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
 
   let node = walker.nextNode();
   while (node) {
-    text += node.textContent ?? "";
+    const nodeText = node.textContent ?? "";
+    rawText += nodeText;
+    const parent = node.parentElement;
+    if (parent && !resolveTextGranularity(parent, normalizeVisibleText(nodeText), options).skip) {
+      text += nodeText;
+    }
     node = walker.nextNode();
   }
 
+  const normalizedRawText = normalizeVisibleText(rawText);
+  if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return "";
   if (text) return normalizeVisibleText(text);
   return normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
 }

@@ -358,4 +358,26 @@ describe("PageController", () => {
     expect(document.body.textContent).toContain("Share");
     expect(document.querySelector("h1")?.textContent).toContain("[zh-Hans] How large language models actually work");
   });
+
+  it("does not send Chinese text with English terminology to the translator when target is Chinese", async () => {
+    document.body.innerHTML = `
+      <main>
+        <p>这篇文章介绍 <strong>React Server Components</strong> 的 <span>streaming</span> 策略。</p>
+        <p>React Server Components stream UI from the server.</p>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["React Server Components stream UI from the server."]);
+    expect(document.body.textContent).toContain("这篇文章介绍 React Server Components 的 streaming 策略。");
+  });
 });

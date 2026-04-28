@@ -127,7 +127,10 @@ export class PageController {
 
   private buildUnits(root: ParentNode, revision: number): TranslationUnit[] {
     const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
-    const scanOptions = { hostname };
+    const scanOptions = {
+      ...(hostname ? { hostname } : {}),
+      targetLang: this.options.targetLang,
+    };
     const scannedTexts = scanDocumentText(root, scanOptions);
     const attributes = scanTranslatableAttributes(root, this.options.attributeNames, scanOptions);
     return buildTranslationUnits({

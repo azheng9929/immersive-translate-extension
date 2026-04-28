@@ -141,6 +141,22 @@ describe("scanDocumentText", () => {
 
     expect(texts).toEqual(["Shipping readable translation without moving the page layout."]);
   });
+
+  it("skips Chinese text when the translation target is Chinese", () => {
+    mountFixture(`
+      <main>
+        <p>这篇文章介绍 React Server Components 的 streaming 策略。</p>
+        <p>React Server Components stream UI from the server.</p>
+        <input placeholder="搜索 React Server Components" />
+      </main>
+    `);
+
+    const texts = scanDocumentText(document.body, { targetLang: "zh-Hans" }).map((item) => item.text);
+    const attrs = scanTranslatableAttributes(document.body, undefined, { targetLang: "zh-Hans" });
+
+    expect(texts).toEqual(["React Server Components stream UI from the server."]);
+    expect(attrs).toEqual([]);
+  });
 });
 
 describe("scanTranslatableAttributes", () => {
