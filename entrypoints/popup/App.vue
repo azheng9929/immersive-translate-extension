@@ -7,6 +7,7 @@ import {
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
+  setSiteDynamicModeOverride,
 } from "../../src/shared/config";
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
@@ -16,6 +17,8 @@ const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
 const pageStatus = ref<PageTranslationStatus | undefined>();
 const pageStatusError = ref("");
+
+type SiteDynamicModeChoice = DynamicMode | "auto";
 
 const send = async (message: BackgroundMessage) => {
   const response = (await chrome.runtime.sendMessage(message)) as MessageResponse;
@@ -48,6 +51,15 @@ const setDynamicMode = (dynamicMode: DynamicMode) => {
   void updateConfig({ dynamicMode });
 };
 
+const setCurrentSiteDynamicMode = async (dynamicMode: SiteDynamicModeChoice) => {
+  const site = currentSite.value;
+  if (!site) return;
+  await updateConfig({
+    siteDynamicModes: setSiteDynamicModeOverride(config.siteDynamicModes, site.siteKey, dynamicMode),
+  });
+  await loadPageStatus();
+};
+
 const openOptions = () => {
   void chrome.runtime.openOptionsPage();
 };
@@ -72,6 +84,20 @@ const pageStatusSummary = computed(() => {
 
 const pageDiagnosticsRows = computed(() => detailedDiagnosticsLabels(pageStatus.value));
 
+const currentSite = computed(() => pageStatus.value?.site);
+
+const currentSiteDynamicMode = computed<SiteDynamicModeChoice>(() => {
+  const site = currentSite.value;
+  if (!site) return "auto";
+  return config.siteDynamicModes[site.siteKey] ?? "auto";
+});
+
+const currentSiteSummary = computed(() => {
+  const site = currentSite.value;
+  if (!site) return "No site policy available";
+  return `${site.siteKey} - ${site.dynamicMode} from ${sourceLabel(site.dynamicModeSource)}`;
+});
+
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
@@ -87,6 +113,12 @@ function statusLabel(phase: PageTranslationStatus["phase"]): string {
   if (phase === "partial") return "Partial";
   if (phase === "failed") return "Failed";
   return "Ready";
+}
+
+function sourceLabel(source: NonNullable<PageTranslationStatus["site"]>["dynamicModeSource"]): string {
+  if (source === "site-default") return "site default";
+  if (source === "site-override") return "site override";
+  return "global setting";
 }
 
 function detailedDiagnosticsLabels(status: PageTranslationStatus | undefined): string[] {
@@ -170,6 +202,19 @@ function plural(label: string, count: number): string {
       </div>
       <div v-if="pageDiagnosticsRows.length > 0" class="debug-details" data-testid="popup-debug-details">
         <p v-for="row in pageDiagnosticsRows" :key="row">{{ row }}</p>
+      </div>
+    </section>
+
+    <section v-if="currentSite" class="site-panel" aria-label="Current site dynamic mode">
+      <div>
+        <h2>Site dynamic mode</h2>
+        <p>{{ currentSiteSummary }}</p>
+      </div>
+      <div class="site-segmented" role="group" aria-label="Current site dynamic mode override">
+        <button data-testid="site-mode-auto" type="button" :class="{ active: currentSiteDynamicMode === 'auto' }" @click="setCurrentSiteDynamicMode('auto')">Auto</button>
+        <button data-testid="site-mode-off" type="button" :class="{ active: currentSiteDynamicMode === 'off' }" @click="setCurrentSiteDynamicMode('off')">Off</button>
+        <button data-testid="site-mode-conservative" type="button" :class="{ active: currentSiteDynamicMode === 'conservative' }" @click="setCurrentSiteDynamicMode('conservative')">Safe</button>
+        <button data-testid="site-mode-normal" type="button" :class="{ active: currentSiteDynamicMode === 'normal' }" @click="setCurrentSiteDynamicMode('normal')">Normal</button>
       </div>
     </section>
 
@@ -311,6 +356,7 @@ button {
 }
 
 .debug-panel,
+.site-panel,
 .settings {
   display: grid;
   gap: 10px;
@@ -345,6 +391,31 @@ button {
 
 .debug-details p {
   line-height: 1.35;
+}
+
+.site-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(15, 42, 95, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.site-segmented button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #52627a;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.site-segmented button.active {
+  color: #ffffff;
+  background: #1758db;
 }
 
 .field,

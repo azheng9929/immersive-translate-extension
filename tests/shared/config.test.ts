@@ -13,6 +13,11 @@ describe("normalizeExtensionConfig", () => {
         provider: "fake",
         displayMode: "translation-only",
         dynamicMode: "conservative",
+        siteDynamicModes: {
+          "youtube.com": "normal",
+          "x.com": "off",
+          "bad.example": "aggressive",
+        },
         showFloatingBall: false,
         useCache: false,
       }),
@@ -21,6 +26,10 @@ describe("normalizeExtensionConfig", () => {
       provider: "fake",
       displayMode: "translation-only",
       dynamicMode: "conservative",
+      siteDynamicModes: {
+        "youtube.com": "normal",
+        "x.com": "off",
+      },
       showFloatingBall: false,
       useCache: false,
     });
@@ -33,6 +42,7 @@ describe("normalizeExtensionConfig", () => {
         provider: "unknown",
         displayMode: "raw",
         dynamicMode: "aggressive",
+        siteDynamicModes: "youtube.com",
         showFloatingBall: "yes",
         useCache: "no",
       }),

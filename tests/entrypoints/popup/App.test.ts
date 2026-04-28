@@ -55,6 +55,13 @@ describe("popup App", () => {
             skipped: 0,
             dynamicRuns: 2,
             lastError: undefined,
+            site: {
+              hostname: "www.youtube.com",
+              siteKey: "youtube.com",
+              dynamicMode: "conservative",
+              dynamicModeSource: "site-default",
+              isHighDynamic: true,
+            },
             diagnostics: {
               scan: {
                 text: {
@@ -108,5 +115,55 @@ describe("popup App", () => {
     expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Dynamic observing, 2 pending, 3 lazy");
     expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Cache 0 hits, 1 miss");
     expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Provider 1 requested, 0 failed, 0 skipped");
+  });
+
+  it("saves a dynamic mode override for the current site", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteDynamicModes: {} };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_POPUP_GET_ACTIVE_TAB_STATUS") {
+        return {
+          ok: true,
+          status: {
+            phase: "translated",
+            observation: "observing",
+            pendingRoots: 0,
+            observedRoots: 0,
+            total: 0,
+            translated: 0,
+            failed: 0,
+            skipped: 0,
+            dynamicRuns: 0,
+            lastError: undefined,
+            site: {
+              hostname: "www.youtube.com",
+              siteKey: "youtube.com",
+              dynamicMode: "conservative",
+              dynamicModeSource: "site-default",
+              isHighDynamic: true,
+            },
+          },
+        };
+      }
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='site-mode-auto']").classes()).toContain("active");
+
+    await wrapper.find("[data-testid='site-mode-normal']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { siteDynamicModes: { "youtube.com": "normal" } },
+    });
   });
 });

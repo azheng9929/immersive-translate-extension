@@ -5,7 +5,7 @@ import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { PageTranslationSession } from "../src/content/pageTranslationSession";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
-import { resolveSitePolicy, type SitePolicy } from "../src/content/sitePolicy";
+import { resolveSitePolicy, resolveSitePolicyKey, type SitePolicy } from "../src/content/sitePolicy";
 import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, type ExtensionConfig } from "../src/shared/config";
 import { IndexedDbTranslationCache } from "../src/shared/translationCache";
 
@@ -96,7 +96,14 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
 }
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  const sitePolicy = resolveSitePolicy(window.location.hostname, config.dynamicMode);
+  const hostname = window.location.hostname;
+  const siteKey = resolveSitePolicyKey(hostname);
+  const siteDynamicMode = config.siteDynamicModes[siteKey];
+  const sitePolicy = resolveSitePolicy(
+    hostname,
+    config.dynamicMode,
+    siteDynamicMode ? { siteDynamicMode } : {},
+  );
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,
@@ -110,6 +117,13 @@ function createPageSession(config: ExtensionConfig): PageTranslationSession {
     maxObservedRoots: sitePolicy.maxObservedRoots,
     maxMutationNodesPerWindow: sitePolicy.maxMutationNodesPerWindow,
     mutationWindowMs: sitePolicy.mutationWindowMs,
+    site: {
+      hostname: sitePolicy.hostname,
+      siteKey: sitePolicy.siteKey,
+      dynamicMode: sitePolicy.dynamicMode,
+      dynamicModeSource: sitePolicy.dynamicModeSource,
+      isHighDynamic: sitePolicy.isHighDynamic,
+    },
   });
 }
 

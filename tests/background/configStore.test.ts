@@ -10,6 +10,7 @@ describe("createConfigStore", () => {
       provider: "microsoft",
       displayMode: "smart",
       dynamicMode: "normal",
+      siteDynamicModes: {},
       showFloatingBall: true,
       useCache: true,
     });
@@ -19,10 +20,20 @@ describe("createConfigStore", () => {
     const area = new MemoryStorageArea();
     const store = createConfigStore(area);
 
-    const updated = await store.update({ targetLang: "ja", dynamicMode: "off", showFloatingBall: false });
+    const updated = await store.update({
+      targetLang: "ja",
+      dynamicMode: "off",
+      siteDynamicModes: { "youtube.com": "normal" },
+      showFloatingBall: false,
+    });
     const stored = await store.load();
 
-    expect(updated).toMatchObject({ targetLang: "ja", dynamicMode: "off", showFloatingBall: false });
+    expect(updated).toMatchObject({
+      targetLang: "ja",
+      dynamicMode: "off",
+      siteDynamicModes: { "youtube.com": "normal" },
+      showFloatingBall: false,
+    });
     expect(stored).toEqual(updated);
   });
 });

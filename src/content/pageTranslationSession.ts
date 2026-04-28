@@ -1,9 +1,17 @@
 import type { PageController, TranslationPageSummary } from "./pageController";
-import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicTranslationMode } from "./sitePolicy";
+import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicModeSource, type DynamicTranslationMode } from "./sitePolicy";
 import type { TranslationDiagnostics } from "./translationDiagnostics";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
 export type DynamicObservationState = "inactive" | "observing" | "queued" | "paused" | "suspended";
+
+export type PageTranslationSiteStatus = {
+  hostname: string;
+  siteKey: string;
+  dynamicMode: DynamicTranslationMode;
+  dynamicModeSource: DynamicModeSource;
+  isHighDynamic: boolean;
+};
 
 export type PageTranslationStatus = TranslationPageSummary & {
   phase: PageTranslationPhase;
@@ -13,6 +21,7 @@ export type PageTranslationStatus = TranslationPageSummary & {
   dynamicRuns: number;
   lastError: string | undefined;
   diagnostics?: TranslationDiagnostics;
+  site?: PageTranslationSiteStatus;
 };
 
 type PageTranslationSessionOptions = {
@@ -28,6 +37,7 @@ type PageTranslationSessionOptions = {
   maxObservedRoots?: number;
   maxMutationNodesPerWindow?: number;
   mutationWindowMs?: number;
+  site?: PageTranslationSiteStatus;
 };
 
 type StatusListener = (status: PageTranslationStatus) => void;
@@ -74,7 +84,10 @@ export class PageTranslationSession {
   ) {}
 
   getStatus(): PageTranslationStatus {
-    return { ...this.status };
+    return {
+      ...this.status,
+      ...(this.status.site || !this.options.site ? {} : { site: this.options.site }),
+    };
   }
 
   subscribe(listener: StatusListener): () => void {
@@ -489,14 +502,17 @@ export class PageTranslationSession {
     this.listeningForVisibility = false;
   }
 
-  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics"> & {
+  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics" | "site"> & {
     diagnostics?: TranslationDiagnostics;
+    site?: PageTranslationSiteStatus;
   }): void {
+    const site = status.site ?? this.options.site;
     this.status = {
       ...status,
       pendingRoots: this.pendingRoots.size,
       observedRoots: this.lazyObservedRoots.size,
       diagnostics: status.diagnostics ?? this.controller.getDiagnostics(),
+      ...(site ? { site } : {}),
     };
     for (const listener of this.listeners) listener(this.getStatus());
   }

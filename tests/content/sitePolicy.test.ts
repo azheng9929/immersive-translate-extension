@@ -25,6 +25,17 @@ describe("sitePolicy", () => {
     }
   });
 
+  it("uses conservative dynamic defaults for YouTube and Reddit", () => {
+    for (const hostname of ["youtube.com", "www.youtube.com", "m.youtube.com", "reddit.com", "www.reddit.com", "old.reddit.com"]) {
+      const policy = resolveSitePolicy(hostname);
+
+      expect(policy.dynamicMode).toBe("conservative");
+      expect(policy.dynamicModeSource).toBe("site-default");
+      expect(policy.isHighDynamic).toBe(true);
+      expect(policy.maxQueueSize).toBeLessThan(resolveSitePolicy("example.com").maxQueueSize);
+    }
+  });
+
   it("turns dynamic translation off when the user chooses off", () => {
     expect(resolveSitePolicy("example.com", "off").dynamicMode).toBe("off");
     expect(resolveSitePolicy("x.com", "off").dynamicMode).toBe("off");
@@ -41,6 +52,21 @@ describe("sitePolicy", () => {
 
   it("keeps Twitter conservative even when the user chooses normal", () => {
     expect(resolveSitePolicy("x.com", "normal").dynamicMode).toBe("conservative");
+  });
+
+  it("lets an explicit site override force the dynamic mode", () => {
+    const automatic = resolveSitePolicy("www.youtube.com", "normal");
+    const forcedNormal = resolveSitePolicy("www.youtube.com", "normal", { siteDynamicMode: "normal" });
+    const forcedOff = resolveSitePolicy("www.youtube.com", "normal", { siteDynamicMode: "off" });
+
+    expect(automatic.dynamicMode).toBe("conservative");
+    expect(forcedNormal).toMatchObject({
+      dynamicMode: "normal",
+      dynamicModeSource: "site-override",
+      siteKey: "youtube.com",
+    });
+    expect(forcedNormal.maxQueueSize).toBeGreaterThan(automatic.maxQueueSize);
+    expect(forcedOff.dynamicMode).toBe("off");
   });
 
   it("keeps the complete attribute list available for explicit opt-in", () => {

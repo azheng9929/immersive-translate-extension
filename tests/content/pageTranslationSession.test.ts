@@ -66,6 +66,33 @@ describe("PageTranslationSession", () => {
     });
   });
 
+  it("exposes site dynamic mode metadata in page status", () => {
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      dynamicMode: "conservative",
+      site: {
+        hostname: "www.youtube.com",
+        siteKey: "youtube.com",
+        dynamicMode: "conservative",
+        dynamicModeSource: "site-default",
+        isHighDynamic: true,
+      },
+    });
+
+    expect(session.getStatus().site).toEqual({
+      hostname: "www.youtube.com",
+      siteKey: "youtube.com",
+      dynamicMode: "conservative",
+      dynamicModeSource: "site-default",
+      isHighDynamic: true,
+    });
+  });
+
   it("translates newly added content after page translation", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
