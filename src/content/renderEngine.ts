@@ -1,6 +1,8 @@
 import type { RestoreRecord, TranslationUnit } from "../shared/types";
 import { ensureRuntimeStyle } from "./style";
 
+const ORIGINAL_TEXT_ATTRIBUTE = "data-imt-original-text";
+
 export function renderTranslation(unit: TranslationUnit, translatedText: string): RestoreRecord[] {
   ensureRuntimeStyle();
   unit.root.setAttribute("data-imt-unit-id", unit.id);
@@ -9,6 +11,7 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
   if (unit.renderMode === "replace-attribute" && unit.attribute) {
     const originalValue = unit.attribute.element.getAttribute(unit.attribute.name);
     unit.attribute.element.setAttribute(unit.attribute.name, translatedText);
+    unit.attribute.element.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
     return [
       {
         type: "attribute-replace",
@@ -26,6 +29,7 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
 
   const span = document.createElement("span");
   span.setAttribute("data-imt-managed", "true");
+  span.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
   span.className = unit.renderMode === "compact-bilingual" ? "imt-translation-compact" : "imt-translation-block";
   span.textContent = translatedText;
   unit.root.appendChild(span);
@@ -40,15 +44,6 @@ function renderTextReplacement(unit: TranslationUnit, translatedText: string): R
     node.textContent = index === 0 ? translatedText : "";
   });
 
-  const originalTitle = unit.root.getAttribute("title");
-  records.push({
-    type: "attribute-replace",
-    unitId: unit.id,
-    element: unit.root,
-    attribute: "title",
-    originalValue: originalTitle,
-  });
-  unit.root.setAttribute("title", unit.originalText);
-
+  unit.root.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
   return records;
 }

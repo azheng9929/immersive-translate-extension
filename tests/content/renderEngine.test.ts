@@ -12,7 +12,7 @@ function baseUnit(root: HTMLElement, mode: TranslationUnit["renderMode"]): Trans
     textNodes: Array.from(root.childNodes).filter((node): node is Text => node.nodeType === Node.TEXT_NODE),
     originalText: root.textContent ?? "",
     normalizedText: (root.textContent ?? "").trim().toLowerCase(),
-    translatedText: "译文",
+    translatedText: "translated text",
     targetLang: "zh-Hans",
     category: "content-block",
     renderMode: mode,
@@ -25,29 +25,49 @@ describe("renderTranslation", () => {
   it("adds managed bilingual text inside a paragraph and restores it", () => {
     document.body.innerHTML = "<p>Hello world</p>";
     const unit = baseUnit(document.querySelector("p")!, "bilingual-inside");
-    const records = renderTranslation(unit, "你好，世界");
+    const records = renderTranslation(unit, "Translated hello");
 
-    expect(document.querySelector("[data-imt-managed='true']")?.textContent).toBe("你好，世界");
+    const translated = document.querySelector<HTMLElement>("[data-imt-managed='true']");
+    expect(translated?.textContent).toBe("Translated hello");
+    expect(translated?.getAttribute("data-imt-original-text")).toBe("Hello world");
     expect(unit.root.getAttribute("data-imt-unit-id")).toBe("u1");
 
     restoreAll(records);
     expect(document.body.innerHTML).toBe("<p>Hello world</p>");
   });
 
-  it("replaces button text and restores it", () => {
+  it("replaces button text, exposes original text for hover, and restores it", () => {
     document.body.innerHTML = "<button>Submit</button>";
     const unit = baseUnit(document.querySelector("button")!, "replace-text");
-    const records = renderTranslation(unit, "提交");
+    const records = renderTranslation(unit, "Translated submit");
 
-    expect(document.querySelector("button")!.textContent).toBe("提交");
-    expect(document.querySelector("button")!.title).toBe("Submit");
+    const button = document.querySelector("button")!;
+    expect(button.textContent).toBe("Translated submit");
+    expect(button.getAttribute("data-imt-original-text")).toBe("Submit");
+    expect(button.hasAttribute("title")).toBe(false);
 
     restoreAll(records);
-    expect(document.querySelector("button")!.textContent).toBe("Submit");
-    expect(document.querySelector("button")!.hasAttribute("title")).toBe(false);
+    expect(button.textContent).toBe("Submit");
+    expect(button.hasAttribute("data-imt-original-text")).toBe(false);
+    expect(button.hasAttribute("title")).toBe(false);
   });
 
-  it("replaces attributes and restores them", () => {
+  it("preserves an existing title while exposing original text through metadata", () => {
+    document.body.innerHTML = '<button title="Native hint">Submit</button>';
+    const unit = baseUnit(document.querySelector("button")!, "replace-text");
+    const records = renderTranslation(unit, "Translated submit");
+
+    const button = document.querySelector("button")!;
+    expect(button.textContent).toBe("Translated submit");
+    expect(button.getAttribute("data-imt-original-text")).toBe("Submit");
+    expect(button.title).toBe("Native hint");
+
+    restoreAll(records);
+    expect(button.textContent).toBe("Submit");
+    expect(button.title).toBe("Native hint");
+  });
+
+  it("replaces attributes, exposes original text for hover, and restores them", () => {
     document.body.innerHTML = '<input placeholder="Search docs" />';
     const input = document.querySelector("input")!;
     const unit = {
@@ -57,10 +77,12 @@ describe("renderTranslation", () => {
       originalText: "Search docs",
     };
 
-    const records = renderTranslation(unit, "搜索文档");
-    expect(input.getAttribute("placeholder")).toBe("搜索文档");
+    const records = renderTranslation(unit, "Translated search");
+    expect(input.getAttribute("placeholder")).toBe("Translated search");
+    expect(input.getAttribute("data-imt-original-text")).toBe("Search docs");
 
     restoreAll(records);
     expect(input.getAttribute("placeholder")).toBe("Search docs");
+    expect(input.hasAttribute("data-imt-original-text")).toBe(false);
   });
 });

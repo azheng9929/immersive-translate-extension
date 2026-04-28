@@ -1,5 +1,7 @@
 import type { RestoreRecord } from "../shared/types";
 
+const ORIGINAL_TEXT_ATTRIBUTE = "data-imt-original-text";
+
 export function restoreAll(records: RestoreRecord[]): void {
   for (const record of [...records].reverse()) {
     if (record.type === "inserted-node") {
@@ -20,5 +22,9 @@ export function restoreAll(records: RestoreRecord[]): void {
   document.querySelectorAll("[data-imt-unit-id]").forEach((node) => {
     node.removeAttribute("data-imt-unit-id");
     node.removeAttribute("data-imt-state");
+  });
+
+  document.querySelectorAll(`[${ORIGINAL_TEXT_ATTRIBUTE}]`).forEach((node) => {
+    node.removeAttribute(ORIGINAL_TEXT_ATTRIBUTE);
   });
 }

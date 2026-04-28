@@ -1,4 +1,5 @@
 import { FloatingTranslationControl } from "../src/content/floatingControl";
+import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
 import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, type ExtensionConfig } from "../src/shared/config";
@@ -11,12 +12,14 @@ export default defineContentScript({
     let config = await loadConfig();
     let controller = createController(config);
     let selectionTranslator = createSelectionTranslator(config);
+    const originalTextTooltip = new OriginalTextTooltip();
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => controller.translatePage(),
       restorePage: () => controller.restorePage(),
     });
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
+    originalTextTooltip.mount();
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "IMT_TRANSLATE_PAGE") {
