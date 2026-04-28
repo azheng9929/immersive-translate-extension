@@ -3,6 +3,9 @@ export type DisplayMode = "smart" | "bilingual" | "translation-only";
 export type DynamicMode = "off" | "conservative" | "normal";
 export type SiteDynamicModeOverrides = Record<string, DynamicMode>;
 
+export const DEFAULT_OPENAI_SYSTEM_PROMPT =
+  "You are a web translation engine. Translate each item to the target language. Return exactly JSON: {\"items\":[{\"id\":\"...\",\"text\":\"...\",\"status\":\"ok\"}]}. Preserve ids, item count, and item boundaries. Do not merge, split, omit, reorder, add notes, add Markdown, or add HTML. If translation is unnecessary, return the original text with status ok.";
+
 export type ExtensionConfig = {
   targetLang: string;
   provider: ExtensionProvider;
@@ -11,6 +14,11 @@ export type ExtensionConfig = {
   openaiEndpoint: string;
   openaiApiKey: string;
   openaiModel: string;
+  openaiMaxConcurrentRequests: number;
+  openaiMaxBatchItems: number;
+  openaiMaxBatchChars: number;
+  openaiRequestTimeoutMs: number;
+  openaiSystemPrompt: string;
   siteDynamicModes: SiteDynamicModeOverrides;
   showFloatingBall: boolean;
   useCache: boolean;
@@ -26,6 +34,11 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   openaiEndpoint: "https://api.openai.com/v1/chat/completions",
   openaiApiKey: "",
   openaiModel: "gpt-4o-mini",
+  openaiMaxConcurrentRequests: 2,
+  openaiMaxBatchItems: 16,
+  openaiMaxBatchChars: 6000,
+  openaiRequestTimeoutMs: 45000,
+  openaiSystemPrompt: DEFAULT_OPENAI_SYSTEM_PROMPT,
   siteDynamicModes: {},
   showFloatingBall: true,
   useCache: true,
@@ -46,6 +59,11 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     openaiEndpoint: normalizeString(input.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint),
     openaiApiKey: normalizeString(input.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey),
     openaiModel: normalizeString(input.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel),
+    openaiMaxConcurrentRequests: normalizeInteger(input.openaiMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.openaiMaxConcurrentRequests, 1, 8),
+    openaiMaxBatchItems: normalizeInteger(input.openaiMaxBatchItems, DEFAULT_EXTENSION_CONFIG.openaiMaxBatchItems, 1, 80),
+    openaiMaxBatchChars: normalizeInteger(input.openaiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.openaiMaxBatchChars, 500, 30000),
+    openaiRequestTimeoutMs: normalizeInteger(input.openaiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.openaiRequestTimeoutMs, 5000, 180000),
+    openaiSystemPrompt: normalizeString(input.openaiSystemPrompt, DEFAULT_EXTENSION_CONFIG.openaiSystemPrompt),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
     showFloatingBall: normalizeBoolean(input.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall),
     useCache: normalizeBoolean(input.useCache, DEFAULT_EXTENSION_CONFIG.useCache),
@@ -63,6 +81,11 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("openaiEndpoint" in value) patch.openaiEndpoint = normalizeString(value.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint);
   if ("openaiApiKey" in value) patch.openaiApiKey = normalizeString(value.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey);
   if ("openaiModel" in value) patch.openaiModel = normalizeString(value.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel);
+  if ("openaiMaxConcurrentRequests" in value) patch.openaiMaxConcurrentRequests = normalizeInteger(value.openaiMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.openaiMaxConcurrentRequests, 1, 8);
+  if ("openaiMaxBatchItems" in value) patch.openaiMaxBatchItems = normalizeInteger(value.openaiMaxBatchItems, DEFAULT_EXTENSION_CONFIG.openaiMaxBatchItems, 1, 80);
+  if ("openaiMaxBatchChars" in value) patch.openaiMaxBatchChars = normalizeInteger(value.openaiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.openaiMaxBatchChars, 500, 30000);
+  if ("openaiRequestTimeoutMs" in value) patch.openaiRequestTimeoutMs = normalizeInteger(value.openaiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.openaiRequestTimeoutMs, 5000, 180000);
+  if ("openaiSystemPrompt" in value) patch.openaiSystemPrompt = normalizeString(value.openaiSystemPrompt, DEFAULT_EXTENSION_CONFIG.openaiSystemPrompt);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
   if ("showFloatingBall" in value) patch.showFloatingBall = normalizeBoolean(value.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall);
   if ("useCache" in value) patch.useCache = normalizeBoolean(value.useCache, DEFAULT_EXTENSION_CONFIG.useCache);
@@ -97,6 +120,12 @@ function normalizeString(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : Number.NaN;
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.min(Math.max(Math.round(numberValue), min), max);
 }
 
 function normalizeProvider(value: unknown): ExtensionProvider {

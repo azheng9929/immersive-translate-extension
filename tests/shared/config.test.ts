@@ -16,6 +16,11 @@ describe("normalizeExtensionConfig", () => {
         openaiEndpoint: " https://api.example.test/v1/chat/completions ",
         openaiApiKey: " sk-test ",
         openaiModel: " gpt-test ",
+        openaiMaxConcurrentRequests: "4",
+        openaiMaxBatchItems: 24.2,
+        openaiMaxBatchChars: "12000",
+        openaiRequestTimeoutMs: "60000",
+        openaiSystemPrompt: " Custom prompt ",
         siteDynamicModes: {
           "youtube.com": "normal",
           "x.com": "off",
@@ -32,6 +37,11 @@ describe("normalizeExtensionConfig", () => {
       openaiEndpoint: "https://api.example.test/v1/chat/completions",
       openaiApiKey: "sk-test",
       openaiModel: "gpt-test",
+      openaiMaxConcurrentRequests: 4,
+      openaiMaxBatchItems: 24,
+      openaiMaxBatchChars: 12000,
+      openaiRequestTimeoutMs: 60000,
+      openaiSystemPrompt: "Custom prompt",
       siteDynamicModes: {
         "youtube.com": "normal",
         "x.com": "off",
@@ -53,5 +63,21 @@ describe("normalizeExtensionConfig", () => {
         useCache: "no",
       }),
     ).toEqual(DEFAULT_EXTENSION_CONFIG);
+  });
+
+  it("clamps OpenAI request settings to safe bounds", () => {
+    expect(
+      normalizeExtensionConfig({
+        openaiMaxConcurrentRequests: 99,
+        openaiMaxBatchItems: 0,
+        openaiMaxBatchChars: 100,
+        openaiRequestTimeoutMs: 999999,
+      }),
+    ).toMatchObject({
+      openaiMaxConcurrentRequests: 8,
+      openaiMaxBatchItems: 1,
+      openaiMaxBatchChars: 500,
+      openaiRequestTimeoutMs: 180000,
+    });
   });
 });

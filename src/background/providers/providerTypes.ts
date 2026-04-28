@@ -13,6 +13,11 @@ export type ProviderRequest = {
   model?: string;
   endpoint?: string;
   apiKey?: string;
+  maxConcurrentRequests?: number;
+  maxBatchItems?: number;
+  maxBatchChars?: number;
+  requestTimeoutMs?: number;
+  systemPrompt?: string;
   sourceLang?: string;
   targetLang: string;
   items: ProviderRequestItem[];

@@ -51,11 +51,23 @@ describe("options App", () => {
     const endpoint = wrapper.find<HTMLInputElement>("[data-testid='openai-endpoint']");
     const apiKey = wrapper.find<HTMLInputElement>("[data-testid='openai-api-key']");
     const model = wrapper.find<HTMLInputElement>("[data-testid='openai-model']");
+    const maxConcurrent = wrapper.find<HTMLInputElement>("[data-testid='openai-max-concurrent']");
+    const maxBatchItems = wrapper.find<HTMLInputElement>("[data-testid='openai-max-batch-items']");
+    const maxBatchChars = wrapper.find<HTMLInputElement>("[data-testid='openai-max-batch-chars']");
+    const timeout = wrapper.find<HTMLInputElement>("[data-testid='openai-request-timeout']");
+    const systemPrompt = wrapper.find<HTMLTextAreaElement>("[data-testid='openai-system-prompt']");
 
     expect(endpoint.element.value).toBe("https://api.openai.com/v1/chat/completions");
+    expect(maxConcurrent.element.value).toBe("2");
+    expect(maxBatchItems.element.value).toBe("16");
     await endpoint.setValue("https://api.example.test/v1/chat/completions");
     await apiKey.setValue("sk-test");
     await model.setValue("gpt-test");
+    await maxConcurrent.setValue("4");
+    await maxBatchItems.setValue("12");
+    await maxBatchChars.setValue("9000");
+    await timeout.setValue("60000");
+    await systemPrompt.setValue("Custom prompt");
     await flushPromises();
 
     expect(sendMessage).toHaveBeenCalledWith({
@@ -69,6 +81,26 @@ describe("options App", () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: { openaiModel: "gpt-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openaiMaxConcurrentRequests: 4 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openaiMaxBatchItems: 12 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openaiMaxBatchChars: 9000 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openaiRequestTimeoutMs: 60000 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openaiSystemPrompt: "Custom prompt" },
     });
   });
 });

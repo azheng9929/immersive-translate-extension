@@ -43,12 +43,36 @@ const setOpenAIModel = (event: Event) => {
   void updateConfig({ openaiModel: (event.target as HTMLInputElement).value });
 };
 
+const setOpenAIMaxConcurrentRequests = (event: Event) => {
+  void updateConfig({ openaiMaxConcurrentRequests: numberInputValue(event) });
+};
+
+const setOpenAIMaxBatchItems = (event: Event) => {
+  void updateConfig({ openaiMaxBatchItems: numberInputValue(event) });
+};
+
+const setOpenAIMaxBatchChars = (event: Event) => {
+  void updateConfig({ openaiMaxBatchChars: numberInputValue(event) });
+};
+
+const setOpenAIRequestTimeoutMs = (event: Event) => {
+  void updateConfig({ openaiRequestTimeoutMs: numberInputValue(event) });
+};
+
+const setOpenAISystemPrompt = (event: Event) => {
+  void updateConfig({ openaiSystemPrompt: (event.target as HTMLTextAreaElement).value });
+};
+
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
   if (!response.ok) console.warn(response.error);
   isLoading.value = false;
 });
+
+function numberInputValue(event: Event): number {
+  return Number((event.target as HTMLInputElement).value);
+}
 </script>
 
 <template>
@@ -116,6 +140,73 @@ onMounted(async () => {
           />
         </label>
       </div>
+
+      <div class="openai-advanced" aria-label="OpenAI API request settings">
+        <h3>OpenAI request design</h3>
+        <div class="tuning-grid">
+          <label class="field">
+            <span>Concurrency</span>
+            <input
+              data-testid="openai-max-concurrent"
+              type="number"
+              min="1"
+              max="8"
+              step="1"
+              :value="config.openaiMaxConcurrentRequests"
+              @input="setOpenAIMaxConcurrentRequests"
+            />
+          </label>
+
+          <label class="field">
+            <span>Batch items</span>
+            <input
+              data-testid="openai-max-batch-items"
+              type="number"
+              min="1"
+              max="80"
+              step="1"
+              :value="config.openaiMaxBatchItems"
+              @input="setOpenAIMaxBatchItems"
+            />
+          </label>
+
+          <label class="field">
+            <span>Batch chars</span>
+            <input
+              data-testid="openai-max-batch-chars"
+              type="number"
+              min="500"
+              max="30000"
+              step="500"
+              :value="config.openaiMaxBatchChars"
+              @input="setOpenAIMaxBatchChars"
+            />
+          </label>
+
+          <label class="field">
+            <span>Timeout ms</span>
+            <input
+              data-testid="openai-request-timeout"
+              type="number"
+              min="5000"
+              max="180000"
+              step="5000"
+              :value="config.openaiRequestTimeoutMs"
+              @input="setOpenAIRequestTimeoutMs"
+            />
+          </label>
+        </div>
+
+        <label class="field prompt-field">
+          <span>System prompt</span>
+          <textarea
+            data-testid="openai-system-prompt"
+            spellcheck="false"
+            :value="config.openaiSystemPrompt"
+            @input="setOpenAISystemPrompt"
+          />
+        </label>
+      </div>
     </section>
 
     <section class="panel" aria-label="Dynamic translation settings" :aria-busy="isLoading">
@@ -176,6 +267,7 @@ onMounted(async () => {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -187,6 +279,11 @@ h1 {
 
 h2 {
   font-size: 17px;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 14px;
   line-height: 1.25;
 }
 
@@ -231,22 +328,50 @@ p {
 }
 
 select,
-input {
+input,
+textarea {
   width: 100%;
-  min-height: 36px;
   box-sizing: border-box;
   border: 1px solid rgba(15, 42, 95, 0.14);
   border-radius: 9px;
-  padding: 0 10px;
   color: #102a5f;
   background: #ffffff;
   font: inherit;
+}
+
+select,
+input {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+textarea {
+  min-height: 116px;
+  resize: vertical;
+  padding: 10px;
+  line-height: 1.45;
 }
 
 .openai-settings {
   display: grid;
   grid-template-columns: 1.4fr 1fr 0.8fr;
   gap: 12px;
+}
+
+.openai-advanced {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.tuning-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.prompt-field {
+  max-width: 100%;
 }
 
 .mode-grid {
@@ -293,6 +418,7 @@ input {
   .page-header,
   .panel-heading,
   .openai-settings,
+  .tuning-grid,
   .mode-grid {
     grid-template-columns: 1fr;
   }
