@@ -1,3 +1,4 @@
+import { createConfigStore } from "./configStore";
 import { fakeProvider } from "./providers/fakeProvider";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
@@ -32,7 +33,20 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
   if (message.type === "IMT_TRANSLATE_BATCH") {
     return translateBatch(message.request);
   }
+  if (message.type === "IMT_GET_CONFIG") {
+    const config = await createConfigStore().load();
+    return { ok: true, config };
+  }
+  if (message.type === "IMT_UPDATE_CONFIG") {
+    const config = await createConfigStore().update(message.patch);
+    await notifyActiveTab({ type: "IMT_CONFIG_UPDATED", config });
+    return { ok: true, config };
+  }
   return { ok: false, error: "Unknown background message" };
+}
+
+async function notifyActiveTab(message: ContentMessage): Promise<void> {
+  await sendToActiveTab(message);
 }
 
 async function translateBatch(request: ProviderRequest): Promise<MessageResponse> {

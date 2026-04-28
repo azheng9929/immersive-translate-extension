@@ -137,4 +137,34 @@ describe("PageController", () => {
       skipped: 0,
     });
   });
+
+  it("uses translation-only display mode to replace readable page text", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      displayMode: "translation-only",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    await controller.translatePage();
+
+    expect(document.querySelector("p")?.textContent).toBe("[zh-Hans] Hello world.");
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
+  });
+
+  it("keeps fragile UI as replacement in bilingual display mode", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      displayMode: "bilingual",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    await controller.translatePage();
+
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+  });
 });

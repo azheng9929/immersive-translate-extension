@@ -2,8 +2,9 @@ import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { renderTranslation } from "./renderEngine";
 import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
+import type { DisplayMode } from "../shared/config";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
-import type { RestoreRecord, TranslationUnit } from "../shared/types";
+import type { RenderMode, RestoreRecord, TranslationUnit, UnitCategory } from "../shared/types";
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
@@ -11,6 +12,7 @@ type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "faile
 type ControllerOptions = {
   targetLang: string;
   providerId?: string;
+  displayMode?: DisplayMode;
   cache?: TranslationCache;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
@@ -44,6 +46,7 @@ export class PageController {
       revision: this.revision,
       targetLang: this.options.targetLang,
     });
+    this.applyDisplayMode(this.units);
 
     const summary: TranslationPageSummary = {
       total: this.units.length,
@@ -146,6 +149,30 @@ export class PageController {
     unit.translatedText = translatedText;
     unit.state = "translated";
   }
+
+  private applyDisplayMode(units: TranslationUnit[]): void {
+    const displayMode = this.options.displayMode ?? "smart";
+    if (displayMode === "smart") return;
+
+    for (const unit of units) {
+      unit.renderMode = displayMode === "translation-only" ? translationOnlyMode(unit) : bilingualMode(unit);
+    }
+  }
+}
+
+function translationOnlyMode(unit: TranslationUnit): RenderMode {
+  return unit.category === "attribute" ? "replace-attribute" : "replace-text";
+}
+
+function bilingualMode(unit: TranslationUnit): RenderMode {
+  if (unit.category === "attribute") return "replace-attribute";
+  if (isFragileCategory(unit.category)) return "replace-text";
+  if (unit.category === "heading" || unit.category === "table-cell" || unit.category === "card-text") return "compact-bilingual";
+  return "bilingual-inside";
+}
+
+function isFragileCategory(category: UnitCategory): boolean {
+  return category === "button" || category === "nav" || category === "menu" || category === "label" || category === "inline-ui";
 }
 
 function createSessionId(): string {
