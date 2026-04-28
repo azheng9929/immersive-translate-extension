@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGlossarySystemPrompt,
+  exportGlossaryEntries,
   glossaryEntriesToText,
   glossaryTextToEntries,
+  importGlossaryEntries,
   normalizeGlossaryEntries,
 } from "@/shared/glossary";
 
@@ -44,5 +46,22 @@ describe("glossary helpers", () => {
         { source: "prompt", target: "提示词", note: "LLM term" },
       ]),
     ).toContain('"prompt" => "提示词" (LLM term)');
+  });
+
+  it("exports and imports glossary JSON", () => {
+    const exported = exportGlossaryEntries([
+      { source: "OpenAI", target: "OpenAI" },
+      { source: "prompt", target: "提示词", note: "LLM term" },
+    ]);
+
+    expect(exported).toContain('"schema": "imt-glossary-v1"');
+    expect(importGlossaryEntries(exported)).toEqual([
+      { source: "OpenAI", target: "OpenAI" },
+      { source: "prompt", target: "提示词", note: "LLM term" },
+    ]);
+  });
+
+  it("imports pasted glossary text when JSON is not used", () => {
+    expect(importGlossaryEntries("API = 接口")).toEqual([{ source: "API", target: "接口" }]);
   });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
   requestProfilePatch,
@@ -10,13 +10,31 @@ import {
   type FallbackProvider,
   type RequestProfile,
 } from "../../src/shared/config";
-import { glossaryEntriesToText, glossaryTextToEntries } from "../../src/shared/glossary";
+import {
+  exportGlossaryEntries,
+  glossaryEntriesToText,
+  glossaryTextToEntries,
+  importGlossaryEntries,
+} from "../../src/shared/glossary";
 import type { MessageResponse } from "../../src/shared/messages";
+import { normalizeSiteRuleKey, setSiteDynamicModeRule } from "../../src/shared/siteRules";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
 const savedAt = ref("");
 const glossaryText = ref("");
+const glossaryImportText = ref("");
+const glossaryExportText = ref("");
+const glossaryImportError = ref("");
+const siteRuleHost = ref("");
+const siteRuleMode = ref<DynamicMode>("conservative");
+const siteRuleError = ref("");
+
+const siteRules = computed(() =>
+  Object.entries(config.siteDynamicModes)
+    .map(([siteKey, dynamicMode]) => ({ siteKey, dynamicMode }))
+    .sort((left, right) => left.siteKey.localeCompare(right.siteKey)),
+);
 
 const updateConfig = async (patch: ExtensionConfigPatch) => {
   Object.assign(config, patch);
@@ -111,6 +129,41 @@ const setGeminiSystemPrompt = (event: Event) => {
 const setGlossaryText = (event: Event) => {
   glossaryText.value = (event.target as HTMLTextAreaElement).value;
   void updateConfig({ glossary: glossaryTextToEntries(glossaryText.value) });
+};
+
+const exportGlossary = () => {
+  glossaryExportText.value = exportGlossaryEntries(config.glossary);
+};
+
+const importGlossary = () => {
+  try {
+    const glossary = importGlossaryEntries(glossaryImportText.value);
+    glossaryImportError.value = "";
+    glossaryText.value = glossaryEntriesToText(glossary);
+    void updateConfig({ glossary });
+  } catch (error) {
+    glossaryImportError.value = error instanceof Error ? error.message : String(error);
+  }
+};
+
+const saveSiteRule = () => {
+  const siteKey = normalizeSiteRuleKey(siteRuleHost.value);
+  if (!siteKey) {
+    siteRuleError.value = "Invalid site";
+    return;
+  }
+  siteRuleError.value = "";
+  siteRuleHost.value = siteKey;
+  const next = setSiteDynamicModeRule(config.siteDynamicModes, siteKey, siteRuleMode.value);
+  void updateConfig({ siteDynamicModes: next });
+};
+
+const removeSiteRule = (siteKey: string) => {
+  void updateConfig({ siteDynamicModes: setSiteDynamicModeRule(config.siteDynamicModes, siteKey, "auto") });
+};
+
+const clearSiteRules = () => {
+  void updateConfig({ siteDynamicModes: {} });
 };
 
 onMounted(async () => {
@@ -395,6 +448,81 @@ function numberInputValue(event: Event): number {
           @input="setGlossaryText"
         />
       </label>
+
+      <div class="action-row">
+        <button data-testid="glossary-export" class="compact-button" type="button" @click="exportGlossary">Export glossary</button>
+        <button data-testid="glossary-import" class="compact-button" type="button" @click="importGlossary">Import glossary</button>
+      </div>
+
+      <div class="import-grid">
+        <label class="field prompt-field">
+          <span>Import JSON or text</span>
+          <textarea
+            data-testid="glossary-import-text"
+            spellcheck="false"
+            :value="glossaryImportText"
+            @input="glossaryImportText = ($event.target as HTMLTextAreaElement).value"
+          />
+        </label>
+        <label class="field prompt-field">
+          <span>Export JSON</span>
+          <textarea data-testid="glossary-export-text" readonly spellcheck="false" :value="glossaryExportText" />
+        </label>
+      </div>
+      <p v-if="glossaryImportError" class="error-text">{{ glossaryImportError }}</p>
+    </section>
+
+    <section class="panel" aria-label="Site rules settings" :aria-busy="isLoading">
+      <div class="panel-heading">
+        <div>
+          <h2>Site rules</h2>
+          <p>Override dynamic translation behavior for specific sites.</p>
+        </div>
+        <button v-if="siteRules.length > 0" class="compact-button danger-button" type="button" @click="clearSiteRules">Clear</button>
+      </div>
+
+      <div class="site-rule-editor">
+        <label class="field">
+          <span>Site</span>
+          <input
+            data-testid="site-rule-host"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="youtube.com"
+            :value="siteRuleHost"
+            @input="siteRuleHost = ($event.target as HTMLInputElement).value"
+          />
+        </label>
+        <label class="field">
+          <span>Dynamic mode</span>
+          <select data-testid="site-rule-mode" :value="siteRuleMode" @change="siteRuleMode = ($event.target as HTMLSelectElement).value as DynamicMode">
+            <option value="off">Off</option>
+            <option value="conservative">Safe</option>
+            <option value="normal">Normal</option>
+          </select>
+        </label>
+        <button data-testid="site-rule-save" class="compact-button site-rule-save" type="button" @click="saveSiteRule">Save rule</button>
+      </div>
+      <p v-if="siteRuleError" class="error-text">{{ siteRuleError }}</p>
+
+      <div class="site-rule-list">
+        <div v-for="rule in siteRules" :key="rule.siteKey" class="site-rule-row" :data-testid="`site-rule-row-${rule.siteKey}`">
+          <div>
+            <strong>{{ rule.siteKey }}</strong>
+            <span>{{ rule.dynamicMode }}</span>
+          </div>
+          <button
+            class="compact-button danger-button"
+            type="button"
+            :data-testid="`site-rule-remove-${rule.siteKey}`"
+            @click="removeSiteRule(rule.siteKey)"
+          >
+            Remove
+          </button>
+        </div>
+        <p v-if="siteRules.length === 0" class="empty-text">No site rules</p>
+      </div>
     </section>
 
     <section class="panel" aria-label="Dynamic translation settings" :aria-busy="isLoading">
@@ -523,6 +651,83 @@ p {
   align-items: flex-start;
 }
 
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.compact-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 42, 95, 0.14);
+  border-radius: 8px;
+  color: #102a5f;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.compact-button:hover {
+  background: #f2f7fb;
+}
+
+.danger-button {
+  color: #9f2d2d;
+}
+
+.import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.site-rule-editor {
+  display: grid;
+  grid-template-columns: 1.3fr 0.7fr auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.site-rule-save {
+  min-width: 112px;
+}
+
+.site-rule-list {
+  display: grid;
+  gap: 8px;
+}
+
+.site-rule-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid rgba(15, 42, 95, 0.1);
+  border-radius: 8px;
+  background: #f9fbfd;
+}
+
+.site-rule-row strong,
+.site-rule-row span {
+  display: block;
+}
+
+.site-rule-row span,
+.empty-text,
+.error-text {
+  color: #66758c;
+  font-size: 12px;
+}
+
+.error-text {
+  color: #a23b3b;
+  font-weight: 650;
+}
+
 .field {
   display: grid;
   gap: 6px;
@@ -639,6 +844,8 @@ textarea {
   .openai-settings,
   .gemini-settings,
   .tuning-grid,
+  .import-grid,
+  .site-rule-editor,
   .profile-grid,
   .mode-grid {
     grid-template-columns: 1fr;

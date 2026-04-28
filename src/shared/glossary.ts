@@ -7,6 +7,7 @@ export type GlossaryEntry = {
 const MAX_GLOSSARY_ENTRIES = 200;
 const MAX_TERM_LENGTH = 120;
 const MAX_NOTE_LENGTH = 160;
+const GLOSSARY_SCHEMA = "imt-glossary-v1";
 
 export function normalizeGlossaryEntries(value: unknown): GlossaryEntry[] {
   if (!Array.isArray(value)) return [];
@@ -45,6 +46,33 @@ export function glossaryEntriesToText(entries: readonly GlossaryEntry[]): string
   return normalizeGlossaryEntries([...entries])
     .map((entry) => `${entry.source} = ${entry.target}${entry.note ? ` # ${entry.note}` : ""}`)
     .join("\n");
+}
+
+export function exportGlossaryEntries(entries: readonly GlossaryEntry[]): string {
+  return JSON.stringify(
+    {
+      schema: GLOSSARY_SCHEMA,
+      glossary: normalizeGlossaryEntries([...entries]),
+    },
+    null,
+    2,
+  );
+}
+
+export function importGlossaryEntries(value: string): GlossaryEntry[] {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) return normalizeGlossaryEntries(parsed);
+    if (isRecord(parsed) && "glossary" in parsed) return normalizeGlossaryEntries(parsed.glossary);
+    throw new Error("Invalid glossary JSON");
+  } catch {
+    const entries = glossaryTextToEntries(trimmed);
+    if (entries.length > 0) return entries;
+    throw new Error("Invalid glossary import");
+  }
 }
 
 export function buildGlossarySystemPrompt(basePrompt: string, entries: readonly GlossaryEntry[]): string {

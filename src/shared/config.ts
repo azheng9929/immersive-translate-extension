@@ -1,4 +1,5 @@
 import { normalizeGlossaryEntries, type GlossaryEntry } from "./glossary";
+import { normalizeSiteRuleKey, setSiteDynamicModeRule } from "./siteRules";
 
 export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini";
 export type FallbackProvider = "none" | ExtensionProvider;
@@ -203,17 +204,7 @@ export function setSiteDynamicModeOverride(
   siteKey: string,
   dynamicMode: DynamicMode | "auto",
 ): SiteDynamicModeOverrides {
-  const normalizedSiteKey = normalizeSiteKey(siteKey);
-  if (!normalizedSiteKey) return { ...current };
-
-  const next = { ...current };
-  if (dynamicMode === "auto") {
-    delete next[normalizedSiteKey];
-    return next;
-  }
-
-  next[normalizedSiteKey] = dynamicMode;
-  return next;
+  return setSiteDynamicModeRule(current, siteKey, dynamicMode);
 }
 
 function normalizeTargetLang(value: unknown): string {
@@ -270,28 +261,11 @@ function normalizeSiteDynamicModes(value: unknown): SiteDynamicModeOverrides {
   const overrides: SiteDynamicModeOverrides = {};
   for (const [rawKey, rawMode] of Object.entries(value)) {
     if (typeof rawMode !== "string" || !SUPPORTED_DYNAMIC_MODES.has(rawMode as DynamicMode)) continue;
-    const key = normalizeSiteKey(rawKey);
+    const key = normalizeSiteRuleKey(rawKey);
     if (!key) continue;
     overrides[key] = rawMode as DynamicMode;
   }
   return overrides;
-}
-
-function normalizeSiteKey(value: string): string {
-  let key = value.trim().toLowerCase();
-  if (!key) return "";
-
-  const schemeIndex = key.indexOf("://");
-  if (schemeIndex >= 0) {
-    key = key.slice(schemeIndex + 3);
-  }
-
-  key = key.split("/")[0] ?? "";
-  key = key.split("?")[0] ?? "";
-  key = key.replace(/:\d+$/, "");
-  key = key.replace(/\.$/, "");
-
-  return /^[a-z0-9.-]+$/.test(key) ? key : "";
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {

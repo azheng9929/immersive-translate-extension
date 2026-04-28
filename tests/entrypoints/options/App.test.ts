@@ -240,4 +240,71 @@ describe("options App", () => {
       },
     });
   });
+
+  it("imports and exports glossary JSON", async () => {
+    let config: ExtensionConfig = {
+      ...DEFAULT_EXTENSION_CONFIG,
+      glossary: [{ source: "OpenAI", target: "OpenAI" }],
+    };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find("[data-testid='glossary-export']").trigger("click");
+    expect(wrapper.find<HTMLTextAreaElement>("[data-testid='glossary-export-text']").element.value).toContain("imt-glossary-v1");
+
+    await wrapper.find<HTMLTextAreaElement>("[data-testid='glossary-import-text']").setValue(
+      JSON.stringify({ schema: "imt-glossary-v1", glossary: [{ source: "API", target: "接口" }] }),
+    );
+    await wrapper.find("[data-testid='glossary-import']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { glossary: [{ source: "API", target: "接口" }] },
+    });
+  });
+
+  it("manages site dynamic mode rules from settings", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteDynamicModes: { "x.com": "conservative" } };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find<HTMLInputElement>("[data-testid='site-rule-host']").setValue("https://www.youtube.com/watch?v=abc");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-mode']").setValue("off");
+    await wrapper.find("[data-testid='site-rule-save']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { siteDynamicModes: { "x.com": "conservative", "youtube.com": "off" } },
+    });
+
+    await wrapper.find("[data-testid='site-rule-remove-x.com']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { siteDynamicModes: { "youtube.com": "off" } },
+    });
+  });
 });
