@@ -167,4 +167,63 @@ describe("PageController", () => {
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
     expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
   });
+
+  it("translates newly added content without re-translating existing translated units", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(lateParagraph);
+
+    const result = await controller.translateNewContent(lateParagraph);
+
+    expect(result).toEqual({
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
+    expect(Array.from(document.querySelectorAll(".imt-translation-block")).map((node) => node.textContent)).toEqual([
+      "[zh-Hans] Hello world.",
+      "[zh-Hans] Late content.",
+    ]);
+
+    controller.restorePage();
+    expect(document.body.textContent?.replace(/\s+/g, " ").trim()).toBe("Hello world.Late content.");
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
+  });
+
+  it("skips already translated areas during supplemental scans", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    const result = await controller.translateNewContent(document.body);
+
+    expect(result).toEqual({
+      total: 0,
+      translated: 0,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(batchCalls).toBe(1);
+    expect(document.querySelectorAll(".imt-translation-block")).toHaveLength(1);
+  });
 });

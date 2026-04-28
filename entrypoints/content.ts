@@ -2,6 +2,7 @@ import { FloatingTranslationControl } from "../src/content/floatingControl";
 import { InputTranslator } from "../src/content/inputTranslator";
 import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
+import { PageTranslationSession } from "../src/content/pageTranslationSession";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
 import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, type ExtensionConfig } from "../src/shared/config";
 import { IndexedDbTranslationCache } from "../src/shared/translationCache";
@@ -11,13 +12,15 @@ export default defineContentScript({
   runAt: "document_idle",
   async main() {
     let config = await loadConfig();
-    let controller = createController(config);
+    let pageSession = createPageSession(config);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = createInputTranslator(config);
     const originalTextTooltip = new OriginalTextTooltip();
     const floatingControl = new FloatingTranslationControl({
-      translatePage: () => controller.translatePage(),
-      restorePage: () => controller.restorePage(),
+      translatePage: () => pageSession.translatePage(),
+      restorePage: () => pageSession.restorePage(),
+      getStatus: () => pageSession.getStatus(),
+      subscribeStatus: (listener) => pageSession.subscribe(listener),
     });
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
@@ -26,25 +29,26 @@ export default defineContentScript({
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "IMT_TRANSLATE_PAGE") {
-        floatingControl.translate().then(() => sendResponse({ ok: true }));
+        pageSession.translatePage().then(() => sendResponse({ ok: true }));
         return true;
       }
       if (message?.type === "IMT_RESTORE_PAGE") {
-        floatingControl.restore();
+        pageSession.restorePage();
         sendResponse({ ok: true });
       }
       if (message?.type === "IMT_CONFIG_UPDATED") {
-        controller.restorePage();
+        pageSession.restorePage();
+        pageSession.dispose();
         config = normalizeExtensionConfig(message.config);
-        controller = createController(config);
+        pageSession = createPageSession(config);
         selectionTranslator.unmount();
         selectionTranslator = createSelectionTranslator(config);
         selectionTranslator.mount();
         inputTranslator.unmount();
         inputTranslator = createInputTranslator(config);
         inputTranslator.mount();
+        floatingControl.hide();
         if (config.showFloatingBall) floatingControl.mount();
-        else floatingControl.hide();
         sendResponse({ ok: true });
       }
       return undefined;
@@ -81,6 +85,10 @@ function createController(config: ExtensionConfig): PageController {
   };
 
   return new PageController(config.useCache ? { ...options, cache: new IndexedDbTranslationCache() } : options);
+}
+
+function createPageSession(config: ExtensionConfig): PageTranslationSession {
+  return new PageTranslationSession(createController(config), { observeRoot: document.body, debounceMs: 250 });
 }
 
 function createSelectionTranslator(config: ExtensionConfig): SelectionTranslator {

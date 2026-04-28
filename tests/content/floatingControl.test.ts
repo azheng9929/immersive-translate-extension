@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FloatingTranslationControl } from "@/content/floatingControl";
+import type { PageTranslationStatus } from "@/content/pageTranslationSession";
 
 describe("FloatingTranslationControl", () => {
   afterEach(() => {
@@ -43,6 +44,26 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Partial");
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("2 / 3 translated");
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 failed");
+  });
+
+  it("reflects page session status updates", () => {
+    let listener: ((status: PageTranslationStatus) => void) | undefined;
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      subscribeStatus: (next) => {
+        listener = next;
+        return () => undefined;
+      },
+    });
+    control.mount(document.body);
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    listener?.({ phase: "updating", total: 2, translated: 1, failed: 0, skipped: 0, dynamicRuns: 1, lastError: undefined });
+
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Updating");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 / 2 translated");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 dynamic update");
   });
 
   it("runs restore and returns to ready state", async () => {

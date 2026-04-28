@@ -34,33 +34,42 @@ export class PageController {
 
   async translatePage(root: ParentNode = document.body): Promise<TranslationPageSummary> {
     this.restorePage();
+    return this.translateRoot(root);
+  }
+
+  async translateNewContent(root: ParentNode): Promise<TranslationPageSummary> {
+    return this.translateRoot(root);
+  }
+
+  private async translateRoot(root: ParentNode): Promise<TranslationPageSummary> {
     const revision = this.revision + 1;
     this.revision = revision;
 
     const scannedTexts = scanDocumentText(root);
     const attributes = scanTranslatableAttributes(root);
-    this.units = buildTranslationUnits({
+    const units = buildTranslationUnits({
       scannedTexts,
       attributes,
       sessionId: this.sessionId,
       revision: this.revision,
       targetLang: this.options.targetLang,
     });
-    this.applyDisplayMode(this.units);
+    this.applyDisplayMode(units);
+    this.units.push(...units);
 
     const summary: TranslationPageSummary = {
-      total: this.units.length,
+      total: units.length,
       translated: 0,
       failed: 0,
       skipped: 0,
     };
 
-    const lookupByUnitId = this.buildCacheLookups(this.units);
+    const lookupByUnitId = this.buildCacheLookups(units);
     const cacheHits = await this.readCache([...lookupByUnitId.values()]);
     if (revision !== this.revision) return summary;
 
     const missingUnits: TranslationUnit[] = [];
-    for (const unit of this.units) {
+    for (const unit of units) {
       const lookup = lookupByUnitId.get(unit.id);
       const cachedText = lookup ? cacheHits.get(lookup.key) : undefined;
       if (cachedText !== undefined) {

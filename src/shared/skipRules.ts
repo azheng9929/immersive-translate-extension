@@ -32,6 +32,7 @@ const UI_CATEGORIES = new Set<UnitCategory>([
 
 export function isSkippableElement(element: Element): boolean {
   if (element.closest('[data-imt-managed="true"]')) return true;
+  if (element.closest('[data-imt-state="translated"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
 
   let current: Element | null = element;

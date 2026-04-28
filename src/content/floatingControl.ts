@@ -1,10 +1,14 @@
 import type { TranslationPageSummary } from "./pageController";
+import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
 
-type FloatingState = "idle" | "translating" | "translated" | "partial" | "failed";
+type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
+type FloatingStatus = TranslationPageSummary | PageTranslationStatus;
 
 type FloatingTranslationControlOptions = {
-  translatePage: () => Promise<TranslationPageSummary>;
+  translatePage: () => Promise<FloatingStatus>;
   restorePage: () => void;
+  getStatus?: () => PageTranslationStatus;
+  subscribeStatus?: (listener: (status: PageTranslationStatus) => void) => () => void;
 };
 
 const STYLE_TEXT = `
@@ -47,6 +51,9 @@ const STYLE_TEXT = `
 }
 .imt-floating-root[data-state="translating"] .imt-floating-dot {
   background: #f6b840;
+}
+.imt-floating-root[data-state="updating"] .imt-floating-dot {
+  background: #38bdf8;
 }
 .imt-floating-root[data-state="translated"] .imt-floating-dot {
   background: #12b8a5;
@@ -143,8 +150,9 @@ export class FloatingTranslationControl {
   private root: HTMLElement | undefined;
   private expanded = false;
   private state: FloatingState = "idle";
-  private summary: TranslationPageSummary | undefined;
+  private summary: FloatingStatus | undefined;
   private error: string | undefined;
+  private unsubscribeStatus: (() => void) | undefined;
 
   constructor(private readonly options: FloatingTranslationControlOptions) {}
 
@@ -155,19 +163,21 @@ export class FloatingTranslationControl {
     this.root.dataset.imtManaged = "true";
     this.root.dataset.imtControl = "root";
     parent.append(this.root);
+    const status = this.options.getStatus?.();
+    if (status) this.applyStatus(status);
+    this.unsubscribeStatus = this.options.subscribeStatus?.((nextStatus) => this.applyStatus(nextStatus));
     this.render();
   }
 
   async translate(): Promise<void> {
-    if (!this.root || this.state === "translating") return;
+    if (!this.root || this.state === "translating" || this.state === "updating") return;
     this.state = "translating";
     this.error = undefined;
     this.render();
 
     try {
       const summary = await this.options.translatePage();
-      this.summary = summary;
-      this.state = stateFromSummary(summary);
+      this.applyStatus(summary);
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
       this.state = "failed";
@@ -185,6 +195,8 @@ export class FloatingTranslationControl {
   }
 
   hide(): void {
+    this.unsubscribeStatus?.();
+    this.unsubscribeStatus = undefined;
     this.root?.remove();
     this.root = undefined;
   }
@@ -251,7 +263,7 @@ export class FloatingTranslationControl {
     const translateButton = this.createButton("Translate", "translate", "imt-floating-button imt-floating-button-primary", () => {
       void this.translate();
     });
-    translateButton.disabled = this.state === "translating";
+    translateButton.disabled = this.state === "translating" || this.state === "updating";
 
     const restoreButton = this.createButton("Restore", "restore", "imt-floating-button", () => this.restore());
     const hideButton = this.createButton("Hide on this page", "hide", "imt-floating-button imt-floating-button-subtle", () => this.hide());
@@ -270,6 +282,22 @@ export class FloatingTranslationControl {
     button.addEventListener("click", onClick);
     return button;
   }
+
+  private applyStatus(status: FloatingStatus): void {
+    this.summary = status;
+    this.error = "lastError" in status ? status.lastError : undefined;
+    this.state = "phase" in status ? floatingStateFromPhase(status.phase) : stateFromSummary(status);
+    this.render();
+  }
+}
+
+function floatingStateFromPhase(phase: PageTranslationPhase): FloatingState {
+  if (phase === "translating") return "translating";
+  if (phase === "updating") return "updating";
+  if (phase === "translated") return "translated";
+  if (phase === "partial") return "partial";
+  if (phase === "failed") return "failed";
+  return "idle";
 }
 
 function stateFromSummary(summary: TranslationPageSummary): FloatingState {
@@ -280,18 +308,22 @@ function stateFromSummary(summary: TranslationPageSummary): FloatingState {
 
 function statusLabel(state: FloatingState): string {
   if (state === "translating") return "Translating";
+  if (state === "updating") return "Updating";
   if (state === "translated") return "Translated";
   if (state === "partial") return "Partial";
   if (state === "failed") return "Failed";
   return "Ready";
 }
 
-function summaryLabel(summary: TranslationPageSummary | undefined): string {
+function summaryLabel(summary: FloatingStatus | undefined): string {
   if (!summary) return "No page translation yet";
   if (summary.total === 0) return "No translatable text found";
 
   const parts = [`${summary.translated} / ${summary.total} translated`];
   if (summary.failed > 0) parts.push(`${summary.failed} failed`);
   if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
+  if ("dynamicRuns" in summary && summary.dynamicRuns > 0) {
+    parts.push(`${summary.dynamicRuns} dynamic ${summary.dynamicRuns === 1 ? "update" : "updates"}`);
+  }
   return parts.join(", ");
 }
