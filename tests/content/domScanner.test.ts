@@ -85,6 +85,62 @@ describe("scanDocumentText", () => {
     expect(texts).toContain("Visible text");
     expect(texts).not.toContain("Editable text");
   });
+
+  it("uses YouTube granularity rules to keep content and skip controls", () => {
+    mountFixture(`
+      <main>
+        <div id="masthead-container">Search</div>
+        <h1 class="title">How large language models actually work</h1>
+        <yt-formatted-string id="content-text">This explanation finally made the idea click for me.</yt-formatted-string>
+        <div id="metadata-line">1.2M views</div>
+        <div id="top-level-buttons-computed"><button>Share</button></div>
+      </main>
+    `);
+
+    const texts = scanDocumentText(document.body, { hostname: "www.youtube.com" }).map((item) => item.text);
+
+    expect(texts).toContain("How large language models actually work");
+    expect(texts).toContain("This explanation finally made the idea click for me.");
+    expect(texts).not.toContain("Search");
+    expect(texts).not.toContain("1.2M views");
+    expect(texts).not.toContain("Share");
+  });
+
+  it("uses Reddit granularity rules to keep posts and skip metadata/actions", () => {
+    mountFixture(`
+      <shreddit-post>
+        <a data-testid="post_author_link">u/alice</a>
+        <a data-testid="post-title" slot="title">A practical guide to browser extension translation</a>
+        <div data-click-id="upvote">12K</div>
+        <button data-click-id="share">Share</button>
+        <div data-testid="comment"><p>This comment adds useful context for readers.</p></div>
+      </shreddit-post>
+    `);
+
+    const texts = scanDocumentText(document.body, { hostname: "www.reddit.com" }).map((item) => item.text);
+
+    expect(texts).toContain("A practical guide to browser extension translation");
+    expect(texts).toContain("This comment adds useful context for readers.");
+    expect(texts).not.toContain("u/alice");
+    expect(texts).not.toContain("12K");
+    expect(texts).not.toContain("Share");
+  });
+
+  it("uses X granularity rules to keep tweet text and skip hover/control text", () => {
+    mountFixture(`
+      <article>
+        <div data-testid="User-Name"><span>@openai</span></div>
+        <time>2h</time>
+        <div data-testid="tweetText" lang="en">Shipping readable translation without moving the page layout.</div>
+        <div role="button">Reply</div>
+        <div data-testid="HoverCard"><span>218 likes</span></div>
+      </article>
+    `);
+
+    const texts = scanDocumentText(document.body, { hostname: "x.com" }).map((item) => item.text);
+
+    expect(texts).toEqual(["Shipping readable translation without moving the page layout."]);
+  });
 });
 
 describe("scanTranslatableAttributes", () => {

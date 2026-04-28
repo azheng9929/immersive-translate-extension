@@ -68,6 +68,7 @@ async function loadConfig(): Promise<ExtensionConfig> {
 function createController(config: ExtensionConfig, sitePolicy: SitePolicy): PageController {
   const options: ConstructorParameters<typeof PageController>[0] = {
     targetLang: config.targetLang,
+    hostname: window.location.hostname,
     providerId: config.provider,
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,

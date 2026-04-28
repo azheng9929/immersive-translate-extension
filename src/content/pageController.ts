@@ -15,6 +15,7 @@ type TranslationRetryOptions = {
 
 type ControllerOptions = {
   targetLang: string;
+  hostname?: string;
   providerId?: string;
   displayMode?: DisplayMode;
   cache?: TranslationCache;
@@ -125,14 +126,17 @@ export class PageController {
   }
 
   private buildUnits(root: ParentNode, revision: number): TranslationUnit[] {
-    const scannedTexts = scanDocumentText(root);
-    const attributes = scanTranslatableAttributes(root, this.options.attributeNames);
+    const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
+    const scanOptions = { hostname };
+    const scannedTexts = scanDocumentText(root, scanOptions);
+    const attributes = scanTranslatableAttributes(root, this.options.attributeNames, scanOptions);
     return buildTranslationUnits({
       scannedTexts,
       attributes,
       sessionId: this.sessionId,
       revision,
       targetLang: this.options.targetLang,
+      hostname,
     });
   }
 

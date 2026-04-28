@@ -2,6 +2,7 @@ import type { ScannedText } from "./domScanner";
 import { normalizeForCache, normalizeVisibleText } from "../shared/normalize";
 import { isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
+import { resolveTextGranularity } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
 import { isVisibleElement } from "./visibility";
 
@@ -11,6 +12,7 @@ type BuildInput = {
   sessionId: string;
   revision: number;
   targetLang: string;
+  hostname?: string;
 };
 
 const CONTENT_TAGS = new Set(["P", "BLOCKQUOTE", "FIGCAPTION", "ARTICLE"]);
@@ -19,21 +21,27 @@ const INLINE_TAGS = new Set(["A", "SPAN", "STRONG", "EM", "B", "I", "SMALL", "SU
 
 export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   const rootToTexts = new Map<HTMLElement, Text[]>();
+  const rootToCategories = new Map<HTMLElement, UnitCategory[]>();
 
   for (const scanned of input.scannedTexts) {
-    const root = findSemanticRoot(scanned.parent);
+    const root = scanned.root ?? findSemanticRoot(scanned.parent);
     const texts = rootToTexts.get(root) ?? [];
     texts.push(scanned.node);
     rootToTexts.set(root, texts);
+    if (scanned.category) {
+      const categories = rootToCategories.get(root) ?? [];
+      categories.push(scanned.category);
+      rootToCategories.set(root, categories);
+    }
   }
 
   const units: TranslationUnit[] = [];
   let index = 0;
 
   for (const [root, textNodes] of rootToTexts) {
-    const originalText = collectUnitText(root, textNodes);
+    const originalText = collectUnitText(root, textNodes, input.hostname);
     if (!originalText) continue;
-    const category = classifyRoot(root);
+    const category = categoryFromScanned(rootToCategories.get(root)) ?? classifyRoot(root);
     units.push({
       id: `u-${input.revision}-${index++}`,
       sessionId: input.sessionId,
@@ -71,14 +79,17 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   return sortUnitsByDocumentOrder(dedupeNestedUnits(units));
 }
 
-function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[]): string {
+function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[], hostname?: string): string {
   let text = "";
+  const scanOptions = hostname ? { hostname } : {};
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
       if (isSkippableElement(parent)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
+      const nodeText = normalizeVisibleText(node.textContent ?? "");
+      if (resolveTextGranularity(parent, nodeText, scanOptions).skip) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
@@ -91,6 +102,11 @@ function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[]): string {
 
   if (text) return normalizeVisibleText(text);
   return normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
+}
+
+function categoryFromScanned(categories: UnitCategory[] | undefined): UnitCategory | undefined {
+  if (!categories || categories.length === 0) return undefined;
+  return [...new Set(categories)].sort((a, b) => priorityForCategory(b) - priorityForCategory(a))[0];
 }
 
 function findSemanticRoot(element: HTMLElement): HTMLElement {
@@ -123,6 +139,7 @@ function classifyRoot(root: HTMLElement): UnitCategory {
 function priorityForCategory(category: UnitCategory): number {
   if (category === "content-block" || category === "comment") return 100;
   if (category === "heading") return 90;
+  if (category === "card-text") return 85;
   if (category === "list-item") return 80;
   if (category === "table-cell") return 50;
   if (category === "attribute") return 20;

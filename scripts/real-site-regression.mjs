@@ -134,7 +134,19 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
         '[role="tooltip"] .imt-translation-block',
         '[data-testid="HoverCard"] .imt-translation-block',
         '[data-imt-managed="true"] .imt-translation-block',
-        '[data-imt-managed="true"] [data-imt-state="translated"]'
+        '[data-imt-managed="true"] [data-imt-state="translated"]',
+        '#masthead-container [data-imt-state="translated"]',
+        '#guide-content [data-imt-state="translated"]',
+        '#top-level-buttons-computed [data-imt-state="translated"]',
+        '#metadata-line [data-imt-state="translated"]',
+        'ytd-button-renderer [data-imt-state="translated"]',
+        '[data-click-id="share"] [data-imt-state="translated"]',
+        '[data-click-id="upvote"] [data-imt-state="translated"]',
+        '[data-click-id="downvote"] [data-imt-state="translated"]',
+        '[data-testid="post_author_link"] [data-imt-state="translated"]',
+        '[data-testid="comment_author_link"] [data-imt-state="translated"]',
+        '[data-testid="placementTracking"] [data-imt-state="translated"]',
+        '[data-testid="User-Name"] [data-imt-state="translated"]'
       ].join(',')).length;
       return {
         url: location.href,

@@ -326,4 +326,36 @@ describe("PageController", () => {
     expect(document.querySelector("input")?.getAttribute("title")).toBe("[zh-Hans] Tooltip label");
     expect(document.querySelector("input")?.getAttribute("aria-label")).toBe("[zh-Hans] Search input");
   });
+
+  it("passes only semantic site content to the translator on high-dynamic pages", async () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="masthead-container">Search</div>
+        <h1 class="title">How large language models actually work</h1>
+        <div id="metadata-line">1.2M views</div>
+        <div id="top-level-buttons-computed"><button>Share</button></div>
+        <yt-formatted-string id="content-text">This explanation finally made the idea click for me.</yt-formatted-string>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: "www.youtube.com",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "How large language models actually work",
+      "This explanation finally made the idea click for me.",
+    ]);
+    expect(document.body.textContent).toContain("Search");
+    expect(document.body.textContent).toContain("1.2M views");
+    expect(document.body.textContent).toContain("Share");
+    expect(document.querySelector("h1")?.textContent).toContain("[zh-Hans] How large language models actually work");
+  });
 });

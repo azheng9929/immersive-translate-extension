@@ -9,6 +9,10 @@ const SKIP_TAGS = new Set([
   "SVG",
   "CANVAS",
   "MATH",
+  "TIME",
+  "RUBY",
+  "RT",
+  "RP",
   "PRE",
   "CODE",
   "KBD",
@@ -36,6 +40,34 @@ export function isSkippableElement(element: Element): boolean {
   if (element.closest('[data-imt-state="translated"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
   if (element.closest('[role="tooltip"], [popover]')) return true;
+  if (
+    element.closest(
+      [
+        ".social-share",
+        ".share-nav",
+        '[data-toolbar="share"]',
+        ".o-share",
+        ".prism-code",
+        ".enlighter-code",
+        ".rc-CodeBlock",
+        '[role="code"]',
+        "table.highlight",
+        "hypothesis-highlight",
+        ".hypothesis-highlight",
+        ".material-icons",
+        "material-icon",
+        'span[class^="material-symbols-"]',
+        ".google-symbols",
+        "i.fa",
+        'i[class^="fa-"]',
+        "visuallyhidden",
+        ".visuallyhidden",
+        ".sr-only",
+      ].join(","),
+    )
+  ) {
+    return true;
+  }
 
   let current: Element | null = element;
   while (current) {
@@ -59,8 +91,13 @@ export function isMeaningfulText(value: string, category: UnitCategory): boolean
   if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(text)) return false;
   if (/^https?:\/\//i.test(text)) return false;
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return false;
+  if (/^@[A-Za-z0-9_.-]{1,50}$/.test(text)) return false;
+  if (/^[ur]\/[A-Za-z0-9_-]{1,40}$/i.test(text)) return false;
+  if (/^id@https?:\/\/(?:x\.com|twitter\.com)\/[\w-]+\/status\/\d+/i.test(text)) return false;
+  if (/^[A-Za-z]:[\\/][^\s]+$/.test(text) || /^\.{0,2}[\\/][^\s]+$/.test(text)) return false;
   if (/^v?\d+(\.\d+){1,4}$/i.test(text)) return false;
   if (/^(?:[#$][a-f0-9]{7,}|0x[a-f0-9]{7,})$/i.test(text)) return false;
+  if (/^[a-f0-9]{16,}$/i.test(text)) return false;
   if (text.length < 3 && !UI_CATEGORIES.has(category)) return false;
   return true;
 }

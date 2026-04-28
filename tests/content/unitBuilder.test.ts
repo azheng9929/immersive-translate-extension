@@ -75,4 +75,46 @@ describe("buildTranslationUnits", () => {
     expect(units[0]!.renderMode).toBe("replace-attribute");
     expect(units[0]!.originalText).toBe("Search docs");
   });
+
+  it("carries site granularity roots and categories into translation units", () => {
+    mountFixture(`
+      <article>
+        <div data-testid="User-Name">@openai</div>
+        <div data-testid="tweetText" lang="en"><span>Shipping readable translation without moving the page layout.</span></div>
+        <div role="button">Reply</div>
+      </article>
+      <shreddit-post>
+        <a data-testid="post-title" slot="title">A practical guide to browser extension translation</a>
+      </shreddit-post>
+    `);
+
+    const tweetUnits = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, { hostname: "x.com" }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      hostname: "x.com",
+    });
+    const redditUnits = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, { hostname: "www.reddit.com" }),
+      attributes: [],
+      sessionId: "s2",
+      revision: 1,
+      targetLang: "zh-Hans",
+      hostname: "www.reddit.com",
+    });
+
+    expect(tweetUnits).toHaveLength(2);
+    expect(tweetUnits.find((unit) => unit.originalText.startsWith("Shipping"))).toMatchObject({
+      category: "comment",
+      root: document.querySelector("[data-testid='tweetText']"),
+      priority: 100,
+    });
+    expect(tweetUnits.map((unit) => unit.originalText)).not.toContain("Reply");
+    expect(redditUnits.find((unit) => unit.originalText.startsWith("A practical guide"))).toMatchObject({
+      category: "card-text",
+      root: document.querySelector("[data-testid='post-title']"),
+    });
+  });
 });
