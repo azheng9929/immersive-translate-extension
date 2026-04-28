@@ -38,6 +38,7 @@ describe("openaiProvider", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/chat/completions");
     expect(requestInit.headers).toMatchObject({ Authorization: "Bearer secret" });
     expect(body.model).toBe("test-model");
+    expect(body).not.toHaveProperty("temperature");
     expect(body.messages[0].content).toContain("Preserve ids, item count, and item boundaries");
     expect(JSON.parse(body.messages[1].content).items).toEqual([
       { id: "u-1", category: "content-block", text: "Hello" },

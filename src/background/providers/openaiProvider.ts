@@ -30,7 +30,6 @@ export const openaiProvider: TranslationProvider = {
       },
       body: JSON.stringify({
         model: request.model ?? "gpt-4o-mini",
-        temperature: 0.2,
         messages: [
           {
             role: "system",
