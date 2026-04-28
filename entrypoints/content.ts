@@ -81,14 +81,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
         type: "IMT_TRANSLATE_BATCH",
         request: {
           provider: config.provider,
-          endpoint: config.openaiEndpoint,
-          apiKey: config.openaiApiKey,
-          model: config.openaiModel,
-          maxConcurrentRequests: config.openaiMaxConcurrentRequests,
-          maxBatchItems: config.openaiMaxBatchItems,
-          maxBatchChars: config.openaiMaxBatchChars,
-          requestTimeoutMs: config.openaiRequestTimeoutMs,
-          systemPrompt: config.openaiSystemPrompt,
+          ...providerRequestOptions(config),
           sourceLang: "auto",
           targetLang: config.targetLang,
           items,
@@ -154,14 +147,7 @@ async function translateSingleText(config: ExtensionConfig, scope: "selection" |
     type: "IMT_TRANSLATE_BATCH",
     request: {
       provider: config.provider,
-      endpoint: config.openaiEndpoint,
-      apiKey: config.openaiApiKey,
-      model: config.openaiModel,
-      maxConcurrentRequests: config.openaiMaxConcurrentRequests,
-      maxBatchItems: config.openaiMaxBatchItems,
-      maxBatchChars: config.openaiMaxBatchChars,
-      requestTimeoutMs: config.openaiRequestTimeoutMs,
-      systemPrompt: config.openaiSystemPrompt,
+      ...providerRequestOptions(config),
       sourceLang: "auto",
       targetLang: config.targetLang,
       items: [{ id: `${scope}-${Date.now()}`, text, category: "fallback" }],
@@ -177,6 +163,32 @@ async function translateSingleText(config: ExtensionConfig, scope: "selection" |
     throw new Error(result?.error ?? "Translation failed");
   }
   return result.text;
+}
+
+function providerRequestOptions(config: ExtensionConfig) {
+  if (config.provider === "gemini") {
+    return {
+      endpoint: config.geminiEndpoint,
+      apiKey: config.geminiApiKey,
+      model: config.geminiModel,
+      maxConcurrentRequests: config.geminiMaxConcurrentRequests,
+      maxBatchItems: config.geminiMaxBatchItems,
+      maxBatchChars: config.geminiMaxBatchChars,
+      requestTimeoutMs: config.geminiRequestTimeoutMs,
+      systemPrompt: config.geminiSystemPrompt,
+    };
+  }
+
+  return {
+    endpoint: config.openaiEndpoint,
+    apiKey: config.openaiApiKey,
+    model: config.openaiModel,
+    maxConcurrentRequests: config.openaiMaxConcurrentRequests,
+    maxBatchItems: config.openaiMaxBatchItems,
+    maxBatchChars: config.openaiMaxBatchChars,
+    requestTimeoutMs: config.openaiRequestTimeoutMs,
+    systemPrompt: config.openaiSystemPrompt,
+  };
 }
 
 async function copyToClipboard(text: string): Promise<void> {

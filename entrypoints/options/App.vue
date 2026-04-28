@@ -63,6 +63,38 @@ const setOpenAISystemPrompt = (event: Event) => {
   void updateConfig({ openaiSystemPrompt: (event.target as HTMLTextAreaElement).value });
 };
 
+const setGeminiEndpoint = (event: Event) => {
+  void updateConfig({ geminiEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setGeminiApiKey = (event: Event) => {
+  void updateConfig({ geminiApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setGeminiModel = (event: Event) => {
+  void updateConfig({ geminiModel: (event.target as HTMLInputElement).value });
+};
+
+const setGeminiMaxConcurrentRequests = (event: Event) => {
+  void updateConfig({ geminiMaxConcurrentRequests: numberInputValue(event) });
+};
+
+const setGeminiMaxBatchItems = (event: Event) => {
+  void updateConfig({ geminiMaxBatchItems: numberInputValue(event) });
+};
+
+const setGeminiMaxBatchChars = (event: Event) => {
+  void updateConfig({ geminiMaxBatchChars: numberInputValue(event) });
+};
+
+const setGeminiRequestTimeoutMs = (event: Event) => {
+  void updateConfig({ geminiRequestTimeoutMs: numberInputValue(event) });
+};
+
+const setGeminiSystemPrompt = (event: Event) => {
+  void updateConfig({ geminiSystemPrompt: (event.target as HTMLTextAreaElement).value });
+};
+
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
@@ -99,11 +131,12 @@ function numberInputValue(event: Event): number {
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
+          <option value="gemini">Google Gemini</option>
           <option value="fake">Local test</option>
         </select>
       </label>
 
-      <div class="openai-settings">
+      <div v-if="config.provider === 'openai-compatible'" class="openai-settings">
         <label class="field">
           <span>OpenAI API endpoint</span>
           <input
@@ -141,7 +174,45 @@ function numberInputValue(event: Event): number {
         </label>
       </div>
 
-      <div class="openai-advanced" aria-label="OpenAI API request settings">
+      <div v-if="config.provider === 'gemini'" class="gemini-settings">
+        <label class="field">
+          <span>Gemini API endpoint</span>
+          <input
+            data-testid="gemini-endpoint"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.geminiEndpoint"
+            @input="setGeminiEndpoint"
+          />
+        </label>
+
+        <label class="field">
+          <span>API key</span>
+          <input
+            data-testid="gemini-api-key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.geminiApiKey"
+            @input="setGeminiApiKey"
+          />
+        </label>
+
+        <label class="field">
+          <span>Model</span>
+          <input
+            data-testid="gemini-model"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.geminiModel"
+            @input="setGeminiModel"
+          />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'openai-compatible'" class="openai-advanced" aria-label="OpenAI API request settings">
         <h3>OpenAI request design</h3>
         <div class="tuning-grid">
           <label class="field">
@@ -204,6 +275,73 @@ function numberInputValue(event: Event): number {
             spellcheck="false"
             :value="config.openaiSystemPrompt"
             @input="setOpenAISystemPrompt"
+          />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'gemini'" class="gemini-advanced" aria-label="Gemini API request settings">
+        <h3>Gemini request design</h3>
+        <div class="tuning-grid">
+          <label class="field">
+            <span>Concurrency</span>
+            <input
+              data-testid="gemini-max-concurrent"
+              type="number"
+              min="1"
+              max="8"
+              step="1"
+              :value="config.geminiMaxConcurrentRequests"
+              @input="setGeminiMaxConcurrentRequests"
+            />
+          </label>
+
+          <label class="field">
+            <span>Batch items</span>
+            <input
+              data-testid="gemini-max-batch-items"
+              type="number"
+              min="1"
+              max="80"
+              step="1"
+              :value="config.geminiMaxBatchItems"
+              @input="setGeminiMaxBatchItems"
+            />
+          </label>
+
+          <label class="field">
+            <span>Batch chars</span>
+            <input
+              data-testid="gemini-max-batch-chars"
+              type="number"
+              min="500"
+              max="30000"
+              step="500"
+              :value="config.geminiMaxBatchChars"
+              @input="setGeminiMaxBatchChars"
+            />
+          </label>
+
+          <label class="field">
+            <span>Timeout ms</span>
+            <input
+              data-testid="gemini-request-timeout"
+              type="number"
+              min="5000"
+              max="180000"
+              step="5000"
+              :value="config.geminiRequestTimeoutMs"
+              @input="setGeminiRequestTimeoutMs"
+            />
+          </label>
+        </div>
+
+        <label class="field prompt-field">
+          <span>System prompt</span>
+          <textarea
+            data-testid="gemini-system-prompt"
+            spellcheck="false"
+            :value="config.geminiSystemPrompt"
+            @input="setGeminiSystemPrompt"
           />
         </label>
       </div>
@@ -352,13 +490,15 @@ textarea {
   line-height: 1.45;
 }
 
-.openai-settings {
+.openai-settings,
+.gemini-settings {
   display: grid;
   grid-template-columns: 1.4fr 1fr 0.8fr;
   gap: 12px;
 }
 
-.openai-advanced {
+.openai-advanced,
+.gemini-advanced {
   display: grid;
   gap: 12px;
   padding-top: 4px;
@@ -418,6 +558,7 @@ textarea {
   .page-header,
   .panel-heading,
   .openai-settings,
+  .gemini-settings,
   .tuning-grid,
   .mode-grid {
     grid-template-columns: 1fr;

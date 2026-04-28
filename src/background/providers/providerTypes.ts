@@ -1,6 +1,6 @@
 import type { UnitCategory } from "../../shared/types";
 
-export type ProviderId = "fake" | "microsoft" | "openai-compatible";
+export type ProviderId = "fake" | "microsoft" | "openai-compatible" | "gemini";
 
 export type ProviderRequestItem = {
   id: string;

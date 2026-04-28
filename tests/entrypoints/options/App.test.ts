@@ -103,4 +103,74 @@ describe("options App", () => {
       patch: { openaiSystemPrompt: "Custom prompt" },
     });
   });
+
+  it("saves Gemini API settings from the settings page", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "gemini" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const endpoint = wrapper.find<HTMLInputElement>("[data-testid='gemini-endpoint']");
+    const apiKey = wrapper.find<HTMLInputElement>("[data-testid='gemini-api-key']");
+    const model = wrapper.find<HTMLInputElement>("[data-testid='gemini-model']");
+    const maxConcurrent = wrapper.find<HTMLInputElement>("[data-testid='gemini-max-concurrent']");
+    const maxBatchItems = wrapper.find<HTMLInputElement>("[data-testid='gemini-max-batch-items']");
+    const maxBatchChars = wrapper.find<HTMLInputElement>("[data-testid='gemini-max-batch-chars']");
+    const timeout = wrapper.find<HTMLInputElement>("[data-testid='gemini-request-timeout']");
+    const systemPrompt = wrapper.find<HTMLTextAreaElement>("[data-testid='gemini-system-prompt']");
+
+    expect(endpoint.element.value).toBe("https://generativelanguage.googleapis.com/v1beta");
+    expect(model.element.value).toBe("gemini-3.1-flash-lite-preview");
+    await endpoint.setValue("https://generativelanguage.googleapis.com/v1beta");
+    await apiKey.setValue("gem-test");
+    await model.setValue("gemini-test");
+    await maxConcurrent.setValue("3");
+    await maxBatchItems.setValue("10");
+    await maxBatchChars.setValue("7000");
+    await timeout.setValue("65000");
+    await systemPrompt.setValue("Gemini custom prompt");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiEndpoint: "https://generativelanguage.googleapis.com/v1beta" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiApiKey: "gem-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiModel: "gemini-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiMaxConcurrentRequests: 3 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiMaxBatchItems: 10 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiMaxBatchChars: 7000 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiRequestTimeoutMs: 65000 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { geminiSystemPrompt: "Gemini custom prompt" },
+    });
+  });
 });

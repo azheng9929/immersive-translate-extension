@@ -1,5 +1,6 @@
 import { createConfigStore } from "./configStore";
 import { fakeProvider } from "./providers/fakeProvider";
+import { geminiProvider } from "./providers/geminiProvider";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
 import type { ProviderRequest, ProviderResponseItem, TranslationProvider } from "./providers/providerTypes";
@@ -9,6 +10,7 @@ const providers: Record<ProviderRequest["provider"], TranslationProvider> = {
   fake: fakeProvider,
   microsoft: microsoftProvider,
   "openai-compatible": openaiProvider,
+  gemini: geminiProvider,
 };
 
 export async function sendToActiveTab(message: ContentMessage): Promise<MessageResponse> {

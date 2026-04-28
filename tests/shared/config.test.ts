@@ -21,6 +21,14 @@ describe("normalizeExtensionConfig", () => {
         openaiMaxBatchChars: "12000",
         openaiRequestTimeoutMs: "60000",
         openaiSystemPrompt: " Custom prompt ",
+        geminiEndpoint: " https://generativelanguage.googleapis.com/v1beta ",
+        geminiApiKey: " gem-test ",
+        geminiModel: " gemini-test ",
+        geminiMaxConcurrentRequests: "3",
+        geminiMaxBatchItems: 18.4,
+        geminiMaxBatchChars: "8000",
+        geminiRequestTimeoutMs: "65000",
+        geminiSystemPrompt: " Gemini prompt ",
         siteDynamicModes: {
           "youtube.com": "normal",
           "x.com": "off",
@@ -42,6 +50,14 @@ describe("normalizeExtensionConfig", () => {
       openaiMaxBatchChars: 12000,
       openaiRequestTimeoutMs: 60000,
       openaiSystemPrompt: "Custom prompt",
+      geminiEndpoint: "https://generativelanguage.googleapis.com/v1beta",
+      geminiApiKey: "gem-test",
+      geminiModel: "gemini-test",
+      geminiMaxConcurrentRequests: 3,
+      geminiMaxBatchItems: 18,
+      geminiMaxBatchChars: 8000,
+      geminiRequestTimeoutMs: 65000,
+      geminiSystemPrompt: "Gemini prompt",
       siteDynamicModes: {
         "youtube.com": "normal",
         "x.com": "off",
@@ -78,6 +94,22 @@ describe("normalizeExtensionConfig", () => {
       openaiMaxBatchItems: 1,
       openaiMaxBatchChars: 500,
       openaiRequestTimeoutMs: 180000,
+    });
+  });
+
+  it("clamps Gemini request settings to safe bounds", () => {
+    expect(
+      normalizeExtensionConfig({
+        geminiMaxConcurrentRequests: 99,
+        geminiMaxBatchItems: 0,
+        geminiMaxBatchChars: 100,
+        geminiRequestTimeoutMs: 999999,
+      }),
+    ).toMatchObject({
+      geminiMaxConcurrentRequests: 8,
+      geminiMaxBatchItems: 1,
+      geminiMaxBatchChars: 500,
+      geminiRequestTimeoutMs: 180000,
     });
   });
 });

@@ -55,6 +55,18 @@ const setOpenAIModel = (event: Event) => {
   void updateConfig({ openaiModel: (event.target as HTMLInputElement).value });
 };
 
+const setGeminiEndpoint = (event: Event) => {
+  void updateConfig({ geminiEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setGeminiApiKey = (event: Event) => {
+  void updateConfig({ geminiApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setGeminiModel = (event: Event) => {
+  void updateConfig({ geminiModel: (event.target as HTMLInputElement).value });
+};
+
 const setDisplayMode = (displayMode: DisplayMode) => {
   void updateConfig({ displayMode });
 };
@@ -116,6 +128,13 @@ const openAIStatus = computed(() => {
 });
 
 const openAIEndpointSummary = computed(() => endpointSummary(config.openaiEndpoint));
+
+const geminiStatus = computed(() => {
+  if (config.provider !== "gemini") return "Not selected";
+  return config.geminiApiKey ? `Ready - ${config.geminiModel}` : "API key required";
+});
+
+const geminiEndpointSummary = computed(() => endpointSummary(config.geminiEndpoint));
 
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
@@ -263,6 +282,7 @@ function endpointSummary(value: string): string {
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
+          <option value="gemini">Google Gemini</option>
           <option value="fake">Local test</option>
         </select>
       </label>
@@ -310,6 +330,54 @@ function endpointSummary(value: string): string {
               spellcheck="false"
               :value="config.openaiModel"
               @input="setOpenAIModel"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div v-if="config.provider === 'gemini'" class="openai-quick" aria-label="Gemini API settings">
+        <div class="openai-quick-header">
+          <div>
+            <h2>Google Gemini</h2>
+            <p data-testid="popup-gemini-status">{{ geminiStatus }}</p>
+          </div>
+          <p class="openai-endpoint">{{ geminiEndpointSummary }}</p>
+        </div>
+
+        <label class="field">
+          <span>Endpoint</span>
+          <input
+            data-testid="popup-gemini-endpoint"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.geminiEndpoint"
+            @input="setGeminiEndpoint"
+          />
+        </label>
+
+        <div class="openai-grid">
+          <label class="field">
+            <span>API key</span>
+            <input
+              data-testid="popup-gemini-api-key"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              :value="config.geminiApiKey"
+              @input="setGeminiApiKey"
+            />
+          </label>
+
+          <label class="field">
+            <span>Model</span>
+            <input
+              data-testid="popup-gemini-model"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              :value="config.geminiModel"
+              @input="setGeminiModel"
             />
           </label>
         </div>
