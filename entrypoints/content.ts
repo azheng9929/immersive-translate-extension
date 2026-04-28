@@ -1,4 +1,5 @@
 import { FloatingTranslationControl } from "../src/content/floatingControl";
+import { InputTranslator } from "../src/content/inputTranslator";
 import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
 import { PageController } from "../src/content/pageController";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
@@ -12,6 +13,7 @@ export default defineContentScript({
     let config = await loadConfig();
     let controller = createController(config);
     let selectionTranslator = createSelectionTranslator(config);
+    let inputTranslator = createInputTranslator(config);
     const originalTextTooltip = new OriginalTextTooltip();
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => controller.translatePage(),
@@ -19,6 +21,7 @@ export default defineContentScript({
     });
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
+    inputTranslator.mount();
     originalTextTooltip.mount();
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -37,6 +40,9 @@ export default defineContentScript({
         selectionTranslator.unmount();
         selectionTranslator = createSelectionTranslator(config);
         selectionTranslator.mount();
+        inputTranslator.unmount();
+        inputTranslator = createInputTranslator(config);
+        inputTranslator.mount();
         if (config.showFloatingBall) floatingControl.mount();
         else floatingControl.hide();
         sendResponse({ ok: true });
@@ -79,29 +85,38 @@ function createController(config: ExtensionConfig): PageController {
 
 function createSelectionTranslator(config: ExtensionConfig): SelectionTranslator {
   return new SelectionTranslator({
-    translateText: async (text) => {
-      const response = await chrome.runtime.sendMessage({
-        type: "IMT_TRANSLATE_BATCH",
-        request: {
-          provider: config.provider,
-          sourceLang: "auto",
-          targetLang: config.targetLang,
-          items: [{ id: `selection-${Date.now()}`, text, category: "fallback" }],
-        },
-      });
-
-      if (!response?.ok || !("items" in response) || !Array.isArray(response.items)) {
-        throw new Error(response?.error ?? "Translation failed");
-      }
-
-      const result = response.items[0];
-      if (!result || result.status !== "ok") {
-        throw new Error(result?.error ?? "Translation failed");
-      }
-      return result.text;
-    },
+    translateText: (text) => translateSingleText(config, "selection", text),
     copyText: async (text) => copyToClipboard(text),
   });
+}
+
+function createInputTranslator(config: ExtensionConfig): InputTranslator {
+  return new InputTranslator({
+    translateText: (text) => translateSingleText(config, "input", text),
+    copyText: async (text) => copyToClipboard(text),
+  });
+}
+
+async function translateSingleText(config: ExtensionConfig, scope: "selection" | "input", text: string): Promise<string> {
+  const response = await chrome.runtime.sendMessage({
+    type: "IMT_TRANSLATE_BATCH",
+    request: {
+      provider: config.provider,
+      sourceLang: "auto",
+      targetLang: config.targetLang,
+      items: [{ id: `${scope}-${Date.now()}`, text, category: "fallback" }],
+    },
+  });
+
+  if (!response?.ok || !("items" in response) || !Array.isArray(response.items)) {
+    throw new Error(response?.error ?? "Translation failed");
+  }
+
+  const result = response.items[0];
+  if (!result || result.status !== "ok") {
+    throw new Error(result?.error ?? "Translation failed");
+  }
+  return result.text;
 }
 
 async function copyToClipboard(text: string): Promise<void> {
