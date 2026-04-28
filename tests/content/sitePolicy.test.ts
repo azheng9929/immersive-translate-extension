@@ -13,15 +13,21 @@ describe("sitePolicy", () => {
     expect(policy.excludedDynamicSelectors).toContain('[role="tooltip"]');
   });
 
-  it("uses a conservative dynamic policy for Twitter and X", () => {
+  it("uses a fast bounded dynamic policy for Twitter and X", () => {
     for (const hostname of ["x.com", "twitter.com", "mobile.twitter.com"]) {
       const policy = resolveSitePolicy(hostname);
+      const normal = resolveSitePolicy("example.com");
 
       expect(policy.dynamicMode).toBe("conservative");
       expect(policy.attributeNames).toEqual([]);
-      expect(policy.debounceMs).toBeGreaterThan(resolveSitePolicy("example.com").debounceMs);
-      expect(policy.maxQueueSize).toBeLessThan(resolveSitePolicy("example.com").maxQueueSize);
+      expect(policy.debounceMs).toBeLessThan(3000);
+      expect(policy.lazyRootMargin).toBe("700px");
+      expect(policy.maxRootsPerFlush).toBeGreaterThan(6);
+      expect(policy.maxRootsPerFlush).toBeLessThan(normal.maxRootsPerFlush);
+      expect(policy.maxQueueSize).toBeLessThan(normal.maxQueueSize);
       expect(policy.excludedDynamicSelectors).toContain('[data-testid="HoverCard"]');
+      expect(policy.excludedDynamicSelectors).toContain('[data-testid="sidebarColumn"]');
+      expect(policy.preferredScanRootSelectors).toContain('div[data-testid="tweetText"]');
     }
   });
 

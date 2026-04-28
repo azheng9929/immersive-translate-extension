@@ -394,6 +394,74 @@ describe("PageController", () => {
     expect(document.querySelector("h1")?.textContent).toContain("[zh-Hans] How large language models actually work");
   });
 
+  it("uses preferred scan roots to avoid translating Twitter chrome", async () => {
+    document.body.innerHTML = `
+      <main>
+        <aside data-testid="sidebarColumn">Trending now</aside>
+        <article data-testid="tweet">
+          <div data-testid="User-Name"><span>OpenAI</span><span>@openai</span></div>
+          <time>2h</time>
+          <div data-testid="tweetText" lang="en">
+            Shipping readable translation without moving the page layout.
+          </div>
+          <div role="button">Reply</div>
+          <div data-testid="like">218</div>
+        </article>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: "x.com",
+      preferredScanRootSelectors: [
+        'article[data-testid="tweet"] div[data-testid="tweetText"]',
+        'div[data-testid="tweetText"]',
+      ],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Shipping readable translation without moving the page layout."]);
+    expect(document.body.textContent).toContain("Trending now");
+    expect(document.body.textContent).toContain("@openai");
+    expect(document.body.textContent).toContain("Reply");
+    expect(document.querySelector('[data-testid="tweetText"]')?.textContent).toContain(
+      "[zh-Hans] Shipping readable translation without moving the page layout.",
+    );
+  });
+
+  it("does not fall back to generic scanning when preferred roots are configured", async () => {
+    document.body.innerHTML = `
+      <main>
+        <section data-testid="unknownPanel">Trending stories and suggested accounts</section>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: "x.com",
+      preferredScanRootSelectors: ['div[data-testid="tweetText"]'],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(result).toEqual({
+      total: 0,
+      translated: 0,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(requestedTexts).toEqual([]);
+  });
+
   it("does not send Chinese text with English terminology to the translator when target is Chinese", async () => {
     document.body.innerHTML = `
       <main>

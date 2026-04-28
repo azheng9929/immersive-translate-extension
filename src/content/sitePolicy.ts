@@ -12,6 +12,7 @@ export type SitePolicy = {
   isHighDynamic: boolean;
   dynamicMode: DynamicTranslationMode;
   attributeNames: readonly TranslatableAttributeName[];
+  preferredScanRootSelectors: readonly string[];
   debounceMs: number;
   lazyRootMargin: string;
   lazyThreshold: number;
@@ -58,6 +59,32 @@ const TWITTER_EXCLUDED_DYNAMIC_SELECTORS = [
   '[data-testid="hoverCardParent"]',
   '[data-testid="placementTracking"]',
   '[aria-live="polite"]',
+  '[data-testid="sidebarColumn"]',
+  '[aria-label="Timeline: Trending now"]',
+  '[data-testid="SearchBox_Search_Input"]',
+  '[data-testid="User-Name"]',
+  '[data-testid="UserName"]',
+  '[data-testid="UserCell"]',
+  '[data-testid="suggestedUserHover"]',
+  '[data-testid="reply"]',
+  '[data-testid="retweet"]',
+  '[data-testid="like"]',
+  '[data-testid="share"]',
+  '[data-testid="bookmark"]',
+  '[data-testid="analytics"]',
+  '[role="group"][aria-label]',
+  'header[role="banner"]',
+  "aside",
+  "time",
+] as const;
+
+const TWITTER_PREFERRED_SCAN_ROOT_SELECTORS = [
+  'article[data-testid="tweet"] div[data-testid="tweetText"]',
+  'div[data-testid="tweetText"]',
+  'div[data-testid="UserDescription"]',
+  '[data-testid="card.layoutSmall.detail"] > div:nth-child(2)',
+  '[data-testid="developerBuiltCardContainer"] > div:nth-child(2)',
+  '[data-testid="card.layoutLarge.detail"] > div:nth-child(2)',
 ] as const;
 
 const YOUTUBE_EXCLUDED_DYNAMIC_SELECTORS = [
@@ -90,6 +117,7 @@ const DEFAULT_SITE_POLICY: SitePolicy = {
   isHighDynamic: false,
   dynamicMode: "normal",
   attributeNames: SAFE_TRANSLATABLE_ATTRIBUTES,
+  preferredScanRootSelectors: [],
   debounceMs: 1500,
   lazyRootMargin: "200px",
   lazyThreshold: 0.1,
@@ -111,6 +139,16 @@ const CONSERVATIVE_DYNAMIC_LIMITS = {
   maxMutationNodesPerWindow: 240,
 } satisfies Partial<SitePolicy>;
 
+const TWITTER_FAST_DYNAMIC_LIMITS = {
+  dynamicMode: "conservative",
+  debounceMs: 1200,
+  lazyRootMargin: "700px",
+  maxQueueSize: 120,
+  maxRootsPerFlush: 12,
+  maxObservedRoots: 160,
+  maxMutationNodesPerWindow: 420,
+} satisfies Partial<SitePolicy>;
+
 const NORMAL_DYNAMIC_LIMITS = {
   dynamicMode: "normal",
   debounceMs: DEFAULT_SITE_POLICY.debounceMs,
@@ -123,8 +161,9 @@ const NORMAL_DYNAMIC_LIMITS = {
 
 const TWITTER_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
-  ...CONSERVATIVE_DYNAMIC_LIMITS,
+  ...TWITTER_FAST_DYNAMIC_LIMITS,
   attributeNames: [],
+  preferredScanRootSelectors: TWITTER_PREFERRED_SCAN_ROOT_SELECTORS,
   excludedDynamicSelectors: TWITTER_EXCLUDED_DYNAMIC_SELECTORS,
 };
 

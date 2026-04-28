@@ -28,6 +28,7 @@ type ControllerOptions = {
   cache?: TranslationCache;
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
+  preferredScanRootSelectors?: readonly string[];
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -155,8 +156,11 @@ export class PageController {
       targetLang: this.options.targetLang,
       diagnostics,
     };
-    const scannedTexts = scanDocumentText(root, scanOptions);
-    const attributes = scanTranslatableAttributes(root, this.options.attributeNames, scanOptions);
+    const scanRoots = collectScanRoots(root, this.options.preferredScanRootSelectors);
+    const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
+    const attributes = scanRoots.flatMap((scanRoot) =>
+      scanTranslatableAttributes(scanRoot, this.options.attributeNames, scanOptions),
+    );
     return buildTranslationUnits({
       scannedTexts,
       attributes,
@@ -289,4 +293,33 @@ function createSessionId(): string {
 
 function sleep(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[] | undefined): ParentNode[] {
+  if (!preferredSelectors || preferredSelectors.length === 0) return [root];
+
+  const roots: HTMLElement[] = [];
+  const addRoot = (candidate: HTMLElement): void => {
+    for (const existing of [...roots]) {
+      if (existing === candidate) return;
+      if (candidate.contains(existing)) return;
+      if (existing.contains(candidate)) {
+        roots.splice(roots.indexOf(existing), 1);
+      }
+    }
+    roots.push(candidate);
+  };
+
+  for (const selector of preferredSelectors) {
+    try {
+      if (root instanceof HTMLElement && root.matches(selector)) addRoot(root);
+      root.querySelectorAll?.(selector).forEach((element) => {
+        if (element instanceof HTMLElement) addRoot(element);
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return roots;
 }

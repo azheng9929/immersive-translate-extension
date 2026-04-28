@@ -91,6 +91,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     providerId: providerChainId(config),
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
+    preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
     retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: (items) => translateBatchWithProviderFallback(
       config,
