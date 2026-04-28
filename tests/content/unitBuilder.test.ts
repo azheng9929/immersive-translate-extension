@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scanDocumentText, scanTranslatableAttributes } from "@/content/domScanner";
+import { createTranslationDiagnostics } from "@/content/translationDiagnostics";
 import { buildTranslationUnits } from "@/content/unitBuilder";
 import { mountFixture } from "@/test/domFixtures";
 
@@ -135,5 +136,33 @@ describe("buildTranslationUnits", () => {
     expect(units.map((unit) => unit.originalText)).toEqual([
       "React Server Components stream UI from the server.",
     ]);
+  });
+
+  it("records why a scanned text group did not become a translation unit", () => {
+    mountFixture(`
+      <p>${"\u8fd9\u7bc7\u6587\u7ae0\u4ecb\u7ecd"} <strong>React Server Components</strong> ${"\u7684"} <span>streaming</span> ${"\u7b56\u7565\u3002"}</p>
+      <p>React Server Components stream UI from the server.</p>
+    `);
+    const diagnostics = createTranslationDiagnostics();
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, { targetLang: "zh-Hans", diagnostics }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      diagnostics,
+    });
+
+    expect(units.map((unit) => unit.originalText)).toEqual([
+      "React Server Components stream UI from the server.",
+    ]);
+    expect(diagnostics.units).toMatchObject({
+      built: 1,
+      dropped: 1,
+      droppedByReason: {
+        "target-language": 1,
+      },
+    });
   });
 });

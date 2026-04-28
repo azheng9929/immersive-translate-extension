@@ -5,6 +5,11 @@ import { isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
+import {
+  recordUnitBuilt,
+  recordUnitDropped,
+  type TranslationDiagnostics,
+} from "./translationDiagnostics";
 import { isVisibleElement } from "./visibility";
 
 type BuildInput = {
@@ -14,6 +19,7 @@ type BuildInput = {
   revision: number;
   targetLang: string;
   hostname?: string;
+  diagnostics?: TranslationDiagnostics;
 };
 
 const CONTENT_TAGS = new Set(["P", "BLOCKQUOTE", "FIGCAPTION", "ARTICLE"]);
@@ -40,12 +46,17 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   let index = 0;
 
   for (const [root, textNodes] of rootToTexts) {
-    const originalText = collectUnitText(root, textNodes, {
+    const collected = collectUnitText(root, textNodes, {
       ...(input.hostname ? { hostname: input.hostname } : {}),
       targetLang: input.targetLang,
     });
-    if (!originalText) continue;
+    if (!collected.text) {
+      recordUnitDropped(input.diagnostics, collected.skipReason);
+      continue;
+    }
+    const originalText = collected.text;
     const category = categoryFromScanned(rootToCategories.get(root)) ?? classifyRoot(root);
+    recordUnitBuilt(input.diagnostics);
     units.push({
       id: `u-${input.revision}-${index++}`,
       sessionId: input.sessionId,
@@ -63,6 +74,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   }
 
   for (const attribute of input.attributes) {
+    recordUnitBuilt(input.diagnostics);
     units.push({
       id: `u-${input.revision}-${index++}`,
       sessionId: input.sessionId,
@@ -83,7 +95,11 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   return sortUnitsByDocumentOrder(dedupeNestedUnits(units));
 }
 
-function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[], options: GranularityOptions): string {
+function collectUnitText(
+  root: HTMLElement,
+  fallbackTextNodes: Text[],
+  options: GranularityOptions,
+): { text: string; skipReason?: string } {
   let rawText = "";
   let text = "";
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -108,9 +124,10 @@ function collectUnitText(root: HTMLElement, fallbackTextNodes: Text[], options: 
   }
 
   const normalizedRawText = normalizeVisibleText(rawText);
-  if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return "";
-  if (text) return normalizeVisibleText(text);
-  return normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
+  if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return { text: "", skipReason: "target-language" };
+  if (text) return { text: normalizeVisibleText(text) };
+  const fallbackText = normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
+  return fallbackText ? { text: fallbackText } : { text: "", skipReason: "empty" };
 }
 
 function categoryFromScanned(categories: UnitCategory[] | undefined): UnitCategory | undefined {

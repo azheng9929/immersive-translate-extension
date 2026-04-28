@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_TRANSLATABLE_ATTRIBUTES, scanDocumentText, scanTranslatableAttributes } from "@/content/domScanner";
+import { createTranslationDiagnostics } from "@/content/translationDiagnostics";
 import { mountFixture } from "@/test/domFixtures";
 
 describe("scanDocumentText", () => {
@@ -156,6 +157,41 @@ describe("scanDocumentText", () => {
 
     expect(texts).toEqual(["React Server Components stream UI from the server."]);
     expect(attrs).toEqual([]);
+  });
+
+  it("records scanner skip reasons for explainable page status", () => {
+    mountFixture(`
+      <main>
+        <p>Translate this paragraph.</p>
+        <p data-imt-managed="true">Extension panel text</p>
+        <p hidden>Hidden paragraph.</p>
+        <p>${"\u8fd9\u91cc\u662f\u4e2d\u6587"} React Server Components</p>
+        <input placeholder="${"\u641c\u7d22"} React Server Components" />
+      </main>
+    `);
+    const diagnostics = createTranslationDiagnostics();
+
+    const texts = scanDocumentText(document.body, { targetLang: "zh-Hans", diagnostics });
+    const attrs = scanTranslatableAttributes(document.body, undefined, { targetLang: "zh-Hans", diagnostics });
+
+    expect(texts.map((item) => item.text)).toEqual(["Translate this paragraph."]);
+    expect(attrs).toEqual([]);
+    expect(diagnostics.scan.text).toMatchObject({
+      accepted: 1,
+      skipped: 3,
+      skippedByReason: {
+        "global-selector": 1,
+        hidden: 1,
+        "target-language": 1,
+      },
+    });
+    expect(diagnostics.scan.attributes).toMatchObject({
+      accepted: 0,
+      skipped: 1,
+      skippedByReason: {
+        "target-language": 1,
+      },
+    });
   });
 });
 

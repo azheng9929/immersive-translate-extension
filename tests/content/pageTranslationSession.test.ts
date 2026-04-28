@@ -39,6 +39,33 @@ describe("PageTranslationSession", () => {
     expect(session.getStatus()).toMatchObject({ phase: "idle", total: 0, translated: 0, failed: 0, skipped: 0 });
   });
 
+  it("exposes translation diagnostics in page status", async () => {
+    document.body.innerHTML = `
+      <main>
+        <p>${"\u8fd9\u7bc7\u6587\u7ae0\u4ecb\u7ecd"} <strong>React Server Components</strong> ${"\u7684"} <span>streaming</span> ${"\u7b56\u7565\u3002"}</p>
+        <p>React Server Components stream UI from the server.</p>
+      </main>
+    `;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body });
+
+    const status = await session.translatePage();
+
+    expect(status.diagnostics).toMatchObject({
+      units: {
+        built: 1,
+        dropped: 1,
+        droppedByReason: {
+          "target-language": 1,
+        },
+      },
+    });
+  });
+
   it("translates newly added content after page translation", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;

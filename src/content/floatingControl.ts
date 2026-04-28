@@ -1,5 +1,6 @@
 import type { TranslationPageSummary } from "./pageController";
 import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
+import type { DiagnosticReasonCounts, TranslationDiagnostics } from "./translationDiagnostics";
 
 type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed" | "paused" | "suspended";
 type FloatingStatus = TranslationPageSummary | PageTranslationStatus;
@@ -108,6 +109,15 @@ const STYLE_TEXT = `
   color: #52627a;
   font-size: 12px;
   line-height: 1.4;
+}
+.imt-floating-diagnostics {
+  margin: -4px 0 12px;
+  padding: 8px;
+  border-radius: 8px;
+  color: #52627a;
+  background: #f4f7fb;
+  font-size: 11px;
+  line-height: 1.35;
 }
 .imt-floating-actions {
   display: grid;
@@ -275,7 +285,16 @@ export class FloatingTranslationControl {
     const hideButton = this.createButton("Hide on this page", "hide", "imt-floating-button imt-floating-button-subtle", () => this.hide());
 
     actions.append(translateButton, restoreButton, hideButton);
-    panel.append(header, summary, actions);
+    panel.append(header, summary);
+    const diagnostics = diagnosticsLabel(this.summary);
+    if (diagnostics) {
+      const diagnosticsNode = document.createElement("p");
+      diagnosticsNode.className = "imt-floating-diagnostics";
+      diagnosticsNode.dataset.imtControl = "diagnostics";
+      diagnosticsNode.textContent = diagnostics;
+      panel.append(diagnosticsNode);
+    }
+    panel.append(actions);
     return panel;
   }
 
@@ -346,4 +365,44 @@ function summaryLabel(summary: FloatingStatus | undefined): string {
     parts.push("dynamic updates suspended");
   }
   return parts.join(", ");
+}
+
+function diagnosticsLabel(summary: FloatingStatus | undefined): string {
+  if (!summary || !("diagnostics" in summary) || !summary.diagnostics) return "";
+
+  const skipped = collectSkippedReasons(summary.diagnostics);
+  if (skipped.size === 0) return "";
+
+  const parts = [...skipped.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 3)
+    .map(([label, count]) => `${count} ${label}`);
+
+  return `Skipped: ${parts.join(", ")}`;
+}
+
+function collectSkippedReasons(diagnostics: TranslationDiagnostics): Map<string, number> {
+  const counts = new Map<string, number>();
+  addReasonCounts(counts, diagnostics.scan.text.skippedByReason);
+  addReasonCounts(counts, diagnostics.scan.attributes.skippedByReason);
+  addReasonCounts(counts, diagnostics.units.droppedByReason);
+  return counts;
+}
+
+function addReasonCounts(target: Map<string, number>, reasons: DiagnosticReasonCounts): void {
+  for (const [reason, count] of Object.entries(reasons)) {
+    if (!count) continue;
+    const label = reasonLabel(reason);
+    target.set(label, (target.get(label) ?? 0) + count);
+  }
+}
+
+function reasonLabel(reason: string): string {
+  if (reason === "target-language") return "target language";
+  if (reason === "global-selector" || reason === "site-selector") return "extension/site UI";
+  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "metadata/control text";
+  if (reason === "not-meaningful") return "short text";
+  if (reason === "hidden") return "hidden text";
+  if (reason === "empty") return "empty text";
+  return reason.replaceAll("-", " ");
 }

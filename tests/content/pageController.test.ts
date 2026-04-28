@@ -138,6 +138,41 @@ describe("PageController", () => {
     });
   });
 
+  it("keeps explainable diagnostics for skipped text, cache, and provider work", async () => {
+    document.body.innerHTML = `
+      <main>
+        <p>${"\u8fd9\u7bc7\u6587\u7ae0\u4ecb\u7ecd"} <strong>React Server Components</strong> ${"\u7684"} <span>streaming</span> ${"\u7b56\u7565\u3002"}</p>
+        <p>React Server Components stream UI from the server.</p>
+      </main>
+    `;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    await controller.translatePage();
+
+    expect(controller.getDiagnostics()).toMatchObject({
+      units: {
+        built: 1,
+        dropped: 1,
+        droppedByReason: {
+          "target-language": 1,
+        },
+      },
+      provider: {
+        requested: 1,
+        failed: 0,
+        skipped: 0,
+      },
+      cache: {
+        hits: 0,
+        misses: 1,
+      },
+    });
+  });
+
   it("uses translation-only display mode to replace readable page text", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
     const controller = new PageController({

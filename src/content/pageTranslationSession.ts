@@ -1,5 +1,6 @@
 import type { PageController, TranslationPageSummary } from "./pageController";
 import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicTranslationMode } from "./sitePolicy";
+import type { TranslationDiagnostics } from "./translationDiagnostics";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
 export type DynamicObservationState = "inactive" | "observing" | "queued" | "paused" | "suspended";
@@ -11,6 +12,7 @@ export type PageTranslationStatus = TranslationPageSummary & {
   observedRoots: number;
   dynamicRuns: number;
   lastError: string | undefined;
+  diagnostics?: TranslationDiagnostics;
 };
 
 type PageTranslationSessionOptions = {
@@ -487,11 +489,14 @@ export class PageTranslationSession {
     this.listeningForVisibility = false;
   }
 
-  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots">): void {
+  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics"> & {
+    diagnostics?: TranslationDiagnostics;
+  }): void {
     this.status = {
       ...status,
       pendingRoots: this.pendingRoots.size,
       observedRoots: this.lazyObservedRoots.size,
+      diagnostics: status.diagnostics ?? this.controller.getDiagnostics(),
     };
     for (const listener of this.listeners) listener(this.getStatus());
   }

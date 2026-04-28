@@ -121,6 +121,73 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("changing too quickly");
   });
 
+  it("shows compact diagnostics for skipped content", () => {
+    let listener: ((status: PageTranslationStatus) => void) | undefined;
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      subscribeStatus: (next) => {
+        listener = next;
+        return () => undefined;
+      },
+    });
+    control.mount(document.body);
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    listener?.({
+      phase: "translated",
+      observation: "observing",
+      pendingRoots: 0,
+      observedRoots: 0,
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+      dynamicRuns: 0,
+      lastError: undefined,
+      diagnostics: {
+        scan: {
+          text: {
+            seen: 4,
+            accepted: 1,
+            skipped: 3,
+            skippedByReason: {
+              "target-language": 1,
+              "global-selector": 2,
+            },
+          },
+          attributes: {
+            seen: 1,
+            accepted: 0,
+            skipped: 1,
+            skippedByReason: {
+              "target-language": 1,
+            },
+          },
+        },
+        units: {
+          built: 1,
+          dropped: 1,
+          droppedByReason: {
+            "target-language": 1,
+          },
+        },
+        cache: {
+          hits: 0,
+          misses: 1,
+        },
+        provider: {
+          requested: 1,
+          failed: 0,
+          skipped: 0,
+        },
+      },
+    });
+
+    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("Skipped: 3 target language");
+    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("2 extension/site UI");
+  });
+
   it("runs restore and returns to ready state", async () => {
     const restorePage = vi.fn();
     const control = new FloatingTranslationControl({

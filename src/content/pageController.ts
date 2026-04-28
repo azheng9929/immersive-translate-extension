@@ -5,6 +5,13 @@ import { buildTranslationUnits } from "./unitBuilder";
 import type { DisplayMode } from "../shared/config";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
+import {
+  cloneTranslationDiagnostics,
+  createTranslationDiagnostics,
+  recordCacheUsage,
+  recordProviderUsage,
+  type TranslationDiagnostics,
+} from "./translationDiagnostics";
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
@@ -36,6 +43,7 @@ export class PageController {
   private revision = 0;
   private records: RestoreRecord[] = [];
   private units: TranslationUnit[] = [];
+  private diagnostics: TranslationDiagnostics = createTranslationDiagnostics();
 
   constructor(private readonly options: ControllerOptions) {}
 
@@ -49,7 +57,7 @@ export class PageController {
   }
 
   collectTranslatableRoots(root: ParentNode = document.body): HTMLElement[] {
-    const units = this.buildUnits(root, this.revision + 1);
+    const units = this.buildUnits(root, this.revision + 1, createTranslationDiagnostics());
     const seen = new Set<HTMLElement>();
     const roots: HTMLElement[] = [];
 
@@ -62,11 +70,15 @@ export class PageController {
     return roots;
   }
 
+  getDiagnostics(): TranslationDiagnostics {
+    return cloneTranslationDiagnostics(this.diagnostics);
+  }
+
   private async translateRoot(root: ParentNode): Promise<TranslationPageSummary> {
     const revision = this.revision + 1;
     this.revision = revision;
 
-    const units = this.buildUnits(root, this.revision);
+    const units = this.buildUnits(root, this.revision, this.diagnostics);
     this.applyDisplayMode(units);
     this.units.push(...units);
 
@@ -82,16 +94,21 @@ export class PageController {
     if (revision !== this.revision) return summary;
 
     const missingUnits: TranslationUnit[] = [];
+    let cacheHitsCount = 0;
+    let cacheMissesCount = 0;
     for (const unit of units) {
       const lookup = lookupByUnitId.get(unit.id);
       const cachedText = lookup ? cacheHits.get(lookup.key) : undefined;
       if (cachedText !== undefined) {
+        cacheHitsCount += 1;
         this.applyTranslation(unit, cachedText);
         summary.translated += 1;
       } else {
+        cacheMissesCount += 1;
         missingUnits.push(unit);
       }
     }
+    recordCacheUsage(this.diagnostics, cacheHitsCount, cacheMissesCount);
 
     const batch = missingUnits.map((unit) => ({
       id: unit.id,
@@ -103,6 +120,12 @@ export class PageController {
 
     const results = await this.translateBatchWithRetries(batch);
     if (revision !== this.revision) return summary;
+    recordProviderUsage(
+      this.diagnostics,
+      batch.length,
+      results.filter((result) => result.status === "failed").length,
+      results.filter((result) => result.status === "skipped").length,
+    );
 
     const resultById = new Map(results.map((result) => [result.id, result]));
 
@@ -125,11 +148,12 @@ export class PageController {
     return summary;
   }
 
-  private buildUnits(root: ParentNode, revision: number): TranslationUnit[] {
+  private buildUnits(root: ParentNode, revision: number, diagnostics: TranslationDiagnostics): TranslationUnit[] {
     const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
     const scanOptions = {
       ...(hostname ? { hostname } : {}),
       targetLang: this.options.targetLang,
+      diagnostics,
     };
     const scannedTexts = scanDocumentText(root, scanOptions);
     const attributes = scanTranslatableAttributes(root, this.options.attributeNames, scanOptions);
@@ -140,6 +164,7 @@ export class PageController {
       revision,
       targetLang: this.options.targetLang,
       hostname,
+      diagnostics,
     });
   }
 
@@ -147,6 +172,7 @@ export class PageController {
     restoreAll(this.records);
     this.records = [];
     this.units = [];
+    this.diagnostics = createTranslationDiagnostics();
     this.revision += 1;
   }
 
