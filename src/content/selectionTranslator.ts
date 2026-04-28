@@ -12,11 +12,26 @@ const STYLE_TEXT = `
 .imt-selection-root {
   position: fixed;
   z-index: 2147483647;
-  width: min(320px, calc(100vw - 24px));
   color: #162033;
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
-  transform: translateY(8px);
+}
+.imt-selection-trigger {
+  display: block;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  background: #1766d8;
+  box-shadow: 0 8px 18px rgba(15, 42, 95, 0.18), 0 1px 4px rgba(15, 42, 95, 0.2);
+  cursor: pointer;
+}
+.imt-selection-trigger:hover,
+.imt-selection-trigger:focus-visible {
+  background: #0f57bd;
+  outline: 2px solid rgba(20, 168, 150, 0.24);
+  outline-offset: 2px;
 }
 .imt-selection-panel {
   overflow: hidden;
@@ -126,8 +141,10 @@ export class SelectionTranslator {
   private translatedText = "";
   private error = "";
   private state: SelectionState = "idle";
+  private expanded = false;
   private selectionRect: DOMRect | null = null;
   private mounted = false;
+  private requestId = 0;
 
   constructor(private readonly options: SelectionTranslatorOptions) {
     this.doc = options.document ?? document;
@@ -155,25 +172,29 @@ export class SelectionTranslator {
     const text = normalizeSelectionText(this.options.getSelectionText?.() ?? this.doc.getSelection()?.toString() ?? "");
     const rect = this.options.getSelectionRect?.() ?? getCurrentSelectionRect(this.doc);
 
-    if (!text || this.isSelectionInsideManagedUi()) {
+    if (!isValidSelectionText(text) || this.isSelectionInsideManagedUi()) {
       this.hide();
       return;
     }
 
+    this.requestId += 1;
     this.selectedText = text;
     this.translatedText = "";
     this.error = "";
     this.state = "idle";
+    this.expanded = false;
     this.selectionRect = rect;
     this.render();
   }
 
   hide(): void {
+    this.requestId += 1;
     this.root?.remove();
     this.root = undefined;
     this.translatedText = "";
     this.error = "";
     this.state = "idle";
+    this.expanded = false;
   }
 
   private readonly handleSelectionEvent = (event: MouseEvent): void => {
@@ -198,19 +219,30 @@ export class SelectionTranslator {
 
   private async translate(): Promise<void> {
     if (!this.selectedText || this.state === "loading") return;
+    const requestId = ++this.requestId;
     this.state = "loading";
     this.error = "";
     this.render();
 
     try {
-      this.translatedText = await this.options.translateText(this.selectedText);
+      const translatedText = await this.options.translateText(this.selectedText);
+      if (requestId !== this.requestId || !this.expanded) return;
+      this.translatedText = translatedText;
       this.state = "translated";
     } catch (error) {
+      if (requestId !== this.requestId || !this.expanded) return;
       this.error = error instanceof Error ? error.message : String(error);
       this.state = "failed";
     }
 
     this.render();
+  }
+
+  private expandAndTranslate(): void {
+    if (!this.selectedText) return;
+    this.expanded = true;
+    this.render();
+    void this.translate();
   }
 
   private async copy(): Promise<void> {
@@ -239,10 +271,26 @@ export class SelectionTranslator {
 
     this.root.textContent = "";
     this.root.dataset.state = this.state;
+    this.root.dataset.expanded = String(this.expanded);
     this.positionRoot();
 
     const style = this.doc.createElement("style");
     style.textContent = STYLE_TEXT;
+
+    if (!this.expanded) {
+      const trigger = this.doc.createElement("button");
+      trigger.type = "button";
+      trigger.className = "imt-selection-trigger";
+      trigger.dataset.imtSelection = "trigger";
+      trigger.setAttribute("aria-label", "Translate selected text");
+      trigger.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.expandAndTranslate();
+      });
+      this.root.append(style, trigger);
+      return;
+    }
 
     const panel = this.doc.createElement("div");
     panel.className = "imt-selection-panel";
@@ -272,16 +320,17 @@ export class SelectionTranslator {
     const actions = this.doc.createElement("div");
     actions.className = "imt-selection-actions";
 
-    const translateButton = this.createButton(
-      this.state === "loading" ? "Working" : "Translate",
-      "translate",
-      "imt-selection-button imt-selection-button-primary",
-      () => {
-        void this.translate();
-      },
-    );
-    translateButton.disabled = this.state === "loading";
-    actions.append(translateButton);
+    if (this.state === "idle" || this.state === "failed") {
+      const translateButton = this.createButton(
+        this.state === "failed" ? "Retry" : "Translate",
+        "translate",
+        "imt-selection-button imt-selection-button-primary",
+        () => {
+          void this.translate();
+        },
+      );
+      actions.append(translateButton);
+    }
 
     if (this.translatedText) {
       const copyButton = this.createButton("Copy", "copy", "imt-selection-button", () => {
@@ -318,11 +367,23 @@ export class SelectionTranslator {
     const viewportWidth = view?.innerWidth ?? 1024;
     const viewportHeight = view?.innerHeight ?? 768;
     const rect = this.selectionRect;
+
+    if (!this.expanded) {
+      const size = 22;
+      const left = clamp(rect ? rect.right + 8 : 12, 8, Math.max(8, viewportWidth - size - 8));
+      const top = clamp(rect ? rect.bottom - size / 2 : 80, 8, Math.max(8, viewportHeight - size - 8));
+      this.root.style.width = `${size}px`;
+      this.root.style.left = `${left}px`;
+      this.root.style.top = `${top}px`;
+      return;
+    }
+
     const width = Math.min(320, Math.max(220, viewportWidth - 24));
     const left = clamp(rect ? rect.left : 12, 12, Math.max(12, viewportWidth - width - 12));
     const topCandidate = rect ? rect.bottom + 8 : 80;
     const top = clamp(topCandidate, 12, Math.max(12, viewportHeight - 180));
 
+    this.root.style.width = `${width}px`;
     this.root.style.left = `${left}px`;
     this.root.style.top = `${top}px`;
   }
@@ -360,6 +421,13 @@ function getCurrentSelectionRect(doc: Document): DOMRect | null {
 
 function normalizeSelectionText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function isValidSelectionText(value: string): boolean {
+  if (value.length < 2) return false;
+  if (value.length > 4096) return false;
+  if (/^[\d\s.,:%+-]+$/.test(value)) return false;
+  return true;
 }
 
 function stateLabel(state: SelectionState): string {

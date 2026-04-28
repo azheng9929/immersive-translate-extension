@@ -6,9 +6,10 @@ describe("SelectionTranslator", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows a quiet translation popover for selected text", () => {
+  it("shows only a compact trigger dot for selected text", () => {
+    const translateText = vi.fn().mockResolvedValue("[zh-Hans] Hello world");
     const translator = new SelectionTranslator({
-      translateText: async (text) => `[zh-Hans] ${text}`,
+      translateText,
       getSelectionText: () => "Hello world",
       getSelectionRect: () => new DOMRect(120, 80, 90, 24),
     });
@@ -19,13 +20,15 @@ describe("SelectionTranslator", () => {
     const root = document.querySelector<HTMLElement>("[data-imt-selection='root']");
     expect(root).not.toBeNull();
     expect(root?.dataset.imtManaged).toBe("true");
-    expect(document.querySelector("[data-imt-selection='source']")?.textContent).toBe("Hello world");
-    expect(document.querySelector("[data-imt-selection-status]")?.textContent).toBe("Ready");
-    expect(document.querySelector("[data-imt-selection-action='translate']")).not.toBeNull();
+    expect(document.querySelector("[data-imt-selection='trigger']")).not.toBeNull();
+    expect(document.querySelector("[data-imt-selection='source']")).toBeNull();
+    expect(document.querySelector("[data-imt-selection-status]")).toBeNull();
+    expect(document.querySelector("[data-imt-selection-action='translate']")).toBeNull();
+    expect(translateText).not.toHaveBeenCalled();
   });
 
-  it("translates the current selection after an explicit action", async () => {
-    const translateText = vi.fn().mockResolvedValue("你好，世界");
+  it("expands and translates the current selection after clicking the trigger dot", async () => {
+    const translateText = vi.fn().mockResolvedValue("[zh-Hans] Hello world");
     const translator = new SelectionTranslator({
       translateText,
       getSelectionText: () => "Hello world",
@@ -34,36 +37,37 @@ describe("SelectionTranslator", () => {
     translator.mount(document.body);
     translator.showCurrentSelection();
 
-    document.querySelector<HTMLButtonElement>("[data-imt-selection-action='translate']")?.click();
+    document.querySelector<HTMLButtonElement>("[data-imt-selection='trigger']")?.click();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(translateText).toHaveBeenCalledWith("Hello world");
     expect(document.querySelector("[data-imt-selection-status]")?.textContent).toBe("Translated");
-    expect(document.querySelector("[data-imt-selection='result']")?.textContent).toBe("你好，世界");
+    expect(document.querySelector("[data-imt-selection='source']")?.textContent).toBe("Hello world");
+    expect(document.querySelector("[data-imt-selection='result']")?.textContent).toBe("[zh-Hans] Hello world");
   });
 
-  it("copies the translated result from the popover", async () => {
+  it("copies the translated result from the expanded popover", async () => {
     const copyText = vi.fn().mockResolvedValue(undefined);
     const translator = new SelectionTranslator({
-      translateText: async () => "你好，世界",
+      translateText: async () => "[zh-Hans] Hello world",
       copyText,
       getSelectionText: () => "Hello world",
       getSelectionRect: () => new DOMRect(120, 80, 90, 24),
     });
     translator.mount(document.body);
     translator.showCurrentSelection();
-    document.querySelector<HTMLButtonElement>("[data-imt-selection-action='translate']")?.click();
+    document.querySelector<HTMLButtonElement>("[data-imt-selection='trigger']")?.click();
     await Promise.resolve();
     await Promise.resolve();
 
     document.querySelector<HTMLButtonElement>("[data-imt-selection-action='copy']")?.click();
     await Promise.resolve();
 
-    expect(copyText).toHaveBeenCalledWith("你好，世界");
+    expect(copyText).toHaveBeenCalledWith("[zh-Hans] Hello world");
   });
 
-  it("hides the popover when selection is empty", () => {
+  it("hides the trigger dot when selection is empty", () => {
     const translator = new SelectionTranslator({
       translateText: async (text) => `[zh-Hans] ${text}`,
       getSelectionText: () => "   ",
@@ -76,7 +80,7 @@ describe("SelectionTranslator", () => {
     expect(document.querySelector("[data-imt-selection='root']")).toBeNull();
   });
 
-  it("closes the popover without changing page content", () => {
+  it("closes the expanded popover without changing page content", () => {
     document.body.innerHTML = "<p>Hello world</p>";
     const translator = new SelectionTranslator({
       translateText: async (text) => `[zh-Hans] ${text}`,
@@ -85,6 +89,7 @@ describe("SelectionTranslator", () => {
     });
     translator.mount(document.body);
     translator.showCurrentSelection();
+    document.querySelector<HTMLButtonElement>("[data-imt-selection='trigger']")?.click();
 
     document.querySelector<HTMLButtonElement>("[data-imt-selection-action='close']")?.click();
 
