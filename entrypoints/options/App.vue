@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
-import { DEFAULT_EXTENSION_CONFIG, type DynamicMode, type ExtensionConfig, type ExtensionConfigPatch } from "../../src/shared/config";
+import {
+  DEFAULT_EXTENSION_CONFIG,
+  type DynamicMode,
+  type ExtensionConfig,
+  type ExtensionConfigPatch,
+  type ExtensionProvider,
+} from "../../src/shared/config";
 import type { MessageResponse } from "../../src/shared/messages";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
@@ -17,8 +23,24 @@ const updateConfig = async (patch: ExtensionConfigPatch) => {
   if (!response.ok) console.warn(response.error);
 };
 
+const setProvider = (event: Event) => {
+  void updateConfig({ provider: (event.target as HTMLSelectElement).value as ExtensionProvider });
+};
+
 const setDynamicMode = (dynamicMode: DynamicMode) => {
   void updateConfig({ dynamicMode });
+};
+
+const setOpenAIEndpoint = (event: Event) => {
+  void updateConfig({ openaiEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setOpenAIApiKey = (event: Event) => {
+  void updateConfig({ openaiApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setOpenAIModel = (event: Event) => {
+  void updateConfig({ openaiModel: (event.target as HTMLInputElement).value });
 };
 
 onMounted(async () => {
@@ -35,31 +57,87 @@ onMounted(async () => {
       <img src="/icons/icon-48.png" alt="" class="page-icon" />
       <div>
         <h1>Immersive Translate Lab</h1>
-        <p>设置</p>
+        <p>Settings</p>
       </div>
+      <span v-if="savedAt" class="saved">Saved {{ savedAt }}</span>
     </header>
 
-    <section class="panel" aria-label="动态补翻设置" :aria-busy="isLoading">
+    <section class="panel" aria-label="Translation provider settings" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
-          <h2>动态补翻</h2>
-          <p>控制页面滚动、懒加载、评论流和信息流更新时的补翻强度。</p>
+          <h2>Translation provider</h2>
+          <p>Choose the service used by page, selection, and input translation.</p>
         </div>
-        <span v-if="savedAt" class="saved">已保存 {{ savedAt }}</span>
       </div>
 
-      <div class="mode-grid" role="group" aria-label="动态补翻模式">
+      <label class="field">
+        <span>Provider</span>
+        <select :value="config.provider" @change="setProvider">
+          <option value="microsoft">Microsoft</option>
+          <option value="openai-compatible">OpenAI API</option>
+          <option value="fake">Local test</option>
+        </select>
+      </label>
+
+      <div class="openai-settings">
+        <label class="field">
+          <span>OpenAI API endpoint</span>
+          <input
+            data-testid="openai-endpoint"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.openaiEndpoint"
+            @input="setOpenAIEndpoint"
+          />
+        </label>
+
+        <label class="field">
+          <span>API key</span>
+          <input
+            data-testid="openai-api-key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.openaiApiKey"
+            @input="setOpenAIApiKey"
+          />
+        </label>
+
+        <label class="field">
+          <span>Model</span>
+          <input
+            data-testid="openai-model"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.openaiModel"
+            @input="setOpenAIModel"
+          />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Dynamic translation settings" :aria-busy="isLoading">
+      <div class="panel-heading">
+        <div>
+          <h2>Dynamic updates</h2>
+          <p>Control how the extension translates new content on feeds, comments, and infinite-scroll pages.</p>
+        </div>
+      </div>
+
+      <div class="mode-grid" role="group" aria-label="Dynamic translation mode">
         <button data-testid="options-dynamic-mode-off" type="button" :class="{ active: config.dynamicMode === 'off' }" @click="setDynamicMode('off')">
-          <strong>关闭</strong>
-          <span>只翻译当前已扫描内容，不监听后续变化。</span>
+          <strong>Off</strong>
+          <span>Translate only the content already scanned on the page.</span>
         </button>
         <button data-testid="options-dynamic-mode-conservative" type="button" :class="{ active: config.dynamicMode === 'conservative' }" @click="setDynamicMode('conservative')">
-          <strong>保守</strong>
-          <span>适合 X、YouTube、Reddit 这类高动态页面，降低补翻频率。</span>
+          <strong>Safe</strong>
+          <span>Use slower, smaller batches for X, YouTube, Reddit, and other busy pages.</span>
         </button>
         <button data-testid="options-dynamic-mode-normal" type="button" :class="{ active: config.dynamicMode === 'normal' }" @click="setDynamicMode('normal')">
-          <strong>正常</strong>
-          <span>适合普通文章、文档、搜索结果页，补翻更积极。</span>
+          <strong>Normal</strong>
+          <span>Use more active updates for articles, docs, and search results.</span>
         </button>
       </div>
     </section>
@@ -82,7 +160,8 @@ onMounted(async () => {
 }
 
 .page-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
   max-width: 860px;
@@ -116,9 +195,17 @@ p {
   line-height: 1.5;
 }
 
+.saved {
+  color: #128473;
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .panel {
+  display: grid;
+  gap: 16px;
   max-width: 860px;
-  margin: 0 auto;
+  margin: 0 auto 16px;
   padding: 20px;
   border: 1px solid rgba(15, 42, 95, 0.1);
   border-radius: 8px;
@@ -130,14 +217,36 @@ p {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 16px;
 }
 
-.saved {
-  flex: 0 0 auto;
-  color: #128473;
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  color: #52627a;
   font-size: 12px;
   font-weight: 650;
+}
+
+select,
+input {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  border: 1px solid rgba(15, 42, 95, 0.14);
+  border-radius: 9px;
+  padding: 0 10px;
+  color: #102a5f;
+  background: #ffffff;
+  font: inherit;
+}
+
+.openai-settings {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 12px;
 }
 
 .mode-grid {
@@ -181,13 +290,11 @@ p {
     padding: 18px;
   }
 
+  .page-header,
   .panel-heading,
+  .openai-settings,
   .mode-grid {
     grid-template-columns: 1fr;
-  }
-
-  .panel-heading {
-    display: grid;
   }
 }
 </style>

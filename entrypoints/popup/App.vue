@@ -43,6 +43,18 @@ const setProvider = (event: Event) => {
   void updateConfig({ provider: (event.target as HTMLSelectElement).value as ExtensionProvider });
 };
 
+const setOpenAIEndpoint = (event: Event) => {
+  void updateConfig({ openaiEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setOpenAIApiKey = (event: Event) => {
+  void updateConfig({ openaiApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setOpenAIModel = (event: Event) => {
+  void updateConfig({ openaiModel: (event.target as HTMLInputElement).value });
+};
+
 const setDisplayMode = (displayMode: DisplayMode) => {
   void updateConfig({ displayMode });
 };
@@ -97,6 +109,13 @@ const currentSiteSummary = computed(() => {
   if (!site) return "No site policy available";
   return `${site.siteKey} - ${site.dynamicMode} from ${sourceLabel(site.dynamicModeSource)}`;
 });
+
+const openAIStatus = computed(() => {
+  if (config.provider !== "openai-compatible") return "Not selected";
+  return config.openaiApiKey ? `Ready - ${config.openaiModel}` : "API key required";
+});
+
+const openAIEndpointSummary = computed(() => endpointSummary(config.openaiEndpoint));
 
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
@@ -171,6 +190,15 @@ function reasonLabel(reason: string): string {
 function plural(label: string, count: number): string {
   return count === 1 ? label : `${label}s`;
 }
+
+function endpointSummary(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${url.host}${url.pathname}`;
+  } catch {
+    return "Custom endpoint";
+  }
+}
 </script>
 
 <template>
@@ -234,10 +262,58 @@ function plural(label: string, count: number): string {
         <span>Provider</span>
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
-          <option value="openai-compatible">OpenAI compatible</option>
+          <option value="openai-compatible">OpenAI API</option>
           <option value="fake">Local test</option>
         </select>
       </label>
+
+      <div v-if="config.provider === 'openai-compatible'" class="openai-quick" aria-label="OpenAI API settings">
+        <div class="openai-quick-header">
+          <div>
+            <h2>OpenAI API</h2>
+            <p data-testid="popup-openai-status">{{ openAIStatus }}</p>
+          </div>
+          <p class="openai-endpoint">{{ openAIEndpointSummary }}</p>
+        </div>
+
+        <label class="field">
+          <span>Endpoint</span>
+          <input
+            data-testid="popup-openai-endpoint"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            :value="config.openaiEndpoint"
+            @input="setOpenAIEndpoint"
+          />
+        </label>
+
+        <div class="openai-grid">
+          <label class="field">
+            <span>API key</span>
+            <input
+              data-testid="popup-openai-api-key"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              :value="config.openaiApiKey"
+              @input="setOpenAIApiKey"
+            />
+          </label>
+
+          <label class="field">
+            <span>Model</span>
+            <input
+              data-testid="popup-openai-model"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              :value="config.openaiModel"
+              @input="setOpenAIModel"
+            />
+          </label>
+        </div>
+      </div>
 
       <div class="field">
         <span>Display</span>
@@ -440,6 +516,50 @@ select {
   color: #102a5f;
   background: #ffffff;
   font: inherit;
+}
+
+.field input {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid rgba(15, 42, 95, 0.14);
+  border-radius: 9px;
+  padding: 0 9px;
+  color: #102a5f;
+  background: #ffffff;
+  font: inherit;
+}
+
+.openai-quick {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(20, 168, 150, 0.18);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.openai-quick-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.openai-endpoint {
+  max-width: 118px;
+  overflow: hidden;
+  color: #128473;
+  font-weight: 650;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openai-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr;
+  gap: 8px;
 }
 
 .segmented {

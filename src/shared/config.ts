@@ -8,6 +8,9 @@ export type ExtensionConfig = {
   provider: ExtensionProvider;
   displayMode: DisplayMode;
   dynamicMode: DynamicMode;
+  openaiEndpoint: string;
+  openaiApiKey: string;
+  openaiModel: string;
   siteDynamicModes: SiteDynamicModeOverrides;
   showFloatingBall: boolean;
   useCache: boolean;
@@ -20,6 +23,9 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   provider: "microsoft",
   displayMode: "smart",
   dynamicMode: "normal",
+  openaiEndpoint: "https://api.openai.com/v1/chat/completions",
+  openaiApiKey: "",
+  openaiModel: "gpt-4o-mini",
   siteDynamicModes: {},
   showFloatingBall: true,
   useCache: true,
@@ -37,6 +43,9 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     provider: normalizeProvider(input.provider),
     displayMode: normalizeDisplayMode(input.displayMode),
     dynamicMode: normalizeDynamicMode(input.dynamicMode),
+    openaiEndpoint: normalizeString(input.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint),
+    openaiApiKey: normalizeString(input.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey),
+    openaiModel: normalizeString(input.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
     showFloatingBall: normalizeBoolean(input.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall),
     useCache: normalizeBoolean(input.useCache, DEFAULT_EXTENSION_CONFIG.useCache),
@@ -51,6 +60,9 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("provider" in value) patch.provider = normalizeProvider(value.provider);
   if ("displayMode" in value) patch.displayMode = normalizeDisplayMode(value.displayMode);
   if ("dynamicMode" in value) patch.dynamicMode = normalizeDynamicMode(value.dynamicMode);
+  if ("openaiEndpoint" in value) patch.openaiEndpoint = normalizeString(value.openaiEndpoint, DEFAULT_EXTENSION_CONFIG.openaiEndpoint);
+  if ("openaiApiKey" in value) patch.openaiApiKey = normalizeString(value.openaiApiKey, DEFAULT_EXTENSION_CONFIG.openaiApiKey);
+  if ("openaiModel" in value) patch.openaiModel = normalizeString(value.openaiModel, DEFAULT_EXTENSION_CONFIG.openaiModel);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
   if ("showFloatingBall" in value) patch.showFloatingBall = normalizeBoolean(value.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall);
   if ("useCache" in value) patch.useCache = normalizeBoolean(value.useCache, DEFAULT_EXTENSION_CONFIG.useCache);
@@ -79,6 +91,12 @@ function normalizeTargetLang(value: unknown): string {
   if (typeof value !== "string") return DEFAULT_EXTENSION_CONFIG.targetLang;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : DEFAULT_EXTENSION_CONFIG.targetLang;
+}
+
+function normalizeString(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
 }
 
 function normalizeProvider(value: unknown): ExtensionProvider {

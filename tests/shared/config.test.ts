@@ -13,6 +13,9 @@ describe("normalizeExtensionConfig", () => {
         provider: "fake",
         displayMode: "translation-only",
         dynamicMode: "conservative",
+        openaiEndpoint: " https://api.example.test/v1/chat/completions ",
+        openaiApiKey: " sk-test ",
+        openaiModel: " gpt-test ",
         siteDynamicModes: {
           "youtube.com": "normal",
           "x.com": "off",
@@ -26,6 +29,9 @@ describe("normalizeExtensionConfig", () => {
       provider: "fake",
       displayMode: "translation-only",
       dynamicMode: "conservative",
+      openaiEndpoint: "https://api.example.test/v1/chat/completions",
+      openaiApiKey: "sk-test",
+      openaiModel: "gpt-test",
       siteDynamicModes: {
         "youtube.com": "normal",
         "x.com": "off",

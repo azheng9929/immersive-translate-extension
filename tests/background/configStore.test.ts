@@ -10,6 +10,9 @@ describe("createConfigStore", () => {
       provider: "microsoft",
       displayMode: "smart",
       dynamicMode: "normal",
+      openaiEndpoint: "https://api.openai.com/v1/chat/completions",
+      openaiApiKey: "",
+      openaiModel: "gpt-4o-mini",
       siteDynamicModes: {},
       showFloatingBall: true,
       useCache: true,
@@ -23,6 +26,9 @@ describe("createConfigStore", () => {
     const updated = await store.update({
       targetLang: "ja",
       dynamicMode: "off",
+      openaiEndpoint: "https://api.example.test/v1/chat/completions",
+      openaiApiKey: "sk-test",
+      openaiModel: "gpt-test",
       siteDynamicModes: { "youtube.com": "normal" },
       showFloatingBall: false,
     });
@@ -31,6 +37,9 @@ describe("createConfigStore", () => {
     expect(updated).toMatchObject({
       targetLang: "ja",
       dynamicMode: "off",
+      openaiEndpoint: "https://api.example.test/v1/chat/completions",
+      openaiApiKey: "sk-test",
+      openaiModel: "gpt-test",
       siteDynamicModes: { "youtube.com": "normal" },
       showFloatingBall: false,
     });

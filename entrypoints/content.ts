@@ -81,6 +81,9 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
         type: "IMT_TRANSLATE_BATCH",
         request: {
           provider: config.provider,
+          endpoint: config.openaiEndpoint,
+          apiKey: config.openaiApiKey,
+          model: config.openaiModel,
           sourceLang: "auto",
           targetLang: config.targetLang,
           items,
@@ -146,6 +149,9 @@ async function translateSingleText(config: ExtensionConfig, scope: "selection" |
     type: "IMT_TRANSLATE_BATCH",
     request: {
       provider: config.provider,
+      endpoint: config.openaiEndpoint,
+      apiKey: config.openaiApiKey,
+      model: config.openaiModel,
       sourceLang: "auto",
       targetLang: config.targetLang,
       items: [{ id: `${scope}-${Date.now()}`, text, category: "fallback" }],
