@@ -30,6 +30,9 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
   if (message.type === "IMT_POPUP_RESTORE_ACTIVE_TAB") {
     return sendToActiveTab({ type: "IMT_RESTORE_PAGE" });
   }
+  if (message.type === "IMT_POPUP_GET_ACTIVE_TAB_STATUS") {
+    return sendToActiveTab({ type: "IMT_GET_PAGE_STATUS" });
+  }
   if (message.type === "IMT_TRANSLATE_BATCH") {
     return translateBatch(message.request);
   }

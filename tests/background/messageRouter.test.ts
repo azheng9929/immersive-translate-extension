@@ -61,6 +61,37 @@ describe("handleBackgroundMessage", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("forwards active tab page status requests from popup", async () => {
+    const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
+    const sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      status: {
+        phase: "translated",
+        observation: "observing",
+        pendingRoots: 0,
+        observedRoots: 0,
+        total: 1,
+        translated: 1,
+        failed: 0,
+        skipped: 0,
+        dynamicRuns: 0,
+        lastError: undefined,
+      },
+    });
+    vi.stubGlobal("chrome", {
+      tabs: {
+        query: tabsQuery,
+        sendMessage,
+      },
+    });
+
+    const response = await handleBackgroundMessage({ type: "IMT_POPUP_GET_ACTIVE_TAB_STATUS" });
+
+    expect(response).toMatchObject({ ok: true, status: { phase: "translated" } });
+    expect(sendMessage).toHaveBeenCalledWith(12, { type: "IMT_GET_PAGE_STATUS" });
+    vi.unstubAllGlobals();
+  });
 });
 
 class MemoryStorageArea {

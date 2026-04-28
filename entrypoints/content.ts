@@ -38,6 +38,9 @@ export default defineContentScript({
         pageSession.restorePage();
         sendResponse({ ok: true });
       }
+      if (message?.type === "IMT_GET_PAGE_STATUS") {
+        sendResponse({ ok: true, status: pageSession.getStatus() });
+      }
       if (message?.type === "IMT_CONFIG_UPDATED") {
         pageSession.restorePage();
         pageSession.dispose();

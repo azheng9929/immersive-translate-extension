@@ -119,6 +119,21 @@ const STYLE_TEXT = `
   font-size: 11px;
   line-height: 1.35;
 }
+.imt-floating-details {
+  display: grid;
+  gap: 5px;
+  margin: -4px 0 12px;
+  padding: 8px;
+  border: 1px solid rgba(15, 42, 95, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #52627a;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.imt-floating-detail-row {
+  margin: 0;
+}
 .imt-floating-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -168,6 +183,7 @@ export class FloatingTranslationControl {
   private state: FloatingState = "idle";
   private summary: FloatingStatus | undefined;
   private error: string | undefined;
+  private detailsExpanded = false;
   private unsubscribeStatus: (() => void) | undefined;
 
   constructor(private readonly options: FloatingTranslationControlOptions) {}
@@ -207,6 +223,7 @@ export class FloatingTranslationControl {
     this.state = "idle";
     this.summary = undefined;
     this.error = undefined;
+    this.detailsExpanded = false;
     this.render();
   }
 
@@ -293,6 +310,27 @@ export class FloatingTranslationControl {
       diagnosticsNode.dataset.imtControl = "diagnostics";
       diagnosticsNode.textContent = diagnostics;
       panel.append(diagnosticsNode);
+
+      const detailsButton = this.createButton(
+        this.detailsExpanded ? "Hide details" : "Details",
+        "toggle-debug-details",
+        "imt-floating-button imt-floating-button-subtle",
+        () => this.toggleDetails(),
+      );
+      actions.append(detailsButton);
+    }
+    const detailRows = detailedDiagnosticsLabels(this.summary);
+    if (this.detailsExpanded && detailRows.length > 0) {
+      const details = document.createElement("div");
+      details.className = "imt-floating-details";
+      details.dataset.imtControl = "diagnostics-details";
+      for (const rowText of detailRows) {
+        const row = document.createElement("p");
+        row.className = "imt-floating-detail-row";
+        row.textContent = rowText;
+        details.append(row);
+      }
+      panel.append(details);
     }
     panel.append(actions);
     return panel;
@@ -312,6 +350,11 @@ export class FloatingTranslationControl {
     this.summary = status;
     this.error = "lastError" in status ? status.lastError : undefined;
     this.state = "phase" in status ? floatingStateFromStatus(status) : stateFromSummary(status);
+    this.render();
+  }
+
+  private toggleDetails(): void {
+    this.detailsExpanded = !this.detailsExpanded;
     this.render();
   }
 }
@@ -381,6 +424,26 @@ function diagnosticsLabel(summary: FloatingStatus | undefined): string {
   return `Skipped: ${parts.join(", ")}`;
 }
 
+function detailedDiagnosticsLabels(summary: FloatingStatus | undefined): string[] {
+  if (!summary || !("diagnostics" in summary) || !summary.diagnostics) return [];
+  const diagnostics = summary.diagnostics;
+  const rows = [
+    `Text scan ${diagnostics.scan.text.seen} seen, ${diagnostics.scan.text.accepted} accepted, ${diagnostics.scan.text.skipped} skipped`,
+    `Attributes ${diagnostics.scan.attributes.seen} seen, ${diagnostics.scan.attributes.accepted} accepted, ${diagnostics.scan.attributes.skipped} skipped`,
+    `Units ${diagnostics.units.built} built, ${diagnostics.units.dropped} dropped`,
+    `Cache ${diagnostics.cache.hits} ${plural("hit", diagnostics.cache.hits)}, ${diagnostics.cache.misses} ${plural("miss", diagnostics.cache.misses)}`,
+    `Provider ${diagnostics.provider.requested} requested, ${diagnostics.provider.failed} failed, ${diagnostics.provider.skipped} skipped`,
+  ];
+
+  if ("observation" in summary) {
+    rows.unshift(`Dynamic ${summary.observation}, ${summary.pendingRoots} pending, ${summary.observedRoots} lazy`);
+  }
+
+  const skipped = diagnosticsLabel(summary);
+  if (skipped) rows.push(skipped);
+  return rows;
+}
+
 function collectSkippedReasons(diagnostics: TranslationDiagnostics): Map<string, number> {
   const counts = new Map<string, number>();
   addReasonCounts(counts, diagnostics.scan.text.skippedByReason);
@@ -405,4 +468,8 @@ function reasonLabel(reason: string): string {
   if (reason === "hidden") return "hidden text";
   if (reason === "empty") return "empty text";
   return reason.replaceAll("-", " ");
+}
+
+function plural(label: string, count: number): string {
+  return count === 1 ? label : `${label}s`;
 }
