@@ -115,4 +115,26 @@ describe("PageController", () => {
     expect(batchCalls).toBe(2);
     expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
+
+  it("returns a page translation summary for the control UI", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) =>
+          item.text === "Submit"
+            ? { id: item.id, text: "", status: "failed" as const, error: "provider failed" }
+            : { id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const },
+        ),
+    });
+
+    const result = await controller.translatePage();
+
+    expect(result).toEqual({
+      total: 2,
+      translated: 1,
+      failed: 1,
+      skipped: 0,
+    });
+  });
 });

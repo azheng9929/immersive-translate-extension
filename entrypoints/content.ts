@@ -1,3 +1,4 @@
+import { FloatingTranslationControl } from "../src/content/floatingControl";
 import { PageController } from "../src/content/pageController";
 import { IndexedDbTranslationCache } from "../src/shared/translationCache";
 
@@ -24,14 +25,19 @@ export default defineContentScript({
         return items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error }));
       },
     });
+    const floatingControl = new FloatingTranslationControl({
+      translatePage: () => controller.translatePage(),
+      restorePage: () => controller.restorePage(),
+    });
+    floatingControl.mount();
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "IMT_TRANSLATE_PAGE") {
-        controller.translatePage().then(() => sendResponse({ ok: true }));
+        floatingControl.translate().then(() => sendResponse({ ok: true }));
         return true;
       }
       if (message?.type === "IMT_RESTORE_PAGE") {
-        controller.restorePage();
+        floatingControl.restore();
         sendResponse({ ok: true });
       }
       return undefined;

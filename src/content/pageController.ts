@@ -15,6 +15,13 @@ type ControllerOptions = {
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
+export type TranslationPageSummary = {
+  total: number;
+  translated: number;
+  failed: number;
+  skipped: number;
+};
+
 export class PageController {
   private sessionId = createSessionId();
   private revision = 0;
@@ -23,7 +30,7 @@ export class PageController {
 
   constructor(private readonly options: ControllerOptions) {}
 
-  async translatePage(root: ParentNode = document.body): Promise<void> {
+  async translatePage(root: ParentNode = document.body): Promise<TranslationPageSummary> {
     this.restorePage();
     const revision = this.revision + 1;
     this.revision = revision;
@@ -38,9 +45,16 @@ export class PageController {
       targetLang: this.options.targetLang,
     });
 
+    const summary: TranslationPageSummary = {
+      total: this.units.length,
+      translated: 0,
+      failed: 0,
+      skipped: 0,
+    };
+
     const lookupByUnitId = this.buildCacheLookups(this.units);
     const cacheHits = await this.readCache([...lookupByUnitId.values()]);
-    if (revision !== this.revision) return;
+    if (revision !== this.revision) return summary;
 
     const missingUnits: TranslationUnit[] = [];
     for (const unit of this.units) {
@@ -48,6 +62,7 @@ export class PageController {
       const cachedText = lookup ? cacheHits.get(lookup.key) : undefined;
       if (cachedText !== undefined) {
         this.applyTranslation(unit, cachedText);
+        summary.translated += 1;
       } else {
         missingUnits.push(unit);
       }
@@ -59,10 +74,10 @@ export class PageController {
       category: unit.category,
     }));
 
-    if (batch.length === 0) return;
+    if (batch.length === 0) return summary;
 
     const results = await this.options.translateBatch(batch);
-    if (revision !== this.revision) return;
+    if (revision !== this.revision) return summary;
 
     const resultById = new Map(results.map((result) => [result.id, result]));
 
@@ -70,15 +85,19 @@ export class PageController {
     for (const unit of missingUnits) {
       const result = resultById.get(unit.id);
       if (!result || result.status !== "ok") {
-        unit.state = "failed";
+        unit.state = result?.status === "skipped" ? "skipped" : "failed";
+        if (unit.state === "skipped") summary.skipped += 1;
+        else summary.failed += 1;
         continue;
       }
       this.applyTranslation(unit, result.text);
+      summary.translated += 1;
       const lookup = lookupByUnitId.get(unit.id);
       if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
     }
 
     await this.writeCache(cacheWrites);
+    return summary;
   }
 
   restorePage(): void {
