@@ -116,6 +116,57 @@ describe("geminiProvider", () => {
     ]);
   });
 
+  it("degrades failed Gemini chunks into smaller retries after rate limits", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const userPayload = JSON.parse(body.contents[0].parts[0].text);
+      if (userPayload.items.length > 1) {
+        return {
+          ok: false,
+          status: 429,
+          text: async () => JSON.stringify({ error: { message: "Quota exceeded" } }),
+        };
+      }
+
+      return geminiResponse(
+        userPayload.items.map((item: { id: string }) => ({
+          id: item.id,
+          text: `translated-${item.id}`,
+          status: "ok",
+        })),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      geminiProvider.translate({
+        provider: "gemini",
+        endpoint: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "gemini-secret",
+        maxBatchItems: 2,
+        maxBatchChars: 100,
+        maxConcurrentRequests: 2,
+        targetLang: "zh-Hans",
+        items: [
+          { id: "u-1", text: "Hello", category: "content-block" },
+          { id: "u-2", text: "World", category: "content-block" },
+          { id: "u-3", text: "Again", category: "content-block" },
+        ],
+      }),
+    ).resolves.toEqual([
+      { id: "u-1", text: "translated-u-1", status: "ok" },
+      { id: "u-2", text: "translated-u-2", status: "ok" },
+      { id: "u-3", text: "translated-u-3", status: "ok" },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const requestSizes = fetchMock.mock.calls.map((call) => {
+      const body = JSON.parse((call[1] as RequestInit).body as string);
+      return JSON.parse(body.contents[0].parts[0].text).items.length;
+    });
+    expect(requestSizes).toEqual([2, 1, 1, 1]);
+  });
+
   it("requires endpoint and api key", async () => {
     await expect(
       geminiProvider.translate({

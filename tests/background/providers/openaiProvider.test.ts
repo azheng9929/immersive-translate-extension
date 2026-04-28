@@ -177,6 +177,57 @@ describe("openaiProvider", () => {
     ]);
   });
 
+  it("degrades failed OpenAI chunks into smaller retries after rate limits", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const userPayload = JSON.parse(body.messages[1].content);
+      if (userPayload.items.length > 1) {
+        return {
+          ok: false,
+          status: 429,
+          text: async () => JSON.stringify({ error: { message: "Rate limit exceeded" } }),
+        };
+      }
+
+      return openAIResponse(
+        userPayload.items.map((item: { id: string }) => ({
+          id: item.id,
+          text: `translated-${item.id}`,
+          status: "ok",
+        })),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      openaiProvider.translate({
+        provider: "openai-compatible",
+        endpoint: "https://api.example.test/v1/chat/completions",
+        apiKey: "secret",
+        maxBatchItems: 2,
+        maxBatchChars: 100,
+        maxConcurrentRequests: 2,
+        targetLang: "zh-Hans",
+        items: [
+          { id: "u-1", text: "Hello", category: "content-block" },
+          { id: "u-2", text: "World", category: "content-block" },
+          { id: "u-3", text: "Again", category: "content-block" },
+        ],
+      }),
+    ).resolves.toEqual([
+      { id: "u-1", text: "translated-u-1", status: "ok" },
+      { id: "u-2", text: "translated-u-2", status: "ok" },
+      { id: "u-3", text: "translated-u-3", status: "ok" },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const requestSizes = fetchMock.mock.calls.map((call) => {
+      const body = JSON.parse((call[1] as RequestInit).body as string);
+      return JSON.parse(body.messages[1].content).items.length;
+    });
+    expect(requestSizes).toEqual([2, 1, 1, 1]);
+  });
+
   it("requires endpoint and api key", async () => {
     await expect(
       openaiProvider.translate({

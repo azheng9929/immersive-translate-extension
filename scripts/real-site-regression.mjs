@@ -15,6 +15,8 @@ const extensionDir = join(runtimeDir, "extension");
 const profileDir = join(runtimeDir, "profile");
 const reportDir = resolve(rootDir, ".tmp", "real-site-regression-reports");
 const reportPath = join(reportDir, `report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+const provider = process.env.IMT_REGRESSION_PROVIDER ?? "fake";
+const dynamicModes = parseCsv(process.env.IMT_REGRESSION_DYNAMIC_MODES ?? "conservative,normal");
 
 const sites = [
   { name: "X", host: "x.com", url: "https://x.com/explore" },
@@ -22,11 +24,26 @@ const sites = [
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
 ];
 
-const config = {
+const baseConfig = {
   targetLang: "zh-Hans",
-  provider: "fake",
+  provider,
   displayMode: "bilingual",
-  dynamicMode: "normal",
+  dynamicMode: "conservative",
+  openaiEndpoint: process.env.IMT_REGRESSION_OPENAI_ENDPOINT ?? "https://api.openai.com/v1/chat/completions",
+  openaiApiKey: process.env.IMT_REGRESSION_OPENAI_API_KEY ?? "",
+  openaiModel: process.env.IMT_REGRESSION_OPENAI_MODEL ?? "gpt-4o-mini",
+  openaiMaxConcurrentRequests: Number(process.env.IMT_REGRESSION_OPENAI_CONCURRENCY ?? 2),
+  openaiMaxBatchItems: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_ITEMS ?? 16),
+  openaiMaxBatchChars: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_CHARS ?? 6000),
+  openaiRequestTimeoutMs: Number(process.env.IMT_REGRESSION_OPENAI_TIMEOUT_MS ?? 45000),
+  geminiEndpoint: process.env.IMT_REGRESSION_GEMINI_ENDPOINT ?? "https://generativelanguage.googleapis.com/v1beta",
+  geminiApiKey: process.env.IMT_REGRESSION_GEMINI_API_KEY ?? "",
+  geminiModel: process.env.IMT_REGRESSION_GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
+  geminiMaxConcurrentRequests: Number(process.env.IMT_REGRESSION_GEMINI_CONCURRENCY ?? 2),
+  geminiMaxBatchItems: Number(process.env.IMT_REGRESSION_GEMINI_BATCH_ITEMS ?? 16),
+  geminiMaxBatchChars: Number(process.env.IMT_REGRESSION_GEMINI_BATCH_CHARS ?? 6000),
+  geminiRequestTimeoutMs: Number(process.env.IMT_REGRESSION_GEMINI_TIMEOUT_MS ?? 45000),
+  siteDynamicModes: {},
   showFloatingBall: true,
   useCache: false,
 };
@@ -41,6 +58,7 @@ async function main() {
     console.error(`Browser executable not found. Set CHROME_PATH to override. Tried: ${chromePath}`);
     process.exit(1);
   }
+  validateProviderConfig(baseConfig);
 
   await mkdir(profileDir, { recursive: true });
   await mkdir(reportDir, { recursive: true });
@@ -66,7 +84,9 @@ async function main() {
     extensionSourceDir,
     extensionDir,
     port,
-    config,
+    provider,
+    dynamicModes,
+    config: publicConfig(baseConfig),
     sites: [],
   };
 
@@ -76,12 +96,14 @@ async function main() {
     const extensionId = new URL(serviceWorker.url).host;
     const serviceWorkerSession = await CDPSession.connect(serviceWorker.webSocketDebuggerUrl);
     await serviceWorkerSession.send("Runtime.enable");
-    await setExtensionConfig(serviceWorkerSession, config);
-
-    for (const site of sites) {
-    const siteResult = await runSiteRegression(browserSession, serviceWorkerSession, extensionId, site);
-      report.sites.push(siteResult);
-      console.log(`${siteResult.ok ? "PASS" : "FAIL"} ${site.name}: ${siteResult.summary}`);
+    for (const dynamicMode of dynamicModes) {
+      const config = { ...baseConfig, dynamicMode };
+      await setExtensionConfig(serviceWorkerSession, config);
+      for (const site of sites) {
+        const siteResult = await runSiteRegression(browserSession, serviceWorkerSession, extensionId, site, config);
+        report.sites.push(siteResult);
+        console.log(`${siteResult.ok ? "PASS" : "FAIL"} ${site.name} [${dynamicMode}]: ${siteResult.summary}`);
+      }
     }
 
     await serviceWorkerSession.close();
@@ -103,7 +125,7 @@ async function main() {
   if (failed.length > 0) process.exit(1);
 }
 
-async function runSiteRegression(browserSession, serviceWorkerSession, extensionId, site) {
+async function runSiteRegression(browserSession, serviceWorkerSession, extensionId, site, config) {
   const pageSession = await createPageSession(browserSession);
   const runtimeErrors = [];
   const consoleErrors = [];
@@ -128,6 +150,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await delay(2500);
     await scrollPage(pageSession);
     await delay(3500);
+    const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
 
     const metrics = await evaluate(pageSession, `(() => {
       const forbiddenTranslations = document.querySelectorAll([
@@ -170,20 +193,28 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       ...consoleErrors.filter((error) => !isExtensionError(error, extensionId) && !isIgnorableConsoleError(error.text)),
     ];
     const skipped = isXLoginWall(site, metrics);
+    const pageStatus = pageStatusResponse?.ok ? pageStatusResponse.status : undefined;
+    const excessiveFailures = pageStatus ? pageStatus.failed > Math.max(5, Math.ceil(pageStatus.total * 0.5)) : false;
     const ok = Boolean(translateResponse?.ok) &&
+      Boolean(pageStatusResponse?.ok) &&
       (skipped || metrics.bodyTextLength > 0) &&
       (skipped || metrics.translatedBlocks > 0 || metrics.translatedRoots > 0) &&
       metrics.forbiddenTranslations === 0 &&
+      !excessiveFailures &&
+      pageStatus?.phase !== "failed" &&
       extensionErrors.length === 0;
 
     return {
       ...site,
+      provider: config.provider,
+      dynamicMode: config.dynamicMode,
       ok,
       skipped,
       summary: skipped
         ? `skipped: login wall (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
-        : `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots, forbidden=${metrics.forbiddenTranslations}`,
+        : `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots, failed=${pageStatus?.failed ?? "n/a"}, forbidden=${metrics.forbiddenTranslations}`,
       translateResponse,
+      pageStatusResponse,
       metrics,
       screenshotPath,
       errors: extensionErrors,
@@ -193,6 +224,8 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
   } catch (error) {
     return {
       ...site,
+      provider: config.provider,
+      dynamicMode: config.dynamicMode,
       ok: false,
       summary: error instanceof Error ? error.message : String(error),
       errors: [error instanceof Error ? error.stack ?? error.message : String(error)],
@@ -371,7 +404,7 @@ async function setExtensionConfig(serviceWorkerSession, nextConfig) {
     await chrome.storage.local.set(${JSON.stringify({ "imt-extension-config": nextConfig })});
     return chrome.storage.local.get("imt-extension-config");
   })()`);
-  if (result["imt-extension-config"]?.provider !== "fake") {
+  if (result["imt-extension-config"]?.provider !== nextConfig.provider) {
     throw new Error("Failed to write extension regression config");
   }
 }
@@ -477,6 +510,36 @@ function isXLoginWall(site, metrics) {
 
 function isIgnorableConsoleError(message) {
   return /favicon|net::ERR_BLOCKED_BY_CLIENT|net::ERR_CONNECTION_CLOSED|ResizeObserver loop/i.test(message);
+}
+
+function parseCsv(value) {
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function validateProviderConfig(config) {
+  const supportedProviders = new Set(["fake", "microsoft", "openai-compatible", "gemini"]);
+  if (!supportedProviders.has(config.provider)) {
+    throw new Error(`Unsupported IMT_REGRESSION_PROVIDER: ${config.provider}`);
+  }
+  const supportedDynamicModes = new Set(["off", "conservative", "normal"]);
+  for (const dynamicMode of dynamicModes) {
+    if (!supportedDynamicModes.has(dynamicMode)) throw new Error(`Unsupported IMT_REGRESSION_DYNAMIC_MODES value: ${dynamicMode}`);
+  }
+  if (dynamicModes.length === 0) throw new Error("IMT_REGRESSION_DYNAMIC_MODES must include at least one mode");
+  if (config.provider === "openai-compatible" && !config.openaiApiKey) {
+    throw new Error("IMT_REGRESSION_OPENAI_API_KEY is required when IMT_REGRESSION_PROVIDER=openai-compatible");
+  }
+  if (config.provider === "gemini" && !config.geminiApiKey) {
+    throw new Error("IMT_REGRESSION_GEMINI_API_KEY is required when IMT_REGRESSION_PROVIDER=gemini");
+  }
+}
+
+function publicConfig(config) {
+  return {
+    ...config,
+    openaiApiKey: config.openaiApiKey ? "[set]" : "",
+    geminiApiKey: config.geminiApiKey ? "[set]" : "",
+  };
 }
 
 class CDPSession {

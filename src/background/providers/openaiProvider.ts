@@ -1,5 +1,6 @@
 import { DEFAULT_EXTENSION_CONFIG, DEFAULT_OPENAI_SYSTEM_PROMPT } from "../../shared/config";
 import type { ProviderRequest, ProviderRequestItem, ProviderResponseItem, TranslationProvider } from "./providerTypes";
+import { runProviderBatchesWithAdaptiveRetry } from "./providerScheduler";
 
 type OpenAIResponse = {
   choices?: Array<{ message?: { content?: string } }>;
@@ -31,17 +32,7 @@ export const openaiProvider: TranslationProvider = {
     const options = normalizeOpenAIOptions(request);
     if (request.items.length === 0) return [];
 
-    const chunks = chunkItems(request.items, options.maxBatchItems, options.maxBatchChars);
-    const chunkResults = await mapWithConcurrency(chunks, options.maxConcurrentRequests, async (chunk) => {
-      try {
-        return await translateChunk(request, options, chunk);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return chunk.map((item) => failedItem(item, message));
-      }
-    });
-
-    return chunkResults.flat();
+    return runProviderBatchesWithAdaptiveRetry(request.items, options, (chunk) => translateChunk(request, options, chunk));
   },
 };
 
@@ -108,54 +99,6 @@ function normalizeOpenAIOptions(request: ProviderRequest): OpenAIOptions {
     requestTimeoutMs: normalizeInteger(request.requestTimeoutMs, DEFAULT_EXTENSION_CONFIG.openaiRequestTimeoutMs, 5000, 180000),
     systemPrompt: request.systemPrompt?.trim() || DEFAULT_OPENAI_SYSTEM_PROMPT,
   };
-}
-
-function chunkItems(
-  items: ProviderRequestItem[],
-  maxBatchItems: number,
-  maxBatchChars: number,
-): ProviderRequestItem[][] {
-  const chunks: ProviderRequestItem[][] = [];
-  let current: ProviderRequestItem[] = [];
-  let currentChars = 0;
-
-  for (const item of items) {
-    const itemChars = item.text.length;
-    const wouldOverflowItems = current.length >= maxBatchItems;
-    const wouldOverflowChars = current.length > 0 && currentChars + itemChars > maxBatchChars;
-
-    if (wouldOverflowItems || wouldOverflowChars) {
-      chunks.push(current);
-      current = [];
-      currentChars = 0;
-    }
-
-    current.push(item);
-    currentChars += itemChars;
-  }
-
-  if (current.length > 0) chunks.push(current);
-  return chunks;
-}
-
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  maxConcurrent: number,
-  run: (value: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(maxConcurrent, values.length);
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (nextIndex < values.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await run(values[index] as T, index);
-    }
-  });
-
-  await Promise.all(workers);
-  return results;
 }
 
 async function fetchWithTimeout(endpoint: string, init: RequestInit, timeoutMs: number): Promise<Response> {
