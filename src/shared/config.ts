@@ -1,5 +1,10 @@
 import { normalizeGlossaryEntries, type GlossaryEntry } from "./glossary";
-import { normalizeSiteRuleKey, setSiteDynamicModeRule } from "./siteRules";
+import {
+  normalizeSiteRuleKey,
+  normalizeSiteRules,
+  setSiteDynamicModeRule,
+  type SiteRules,
+} from "./siteRules";
 
 export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini";
 export type FallbackProvider = "none" | ExtensionProvider;
@@ -37,6 +42,7 @@ export type ExtensionConfig = {
   geminiRequestTimeoutMs: number;
   geminiSystemPrompt: string;
   glossary: GlossaryEntry[];
+  siteRules: SiteRules;
   siteDynamicModes: SiteDynamicModeOverrides;
   showFloatingBall: boolean;
   useCache: boolean;
@@ -68,6 +74,7 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   geminiRequestTimeoutMs: 45000,
   geminiSystemPrompt: DEFAULT_GEMINI_SYSTEM_PROMPT,
   glossary: [],
+  siteRules: {},
   siteDynamicModes: {},
   showFloatingBall: true,
   useCache: true,
@@ -143,6 +150,7 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     geminiRequestTimeoutMs: normalizeInteger(input.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000),
     geminiSystemPrompt: normalizeString(input.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt),
     glossary: normalizeGlossaryEntries(input.glossary),
+    siteRules: normalizeSiteRules(input.siteRules),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
     showFloatingBall: normalizeBoolean(input.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall),
     useCache: normalizeBoolean(input.useCache, DEFAULT_EXTENSION_CONFIG.useCache),
@@ -176,6 +184,7 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("geminiRequestTimeoutMs" in value) patch.geminiRequestTimeoutMs = normalizeInteger(value.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000);
   if ("geminiSystemPrompt" in value) patch.geminiSystemPrompt = normalizeString(value.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt);
   if ("glossary" in value) patch.glossary = normalizeGlossaryEntries(value.glossary);
+  if ("siteRules" in value) patch.siteRules = normalizeSiteRules(value.siteRules);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
   if ("showFloatingBall" in value) patch.showFloatingBall = normalizeBoolean(value.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall);
   if ("useCache" in value) patch.useCache = normalizeBoolean(value.useCache, DEFAULT_EXTENSION_CONFIG.useCache);
@@ -205,6 +214,28 @@ export function setSiteDynamicModeOverride(
   dynamicMode: DynamicMode | "auto",
 ): SiteDynamicModeOverrides {
   return setSiteDynamicModeRule(current, siteKey, dynamicMode);
+}
+
+export function resolveSiteConfig(config: ExtensionConfig, hostname: string): ExtensionConfig {
+  const siteKey = normalizeSiteRuleKey(hostname);
+  const rule = siteKey ? config.siteRules[siteKey] : undefined;
+  if (!siteKey || !rule) return config;
+
+  const requestPatch = rule.requestProfile ? requestProfilePatch(rule.requestProfile) : {};
+  const siteDynamicMode = rule.dynamicMode ?? requestPatch.dynamicMode;
+  const siteDynamicModes = siteDynamicMode
+    ? setSiteDynamicModeRule(config.siteDynamicModes, siteKey, siteDynamicMode)
+    : config.siteDynamicModes;
+
+  return normalizeExtensionConfig({
+    ...config,
+    ...requestPatch,
+    ...(rule.provider ? { provider: rule.provider } : {}),
+    ...(rule.fallbackProvider ? { fallbackProvider: rule.fallbackProvider } : {}),
+    ...(rule.displayMode ? { displayMode: rule.displayMode } : {}),
+    ...(rule.dynamicMode ? { dynamicMode: rule.dynamicMode } : {}),
+    siteDynamicModes,
+  });
 }
 
 function normalizeTargetLang(value: unknown): string {

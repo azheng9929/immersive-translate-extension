@@ -296,7 +296,10 @@ describe("options App", () => {
 
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
-      patch: { siteDynamicModes: { "x.com": "conservative", "youtube.com": "off" } },
+      patch: {
+        siteRules: { "youtube.com": { dynamicMode: "off" } },
+        siteDynamicModes: { "x.com": "conservative", "youtube.com": "off" },
+      },
     });
 
     await wrapper.find("[data-testid='site-rule-remove-x.com']").trigger("click");
@@ -304,7 +307,51 @@ describe("options App", () => {
 
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
-      patch: { siteDynamicModes: { "youtube.com": "off" } },
+      patch: {
+        siteRules: { "youtube.com": { dynamicMode: "off" } },
+        siteDynamicModes: { "youtube.com": "off" },
+      },
+    });
+  });
+
+  it("saves enhanced site rule fields from settings", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteRules: {}, siteDynamicModes: {} };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find<HTMLInputElement>("[data-testid='site-rule-host']").setValue("https://reddit.com/r/typescript");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-mode']").setValue("conservative");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-display-mode']").setValue("bilingual");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-provider']").setValue("gemini");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-fallback-provider']").setValue("microsoft");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-request-profile']").setValue("high-dynamic");
+    await wrapper.find("[data-testid='site-rule-save']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: {
+        siteRules: {
+          "reddit.com": {
+            dynamicMode: "conservative",
+            displayMode: "bilingual",
+            provider: "gemini",
+            fallbackProvider: "microsoft",
+            requestProfile: "high-dynamic",
+          },
+        },
+        siteDynamicModes: { "reddit.com": "conservative" },
+      },
     });
   });
 });

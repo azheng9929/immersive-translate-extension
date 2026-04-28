@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
   requestProfilePatch,
+  type DisplayMode,
   type DynamicMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
@@ -17,7 +18,12 @@ import {
   importGlossaryEntries,
 } from "../../src/shared/glossary";
 import type { MessageResponse } from "../../src/shared/messages";
-import { normalizeSiteRuleKey, setSiteDynamicModeRule } from "../../src/shared/siteRules";
+import {
+  normalizeSiteRuleKey,
+  setSiteDynamicModeRule,
+  setSiteRule,
+  type SiteRule,
+} from "../../src/shared/siteRules";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
@@ -27,12 +33,23 @@ const glossaryImportText = ref("");
 const glossaryExportText = ref("");
 const glossaryImportError = ref("");
 const siteRuleHost = ref("");
-const siteRuleMode = ref<DynamicMode>("conservative");
+const siteRuleMode = ref<DynamicMode | "global">("conservative");
+const siteRuleDisplayMode = ref<DisplayMode | "global">("global");
+const siteRuleProvider = ref<ExtensionProvider | "global">("global");
+const siteRuleFallbackProvider = ref<FallbackProvider | "global">("global");
+const siteRuleRequestProfile = ref<RequestProfile | "global">("global");
 const siteRuleError = ref("");
 
 const siteRules = computed(() =>
-  Object.entries(config.siteDynamicModes)
-    .map(([siteKey, dynamicMode]) => ({ siteKey, dynamicMode }))
+  Array.from(new Set([...Object.keys(config.siteRules), ...Object.keys(config.siteDynamicModes)]))
+    .map((siteKey) => ({
+      siteKey,
+      dynamicMode: config.siteRules[siteKey]?.dynamicMode ?? config.siteDynamicModes[siteKey],
+      displayMode: config.siteRules[siteKey]?.displayMode,
+      provider: config.siteRules[siteKey]?.provider,
+      fallbackProvider: config.siteRules[siteKey]?.fallbackProvider,
+      requestProfile: config.siteRules[siteKey]?.requestProfile,
+    }))
     .sort((left, right) => left.siteKey.localeCompare(right.siteKey)),
 );
 
@@ -154,16 +171,25 @@ const saveSiteRule = () => {
   }
   siteRuleError.value = "";
   siteRuleHost.value = siteKey;
-  const next = setSiteDynamicModeRule(config.siteDynamicModes, siteKey, siteRuleMode.value);
-  void updateConfig({ siteDynamicModes: next });
+  const rule = buildSiteRulePatch();
+  const siteRules = setSiteRule(config.siteRules, siteKey, rule);
+  const siteDynamicModes = setSiteDynamicModeRule(
+    config.siteDynamicModes,
+    siteKey,
+    siteRuleMode.value === "global" ? "auto" : siteRuleMode.value,
+  );
+  void updateConfig({ siteRules, siteDynamicModes });
 };
 
 const removeSiteRule = (siteKey: string) => {
-  void updateConfig({ siteDynamicModes: setSiteDynamicModeRule(config.siteDynamicModes, siteKey, "auto") });
+  void updateConfig({
+    siteRules: setSiteRule(config.siteRules, siteKey, {}),
+    siteDynamicModes: setSiteDynamicModeRule(config.siteDynamicModes, siteKey, "auto"),
+  });
 };
 
 const clearSiteRules = () => {
-  void updateConfig({ siteDynamicModes: {} });
+  void updateConfig({ siteRules: {}, siteDynamicModes: {} });
 };
 
 onMounted(async () => {
@@ -176,6 +202,16 @@ onMounted(async () => {
 
 function numberInputValue(event: Event): number {
   return Number((event.target as HTMLInputElement).value);
+}
+
+function buildSiteRulePatch(): SiteRule {
+  const rule: SiteRule = {};
+  if (siteRuleMode.value !== "global") rule.dynamicMode = siteRuleMode.value;
+  if (siteRuleDisplayMode.value !== "global") rule.displayMode = siteRuleDisplayMode.value;
+  if (siteRuleProvider.value !== "global") rule.provider = siteRuleProvider.value;
+  if (siteRuleFallbackProvider.value !== "global") rule.fallbackProvider = siteRuleFallbackProvider.value;
+  if (siteRuleRequestProfile.value !== "global") rule.requestProfile = siteRuleRequestProfile.value;
+  return rule;
 }
 </script>
 
@@ -497,9 +533,50 @@ function numberInputValue(event: Event): number {
         <label class="field">
           <span>Dynamic mode</span>
           <select data-testid="site-rule-mode" :value="siteRuleMode" @change="siteRuleMode = ($event.target as HTMLSelectElement).value as DynamicMode">
+            <option value="global">Global</option>
             <option value="off">Off</option>
             <option value="conservative">Safe</option>
             <option value="normal">Normal</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Display</span>
+          <select data-testid="site-rule-display-mode" :value="siteRuleDisplayMode" @change="siteRuleDisplayMode = ($event.target as HTMLSelectElement).value as DisplayMode">
+            <option value="global">Global</option>
+            <option value="smart">Smart</option>
+            <option value="bilingual">Bilingual</option>
+            <option value="translation-only">Translation</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Provider</span>
+          <select data-testid="site-rule-provider" :value="siteRuleProvider" @change="siteRuleProvider = ($event.target as HTMLSelectElement).value as ExtensionProvider">
+            <option value="global">Global</option>
+            <option value="microsoft">Microsoft</option>
+            <option value="openai-compatible">OpenAI API</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="fake">Local test</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Fallback</span>
+          <select data-testid="site-rule-fallback-provider" :value="siteRuleFallbackProvider" @change="siteRuleFallbackProvider = ($event.target as HTMLSelectElement).value as FallbackProvider">
+            <option value="global">Global</option>
+            <option value="none">None</option>
+            <option value="microsoft">Microsoft</option>
+            <option value="openai-compatible">OpenAI API</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="fake">Local test</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Request profile</span>
+          <select data-testid="site-rule-request-profile" :value="siteRuleRequestProfile" @change="siteRuleRequestProfile = ($event.target as HTMLSelectElement).value as RequestProfile">
+            <option value="global">Global</option>
+            <option value="stable">Stable</option>
+            <option value="balanced">Balanced</option>
+            <option value="fast">Fast</option>
+            <option value="high-dynamic">High dynamic</option>
           </select>
         </label>
         <button data-testid="site-rule-save" class="compact-button site-rule-save" type="button" @click="saveSiteRule">Save rule</button>
@@ -510,7 +587,13 @@ function numberInputValue(event: Event): number {
         <div v-for="rule in siteRules" :key="rule.siteKey" class="site-rule-row" :data-testid="`site-rule-row-${rule.siteKey}`">
           <div>
             <strong>{{ rule.siteKey }}</strong>
-            <span>{{ rule.dynamicMode }}</span>
+            <span>
+              {{ rule.dynamicMode ?? "global" }}
+              <template v-if="rule.displayMode"> · {{ rule.displayMode }}</template>
+              <template v-if="rule.provider"> · {{ rule.provider }}</template>
+              <template v-if="rule.fallbackProvider"> · fallback {{ rule.fallbackProvider }}</template>
+              <template v-if="rule.requestProfile"> · {{ rule.requestProfile }}</template>
+            </span>
           </div>
           <button
             class="compact-button danger-button"

@@ -15,6 +15,7 @@ import { resolveSitePolicy, resolveSitePolicyKey, type SitePolicy } from "../src
 import {
   DEFAULT_EXTENSION_CONFIG,
   normalizeExtensionConfig,
+  resolveSiteConfig,
   type ExtensionConfig,
   type ExtensionProvider,
 } from "../src/shared/config";
@@ -56,7 +57,7 @@ export default defineContentScript({
       if (message?.type === "IMT_CONFIG_UPDATED") {
         pageSession.restorePage();
         pageSession.dispose();
-        config = normalizeExtensionConfig(message.config);
+        config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
         pageSession = createPageSession(config);
         selectionTranslator.unmount();
         selectionTranslator = createSelectionTranslator(config);
@@ -77,7 +78,10 @@ export default defineContentScript({
 
 async function loadConfig(): Promise<ExtensionConfig> {
   const response = await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" });
-  return response?.ok && "config" in response ? normalizeExtensionConfig(response.config) : DEFAULT_EXTENSION_CONFIG;
+  return resolveSiteConfig(
+    response?.ok && "config" in response ? normalizeExtensionConfig(response.config) : DEFAULT_EXTENSION_CONFIG,
+    window.location.hostname,
+  );
 }
 
 function createController(config: ExtensionConfig, sitePolicy: SitePolicy): PageController {

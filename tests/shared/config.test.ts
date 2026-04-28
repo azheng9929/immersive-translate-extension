@@ -35,6 +35,14 @@ describe("normalizeExtensionConfig", () => {
           { source: " OpenAI ", target: "OpenAI" },
           { source: " prompt ", target: "提示词", note: " LLM term " },
         ],
+        siteRules: {
+          "https://www.youtube.com/watch?v=abc": {
+            dynamicMode: "off",
+            displayMode: "bilingual",
+            provider: "gemini",
+            requestProfile: "stable",
+          },
+        },
         siteDynamicModes: {
           "youtube.com": "normal",
           "x.com": "off",
@@ -70,6 +78,14 @@ describe("normalizeExtensionConfig", () => {
         { source: "OpenAI", target: "OpenAI" },
         { source: "prompt", target: "提示词", note: "LLM term" },
       ],
+      siteRules: {
+        "youtube.com": {
+          dynamicMode: "off",
+          displayMode: "bilingual",
+          provider: "gemini",
+          requestProfile: "stable",
+        },
+      },
       siteDynamicModes: {
         "youtube.com": "normal",
         "x.com": "off",
@@ -88,6 +104,9 @@ describe("normalizeExtensionConfig", () => {
         dynamicMode: "aggressive",
         requestProfile: "turbo",
         fallbackProvider: "unknown",
+        siteRules: {
+          "bad site": { dynamicMode: "off" },
+        },
         siteDynamicModes: "youtube.com",
         showFloatingBall: "yes",
         useCache: "no",
