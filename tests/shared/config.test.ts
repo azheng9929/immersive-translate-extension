@@ -153,18 +153,22 @@ describe("normalizeExtensionConfig", () => {
     expect(requestProfilePatch("high-dynamic")).toMatchObject({
       requestProfile: "high-dynamic",
       dynamicMode: "conservative",
-      openaiMaxConcurrentRequests: 1,
-      openaiMaxBatchItems: 6,
-      openaiMaxBatchChars: 2500,
-      geminiMaxConcurrentRequests: 1,
-      geminiMaxBatchItems: 6,
-      geminiMaxBatchChars: 2500,
+      openaiMaxConcurrentRequests: 2,
+      openaiMaxBatchItems: 3,
+      openaiMaxBatchChars: 1000,
+      geminiMaxConcurrentRequests: 2,
+      geminiMaxBatchItems: 3,
+      geminiMaxBatchChars: 1000,
     });
     expect(requestProfilePatch("fast")).toMatchObject({
       requestProfile: "fast",
       dynamicMode: "normal",
-      openaiMaxConcurrentRequests: 3,
-      geminiMaxConcurrentRequests: 3,
+      openaiMaxConcurrentRequests: 6,
+      openaiMaxBatchItems: 4,
+      openaiMaxBatchChars: 1200,
+      geminiMaxConcurrentRequests: 6,
+      geminiMaxBatchItems: 4,
+      geminiMaxBatchChars: 1200,
     });
   });
 });

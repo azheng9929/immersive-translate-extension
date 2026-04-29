@@ -1,4 +1,5 @@
 import { DEFAULT_EXTENSION_CONFIG, DEFAULT_OPENAI_SYSTEM_PROMPT } from "../../shared/config";
+import { renderTranslationPromptTemplate } from "../../shared/promptTemplate";
 import type { ProviderRequest, ProviderRequestItem, ProviderResponseItem, TranslationProvider } from "./providerTypes";
 import {
   ProviderAdaptiveError,
@@ -118,7 +119,10 @@ function openAIRequestBody(
     messages: [
       {
         role: "system",
-        content: options.systemPrompt,
+        content: renderTranslationPromptTemplate(options.systemPrompt, {
+          sourceLang: request.sourceLang,
+          targetLang: request.targetLang,
+        }),
       },
       {
         role: "user",

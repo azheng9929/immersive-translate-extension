@@ -48,6 +48,17 @@ describe("glossary helpers", () => {
     ).toContain('"prompt" => "提示词" (LLM term)');
   });
 
+  it("fills the terms prompt placeholder when present", () => {
+    const prompt = buildGlossarySystemPrompt("Rules.{{terms_prompt}}End.", [
+      { source: "API", target: "API" },
+    ]);
+
+    expect(prompt).toContain("Rules.\nTerminology glossary:");
+    expect(prompt).toContain('"API" => "API"');
+    expect(prompt).toContain("End.");
+    expect(buildGlossarySystemPrompt("Rules.{{terms_prompt}}End.", [])).toBe("Rules.End.");
+  });
+
   it("exports and imports glossary JSON", () => {
     const exported = exportGlossaryEntries([
       { source: "OpenAI", target: "OpenAI" },

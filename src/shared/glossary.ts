@@ -77,19 +77,24 @@ export function importGlossaryEntries(value: string): GlossaryEntry[] {
 
 export function buildGlossarySystemPrompt(basePrompt: string, entries: readonly GlossaryEntry[]): string {
   const glossary = normalizeGlossaryEntries([...entries]);
-  if (glossary.length === 0) return basePrompt;
+  if (glossary.length === 0) return basePrompt.replaceAll("{{terms_prompt}}", "");
 
   const lines = glossary.map((entry) => {
     const note = entry.note ? ` (${entry.note})` : "";
     return `- "${entry.source}" => "${entry.target}"${note}`;
   });
-
-  return [
-    basePrompt,
+  const termsPrompt = [
     "",
     "Terminology glossary:",
     ...lines,
     "When a glossary source term appears in an item, use the matching target term naturally while preserving the required JSON response format.",
+  ].join("\n");
+
+  if (basePrompt.includes("{{terms_prompt}}")) return basePrompt.replaceAll("{{terms_prompt}}", termsPrompt);
+
+  return [
+    basePrompt,
+    termsPrompt,
   ].join("\n");
 }
 

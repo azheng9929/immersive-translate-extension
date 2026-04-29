@@ -13,8 +13,20 @@ export type DynamicMode = "off" | "conservative" | "normal";
 export type RequestProfile = "stable" | "balanced" | "fast" | "high-dynamic";
 export type SiteDynamicModeOverrides = Record<string, DynamicMode>;
 
-export const DEFAULT_OPENAI_SYSTEM_PROMPT =
-  "You are a web translation engine. Translate each item to the target language. Return exactly JSON: {\"items\":[{\"id\":\"...\",\"text\":\"...\",\"status\":\"ok\"}]}. Preserve ids, item count, and item boundaries. Do not merge, split, omit, reorder, add notes, add Markdown, or add HTML. If translation is unnecessary, return the original text with status ok.";
+export const DEFAULT_LLM_TRANSLATION_SYSTEM_PROMPT = `You are a professional {{to}} native translator who needs to fluently translate text into {{to}}.
+
+## Translation Rules
+1. Output only the translated content for each item, without explanations or additional content.
+2. Preserve the exact item count, item ids, and item order from the request.
+3. The returned translation for each item must maintain the same paragraph count and internal format as the original item text.
+4. If the text contains HTML tags, place the tags naturally in the translated text while preserving valid markup.
+5. Keep content that should not be translated, such as proper nouns, product names, code, variables, URLs, and placeholders.
+6. If an item contains %% separators, keep the same number of %% separators in that item's translation. If an item has no %%, do not add %%.
+
+## Structured Output
+Return only the requested JSON object. For every input item, return one output item with the same id, translated text, and status ok. Do not merge, split, omit, reorder, add Markdown, or add HTML that was not present in the source.{{title_prompt}}{{summary_prompt}}{{terms_prompt}}{{imt_style_guide}}`;
+
+export const DEFAULT_OPENAI_SYSTEM_PROMPT = DEFAULT_LLM_TRANSLATION_SYSTEM_PROMPT;
 
 export const DEFAULT_GEMINI_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
 
@@ -61,17 +73,17 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   openaiEndpoint: "https://api.openai.com/v1/chat/completions",
   openaiApiKey: "",
   openaiModel: "gpt-4o-mini",
-  openaiMaxConcurrentRequests: 2,
-  openaiMaxBatchItems: 16,
-  openaiMaxBatchChars: 6000,
+  openaiMaxConcurrentRequests: 4,
+  openaiMaxBatchItems: 4,
+  openaiMaxBatchChars: 1200,
   openaiRequestTimeoutMs: 45000,
   openaiSystemPrompt: DEFAULT_OPENAI_SYSTEM_PROMPT,
   geminiEndpoint: "https://generativelanguage.googleapis.com/v1beta",
   geminiApiKey: "",
   geminiModel: "gemini-3.1-flash-lite-preview",
-  geminiMaxConcurrentRequests: 2,
-  geminiMaxBatchItems: 16,
-  geminiMaxBatchChars: 6000,
+  geminiMaxConcurrentRequests: 4,
+  geminiMaxBatchItems: 4,
+  geminiMaxBatchChars: 1200,
   geminiRequestTimeoutMs: 45000,
   geminiSystemPrompt: DEFAULT_GEMINI_SYSTEM_PROMPT,
   glossary: [],
@@ -97,30 +109,30 @@ const REQUEST_PROFILE_PRESETS: Record<RequestProfile, {
 }> = {
   stable: {
     dynamicMode: "conservative",
-    maxConcurrentRequests: 1,
-    maxBatchItems: 8,
-    maxBatchChars: 3000,
+    maxConcurrentRequests: 2,
+    maxBatchItems: 2,
+    maxBatchChars: 800,
     requestTimeoutMs: 60000,
   },
   balanced: {
     dynamicMode: "normal",
-    maxConcurrentRequests: 2,
-    maxBatchItems: 16,
-    maxBatchChars: 6000,
+    maxConcurrentRequests: 4,
+    maxBatchItems: 4,
+    maxBatchChars: 1200,
     requestTimeoutMs: 45000,
   },
   fast: {
     dynamicMode: "normal",
-    maxConcurrentRequests: 3,
-    maxBatchItems: 24,
-    maxBatchChars: 9000,
+    maxConcurrentRequests: 6,
+    maxBatchItems: 4,
+    maxBatchChars: 1200,
     requestTimeoutMs: 45000,
   },
   "high-dynamic": {
     dynamicMode: "conservative",
-    maxConcurrentRequests: 1,
-    maxBatchItems: 6,
-    maxBatchChars: 2500,
+    maxConcurrentRequests: 2,
+    maxBatchItems: 3,
+    maxBatchChars: 1000,
     requestTimeoutMs: 60000,
   },
 };

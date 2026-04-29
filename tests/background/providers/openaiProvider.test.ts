@@ -54,7 +54,9 @@ describe("openaiProvider", () => {
       "detectedLang",
       "error",
     ]);
-    expect(body.messages[0].content).toContain("Preserve ids, item count, and item boundaries");
+    expect(body.messages[0].content).toContain("professional zh-Hans native translator");
+    expect(body.messages[0].content).toContain("Preserve the exact item count, item ids, and item order");
+    expect(body.messages[0].content).not.toContain("{{to}}");
     expect(JSON.parse(body.messages[1].content).items).toEqual([
       { id: "u-1", category: "content-block", text: "Hello" },
     ]);
@@ -325,6 +327,24 @@ describe("openaiProvider", () => {
         items: [{ id: "u-1", text: "Hello", category: "content-block" }],
       }),
     ).rejects.toThrow("OpenAI API requires endpoint and API key");
+  });
+
+  it("renders Immersive-style prompt placeholders before sending the request", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(openAIResponse([{ id: "u-1", text: "你好", status: "ok" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await openaiProvider.translate({
+      provider: "openai-compatible",
+      endpoint: "https://api.example.test/v1/chat/completions",
+      apiKey: "secret",
+      systemPrompt: "Translate from {{from}} to {{to}}.{{title_prompt}}{{summary_prompt}}{{terms_prompt}}{{imt_style_guide}}",
+      sourceLang: "en",
+      targetLang: "zh-Hans",
+      items: [{ id: "u-1", text: "Hello", category: "content-block" }],
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.messages[0].content).toBe("Translate from en to zh-Hans.");
   });
 });
 

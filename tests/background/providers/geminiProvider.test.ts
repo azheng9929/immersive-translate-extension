@@ -26,7 +26,9 @@ describe("geminiProvider", () => {
     );
     expect(requestInit.headers).toMatchObject({ "x-goog-api-key": "gemini-secret" });
     expect(body).not.toHaveProperty("temperature");
-    expect(body.system_instruction.parts[0].text).toContain("Preserve ids, item count, and item boundaries");
+    expect(body.system_instruction.parts[0].text).toContain("professional zh-Hans native translator");
+    expect(body.system_instruction.parts[0].text).toContain("Preserve the exact item count, item ids, and item order");
+    expect(body.system_instruction.parts[0].text).not.toContain("{{to}}");
     expect(JSON.parse(body.contents[0].parts[0].text).items).toEqual([
       { id: "u-1", category: "content-block", text: "Hello" },
     ]);
@@ -175,6 +177,24 @@ describe("geminiProvider", () => {
         items: [{ id: "u-1", text: "Hello", category: "content-block" }],
       }),
     ).rejects.toThrow("Gemini API requires endpoint and API key");
+  });
+
+  it("renders prompt placeholders before sending the request", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(geminiResponse([{ id: "u-1", text: "你好", status: "ok" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await geminiProvider.translate({
+      provider: "gemini",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta",
+      apiKey: "gemini-secret",
+      systemPrompt: "Translate from {{from}} to {{to}}.{{title_prompt}}{{summary_prompt}}{{terms_prompt}}{{imt_style_guide}}",
+      sourceLang: "en",
+      targetLang: "zh-Hans",
+      items: [{ id: "u-1", text: "Hello", category: "content-block" }],
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.system_instruction.parts[0].text).toBe("Translate from en to zh-Hans.");
   });
 });
 

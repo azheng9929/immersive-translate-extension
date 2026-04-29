@@ -1,4 +1,5 @@
 import { DEFAULT_EXTENSION_CONFIG, DEFAULT_GEMINI_SYSTEM_PROMPT } from "../../shared/config";
+import { renderTranslationPromptTemplate } from "../../shared/promptTemplate";
 import type { ProviderRequest, ProviderRequestItem, ProviderResponseItem, TranslationProvider } from "./providerTypes";
 import { runProviderBatchesWithAdaptiveRetry } from "./providerScheduler";
 
@@ -53,7 +54,14 @@ async function translateChunk(
     },
     body: JSON.stringify({
       system_instruction: {
-        parts: [{ text: options.systemPrompt }],
+        parts: [
+          {
+            text: renderTranslationPromptTemplate(options.systemPrompt, {
+              sourceLang: request.sourceLang,
+              targetLang: request.targetLang,
+            }),
+          },
+        ],
       },
       contents: [
         {

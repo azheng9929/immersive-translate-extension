@@ -99,8 +99,8 @@ describe("options App", () => {
     const systemPrompt = wrapper.find<HTMLTextAreaElement>("[data-testid='openai-system-prompt']");
 
     expect(endpoint.element.value).toBe("https://api.openai.com/v1/chat/completions");
-    expect(maxConcurrent.element.value).toBe("2");
-    expect(maxBatchItems.element.value).toBe("16");
+    expect(maxConcurrent.element.value).toBe("4");
+    expect(maxBatchItems.element.value).toBe("4");
     await endpoint.setValue("https://api.example.test/v1/chat/completions");
     await apiKey.setValue("sk-test");
     await model.setValue("gpt-test");
@@ -239,12 +239,12 @@ describe("options App", () => {
       patch: expect.objectContaining({
         requestProfile: "high-dynamic",
         dynamicMode: "conservative",
-        openaiMaxConcurrentRequests: 1,
-        openaiMaxBatchItems: 6,
-        openaiMaxBatchChars: 2500,
-        geminiMaxConcurrentRequests: 1,
-        geminiMaxBatchItems: 6,
-        geminiMaxBatchChars: 2500,
+      openaiMaxConcurrentRequests: 2,
+      openaiMaxBatchItems: 3,
+      openaiMaxBatchChars: 1000,
+      geminiMaxConcurrentRequests: 2,
+      geminiMaxBatchItems: 3,
+      geminiMaxBatchChars: 1000,
       }),
     });
     expect(sendMessage).toHaveBeenCalledWith({

@@ -86,9 +86,9 @@ describe("site rule helpers", () => {
       displayMode: "translation-only",
       dynamicMode: "off",
       requestProfile: "high-dynamic",
-      geminiMaxConcurrentRequests: 1,
-      geminiMaxBatchItems: 6,
-      geminiMaxBatchChars: 2500,
+      geminiMaxConcurrentRequests: 2,
+      geminiMaxBatchItems: 3,
+      geminiMaxBatchChars: 1000,
       siteDynamicModes: { "youtube.com": "off" },
     });
   });

@@ -348,7 +348,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Batch items</span>
+            <span>Max paragraphs</span>
             <input
               data-testid="openai-max-batch-items"
               type="number"
@@ -361,7 +361,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Batch chars</span>
+            <span>Max text chars</span>
             <input
               data-testid="openai-max-batch-chars"
               type="number"
@@ -415,7 +415,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Batch items</span>
+            <span>Max paragraphs</span>
             <input
               data-testid="gemini-max-batch-items"
               type="number"
@@ -428,7 +428,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Batch chars</span>
+            <span>Max text chars</span>
             <input
               data-testid="gemini-max-batch-chars"
               type="number"
