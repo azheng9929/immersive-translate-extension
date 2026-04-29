@@ -85,10 +85,8 @@ describe("normalizeExtensionConfig", () => {
       siteRules: {
         "youtube.com": {
           autoTranslate: true,
-          dynamicMode: "off",
           displayMode: "bilingual",
           provider: "gemini",
-          requestProfile: "stable",
         },
       },
       siteDynamicModes: {

@@ -2,7 +2,6 @@ import { normalizeGlossaryEntries, type GlossaryEntry } from "./glossary";
 import {
   normalizeSiteRuleKey,
   normalizeSiteRules,
-  setSiteDynamicModeRule,
   type SiteRules,
 } from "./siteRules";
 
@@ -228,34 +227,17 @@ export function requestProfilePatch(value: unknown): ExtensionConfigPatch {
   };
 }
 
-export function setSiteDynamicModeOverride(
-  current: SiteDynamicModeOverrides,
-  siteKey: string,
-  dynamicMode: DynamicMode | "auto",
-): SiteDynamicModeOverrides {
-  return setSiteDynamicModeRule(current, siteKey, dynamicMode);
-}
-
 export function resolveSiteConfig(config: ExtensionConfig, hostname: string): ExtensionConfig {
   const siteKey = normalizeSiteRuleKey(hostname);
   const rule = siteKey ? config.siteRules[siteKey] : undefined;
   if (!siteKey || !rule) return config;
 
-  const requestPatch = rule.requestProfile ? requestProfilePatch(rule.requestProfile) : {};
-  const siteDynamicMode = rule.dynamicMode ?? requestPatch.dynamicMode;
-  const siteDynamicModes = siteDynamicMode
-    ? setSiteDynamicModeRule(config.siteDynamicModes, siteKey, siteDynamicMode)
-    : config.siteDynamicModes;
-
   return normalizeExtensionConfig({
     ...config,
-    ...requestPatch,
     ...(typeof rule.autoTranslate === "boolean" ? { autoTranslate: rule.autoTranslate } : {}),
     ...(rule.provider ? { provider: rule.provider } : {}),
     ...(rule.fallbackProvider ? { fallbackProvider: rule.fallbackProvider } : {}),
     ...(rule.displayMode ? { displayMode: rule.displayMode } : {}),
-    ...(rule.dynamicMode ? { dynamicMode: rule.dynamicMode } : {}),
-    siteDynamicModes,
   });
 }
 

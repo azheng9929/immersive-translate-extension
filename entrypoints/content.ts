@@ -12,7 +12,7 @@ import {
   type TranslationBatchResult,
 } from "../src/content/providerFallback";
 import { SelectionTranslator } from "../src/content/selectionTranslator";
-import { resolveSitePolicy, resolveSitePolicyKey, type SitePolicy } from "../src/content/sitePolicy";
+import { resolveSitePolicy, type SitePolicy } from "../src/content/sitePolicy";
 import {
   DEFAULT_EXTENSION_CONFIG,
   normalizeExtensionConfig,
@@ -112,13 +112,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
   const hostname = window.location.hostname;
-  const siteKey = resolveSitePolicyKey(hostname);
-  const siteDynamicMode = config.siteDynamicModes[siteKey];
-  const sitePolicy = resolveSitePolicy(
-    hostname,
-    config.dynamicMode,
-    siteDynamicMode ? { siteDynamicMode } : {},
-  );
+  const sitePolicy = resolveSitePolicy(hostname, config.dynamicMode);
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,

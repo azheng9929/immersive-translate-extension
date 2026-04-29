@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_EXTENSION_CONFIG, normalizeExtensionConfig, resolveSiteConfig } from "@/shared/config";
-import { normalizeSiteRules, setSiteDynamicModeRule, setSiteRule, normalizeSiteRuleKey } from "@/shared/siteRules";
+import { normalizeSiteRules, setSiteRule, normalizeSiteRuleKey } from "@/shared/siteRules";
 
 describe("site rule helpers", () => {
   it("normalizes user-entered hosts and URLs to stable site keys", () => {
@@ -10,24 +10,14 @@ describe("site rule helpers", () => {
     expect(normalizeSiteRuleKey("not a host")).toBe("");
   });
 
-  it("adds and removes dynamic mode overrides by normalized site key", () => {
-    const added = setSiteDynamicModeRule({}, "https://www.reddit.com/r/typescript", "off");
-    expect(added).toEqual({ "reddit.com": "off" });
-
-    const removed = setSiteDynamicModeRule(added, "reddit.com", "auto");
-    expect(removed).toEqual({});
-  });
-
-  it("normalizes enhanced site rules and drops empty or unsupported fields", () => {
+  it("normalizes site rules and drops empty or unsupported fields", () => {
     expect(
       normalizeSiteRules({
         "https://www.youtube.com/watch?v=abc": {
           autoTranslate: true,
-          dynamicMode: "conservative",
           displayMode: "translation-only",
           provider: "gemini",
           fallbackProvider: "microsoft",
-          requestProfile: "high-dynamic",
         },
         "bad site": {
           dynamicMode: "off",
@@ -40,11 +30,9 @@ describe("site rule helpers", () => {
     ).toEqual({
       "youtube.com": {
         autoTranslate: true,
-        dynamicMode: "conservative",
         displayMode: "translation-only",
         provider: "gemini",
         fallbackProvider: "microsoft",
-        requestProfile: "high-dynamic",
       },
     });
   });
@@ -90,12 +78,9 @@ describe("site rule helpers", () => {
       autoTranslate: true,
       fallbackProvider: "microsoft",
       displayMode: "translation-only",
-      dynamicMode: "off",
-      requestProfile: "high-dynamic",
-      geminiMaxConcurrentRequests: 2,
-      geminiMaxBatchItems: 3,
-      geminiMaxBatchChars: 1000,
-      siteDynamicModes: { "youtube.com": "off" },
+      dynamicMode: "normal",
+      requestProfile: "balanced",
+      siteDynamicModes: {},
     });
   });
 });

@@ -3,11 +3,9 @@ import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
   type DisplayMode,
-  type DynamicMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
-  setSiteDynamicModeOverride,
 } from "../../src/shared/config";
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
@@ -18,8 +16,6 @@ const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
 const pageStatus = ref<PageTranslationStatus | undefined>();
 const pageStatusError = ref("");
-
-type SiteDynamicModeChoice = DynamicMode | "auto";
 
 const send = async (message: BackgroundMessage) => {
   const response = (await chrome.runtime.sendMessage(message)) as MessageResponse;
@@ -72,19 +68,6 @@ const setDisplayMode = (displayMode: DisplayMode) => {
   void updateConfig({ displayMode });
 };
 
-const setDynamicMode = (dynamicMode: DynamicMode) => {
-  void updateConfig({ dynamicMode });
-};
-
-const setCurrentSiteDynamicMode = async (dynamicMode: SiteDynamicModeChoice) => {
-  const site = currentSite.value;
-  if (!site) return;
-  await updateConfig({
-    siteDynamicModes: setSiteDynamicModeOverride(config.siteDynamicModes, site.siteKey, dynamicMode),
-  });
-  await loadPageStatus();
-};
-
 const setCurrentSiteAutoTranslate = async (enabled: boolean) => {
   const site = currentSite.value;
   if (!site) return;
@@ -121,12 +104,6 @@ const pageDiagnosticsRows = computed(() => detailedDiagnosticsLabels(pageStatus.
 
 const currentSite = computed(() => pageStatus.value?.site);
 
-const currentSiteDynamicMode = computed<SiteDynamicModeChoice>(() => {
-  const site = currentSite.value;
-  if (!site) return "auto";
-  return config.siteDynamicModes[site.siteKey] ?? "auto";
-});
-
 const currentSiteAutoTranslate = computed(() => {
   const site = currentSite.value;
   if (!site) return false;
@@ -136,7 +113,7 @@ const currentSiteAutoTranslate = computed(() => {
 const currentSiteSummary = computed(() => {
   const site = currentSite.value;
   if (!site) return "No site policy available";
-  return `${site.siteKey} - ${site.dynamicMode} from ${sourceLabel(site.dynamicModeSource)}`;
+  return `${site.siteKey} - new content handling is automatic`;
 });
 
 const openAIStatus = computed(() => {
@@ -170,17 +147,11 @@ function statusLabel(phase: PageTranslationStatus["phase"]): string {
   return "Ready";
 }
 
-function sourceLabel(source: NonNullable<PageTranslationStatus["site"]>["dynamicModeSource"]): string {
-  if (source === "site-default") return "site default";
-  if (source === "site-override") return "site override";
-  return "global setting";
-}
-
 function detailedDiagnosticsLabels(status: PageTranslationStatus | undefined): string[] {
   if (!status?.diagnostics) return [];
   const diagnostics = status.diagnostics;
   const rows = [
-    `Dynamic ${status.observation}, ${status.pendingRoots} pending, ${status.observedRoots} lazy`,
+    `New content ${status.observation}, ${status.pendingRoots} pending, ${status.observedRoots} lazy`,
     `Text scan ${diagnostics.scan.text.seen} seen, ${diagnostics.scan.text.accepted} accepted, ${diagnostics.scan.text.skipped} skipped`,
     `Attributes ${diagnostics.scan.attributes.seen} seen, ${diagnostics.scan.attributes.accepted} accepted, ${diagnostics.scan.attributes.skipped} skipped`,
     `Units ${diagnostics.units.built} built, ${diagnostics.units.dropped} dropped`,
@@ -269,16 +240,10 @@ function endpointSummary(value: string): string {
       </div>
     </section>
 
-    <section v-if="currentSite" class="site-panel" aria-label="Current site dynamic mode">
+    <section v-if="currentSite" class="site-panel" aria-label="Current site controls">
       <div>
-        <h2>Site dynamic mode</h2>
+        <h2>Site controls</h2>
         <p>{{ currentSiteSummary }}</p>
-      </div>
-      <div class="site-segmented" role="group" aria-label="Current site dynamic mode override">
-        <button data-testid="site-mode-auto" type="button" :class="{ active: currentSiteDynamicMode === 'auto' }" @click="setCurrentSiteDynamicMode('auto')">Auto</button>
-        <button data-testid="site-mode-off" type="button" :class="{ active: currentSiteDynamicMode === 'off' }" @click="setCurrentSiteDynamicMode('off')">Off</button>
-        <button data-testid="site-mode-conservative" type="button" :class="{ active: currentSiteDynamicMode === 'conservative' }" @click="setCurrentSiteDynamicMode('conservative')">Safe</button>
-        <button data-testid="site-mode-normal" type="button" :class="{ active: currentSiteDynamicMode === 'normal' }" @click="setCurrentSiteDynamicMode('normal')">Normal</button>
       </div>
       <label class="toggle-row">
         <span>Auto translate this site</span>
@@ -417,16 +382,6 @@ function endpointSummary(value: string): string {
           <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">Translation</button>
         </div>
       </div>
-
-      <div class="field">
-        <span>Dynamic updates</span>
-        <div class="segmented" role="group" aria-label="Dynamic translation mode">
-          <button data-testid="dynamic-mode-off" type="button" :class="{ active: config.dynamicMode === 'off' }" @click="setDynamicMode('off')">Off</button>
-          <button data-testid="dynamic-mode-conservative" type="button" :class="{ active: config.dynamicMode === 'conservative' }" @click="setDynamicMode('conservative')">Safe</button>
-          <button data-testid="dynamic-mode-normal" type="button" :class="{ active: config.dynamicMode === 'normal' }" @click="setDynamicMode('normal')">Normal</button>
-        </div>
-      </div>
-
       <label class="toggle-row">
         <span>Floating ball</span>
         <input type="checkbox" :checked="config.showFloatingBall" @change="updateConfig({ showFloatingBall: ($event.target as HTMLInputElement).checked })" />
@@ -571,31 +526,6 @@ button {
 
 .debug-details p {
   line-height: 1.35;
-}
-
-.site-segmented {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid rgba(15, 42, 95, 0.12);
-  border-radius: 10px;
-  background: #ffffff;
-}
-
-.site-segmented button {
-  min-height: 30px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #52627a;
-  box-shadow: none;
-  font-size: 12px;
-}
-
-.site-segmented button.active {
-  color: #ffffff;
-  background: #1758db;
 }
 
 .field,

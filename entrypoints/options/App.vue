@@ -2,14 +2,11 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
-  requestProfilePatch,
   type DisplayMode,
-  type DynamicMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
   type FallbackProvider,
-  type RequestProfile,
 } from "../../src/shared/config";
 import {
   exportGlossaryEntries,
@@ -20,7 +17,6 @@ import {
 import type { MessageResponse } from "../../src/shared/messages";
 import {
   normalizeSiteRuleKey,
-  setSiteDynamicModeRule,
   setSiteRule,
   type SiteAutoTranslateChoice,
   type SiteRule,
@@ -34,24 +30,20 @@ const glossaryImportText = ref("");
 const glossaryExportText = ref("");
 const glossaryImportError = ref("");
 const siteRuleHost = ref("");
-const siteRuleMode = ref<DynamicMode | "global">("conservative");
 const siteRuleAutoTranslate = ref<SiteAutoTranslateChoice>("global");
 const siteRuleDisplayMode = ref<DisplayMode | "global">("global");
 const siteRuleProvider = ref<ExtensionProvider | "global">("global");
 const siteRuleFallbackProvider = ref<FallbackProvider | "global">("global");
-const siteRuleRequestProfile = ref<RequestProfile | "global">("global");
 const siteRuleError = ref("");
 
 const siteRules = computed(() =>
-  Array.from(new Set([...Object.keys(config.siteRules), ...Object.keys(config.siteDynamicModes)]))
+  Object.keys(config.siteRules)
     .map((siteKey) => ({
       siteKey,
       autoTranslate: config.siteRules[siteKey]?.autoTranslate,
-      dynamicMode: config.siteRules[siteKey]?.dynamicMode ?? config.siteDynamicModes[siteKey],
       displayMode: config.siteRules[siteKey]?.displayMode,
       provider: config.siteRules[siteKey]?.provider,
       fallbackProvider: config.siteRules[siteKey]?.fallbackProvider,
-      requestProfile: config.siteRules[siteKey]?.requestProfile,
     }))
     .sort((left, right) => left.siteKey.localeCompare(right.siteKey)),
 );
@@ -72,14 +64,6 @@ const setProvider = (event: Event) => {
 
 const setFallbackProvider = (event: Event) => {
   void updateConfig({ fallbackProvider: (event.target as HTMLSelectElement).value as FallbackProvider });
-};
-
-const setDynamicMode = (dynamicMode: DynamicMode) => {
-  void updateConfig({ dynamicMode });
-};
-
-const setRequestProfile = (requestProfile: RequestProfile) => {
-  void updateConfig(requestProfilePatch(requestProfile));
 };
 
 const setOpenAIEndpoint = (event: Event) => {
@@ -146,6 +130,10 @@ const setGeminiSystemPrompt = (event: Event) => {
   void updateConfig({ geminiSystemPrompt: (event.target as HTMLTextAreaElement).value });
 };
 
+const setTranslateNewContent = (event: Event) => {
+  void updateConfig({ dynamicMode: (event.target as HTMLInputElement).checked ? "normal" : "off" });
+};
+
 const setGlossaryText = (event: Event) => {
   glossaryText.value = (event.target as HTMLTextAreaElement).value;
   void updateConfig({ glossary: glossaryTextToEntries(glossaryText.value) });
@@ -176,18 +164,12 @@ const saveSiteRule = () => {
   siteRuleHost.value = siteKey;
   const rule = buildSiteRulePatch();
   const siteRules = setSiteRule(config.siteRules, siteKey, rule);
-  const siteDynamicModes = setSiteDynamicModeRule(
-    config.siteDynamicModes,
-    siteKey,
-    siteRuleMode.value === "global" ? "auto" : siteRuleMode.value,
-  );
-  void updateConfig({ siteRules, siteDynamicModes });
+  void updateConfig({ siteRules });
 };
 
 const removeSiteRule = (siteKey: string) => {
   void updateConfig({
     siteRules: setSiteRule(config.siteRules, siteKey, {}),
-    siteDynamicModes: setSiteDynamicModeRule(config.siteDynamicModes, siteKey, "auto"),
   });
 };
 
@@ -211,11 +193,9 @@ function buildSiteRulePatch(): SiteRule {
   const rule: SiteRule = {};
   if (siteRuleAutoTranslate.value === "always") rule.autoTranslate = true;
   if (siteRuleAutoTranslate.value === "never") rule.autoTranslate = false;
-  if (siteRuleMode.value !== "global") rule.dynamicMode = siteRuleMode.value;
   if (siteRuleDisplayMode.value !== "global") rule.displayMode = siteRuleDisplayMode.value;
   if (siteRuleProvider.value !== "global") rule.provider = siteRuleProvider.value;
   if (siteRuleFallbackProvider.value !== "global") rule.fallbackProvider = siteRuleFallbackProvider.value;
-  if (siteRuleRequestProfile.value !== "global") rule.requestProfile = siteRuleRequestProfile.value;
   return rule;
 }
 </script>
@@ -509,6 +489,16 @@ function buildSiteRulePatch(): SiteRule {
             @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })"
           />
         </label>
+
+        <label class="toggle-row">
+          <span>Translate new content</span>
+          <input
+            data-testid="options-new-content-toggle"
+            type="checkbox"
+            :checked="config.dynamicMode !== 'off'"
+            @change="setTranslateNewContent"
+          />
+        </label>
       </div>
     </section>
 
@@ -558,7 +548,7 @@ function buildSiteRulePatch(): SiteRule {
       <div class="panel-heading">
         <div>
           <h2>Site rules</h2>
-          <p>Override dynamic translation behavior for specific sites.</p>
+          <p>Set per-site auto translation and provider preferences.</p>
         </div>
         <button v-if="siteRules.length > 0" class="compact-button danger-button" type="button" @click="clearSiteRules">Clear</button>
       </div>
@@ -582,15 +572,6 @@ function buildSiteRulePatch(): SiteRule {
             <option value="global">Global</option>
             <option value="always">Always</option>
             <option value="never">Never</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Dynamic mode</span>
-          <select data-testid="site-rule-mode" :value="siteRuleMode" @change="siteRuleMode = ($event.target as HTMLSelectElement).value as DynamicMode">
-            <option value="global">Global</option>
-            <option value="off">Off</option>
-            <option value="conservative">Safe</option>
-            <option value="normal">Normal</option>
           </select>
         </label>
         <label class="field">
@@ -623,16 +604,6 @@ function buildSiteRulePatch(): SiteRule {
             <option value="fake">Local test</option>
           </select>
         </label>
-        <label class="field">
-          <span>Request profile</span>
-          <select data-testid="site-rule-request-profile" :value="siteRuleRequestProfile" @change="siteRuleRequestProfile = ($event.target as HTMLSelectElement).value as RequestProfile">
-            <option value="global">Global</option>
-            <option value="stable">Stable</option>
-            <option value="balanced">Balanced</option>
-            <option value="fast">Fast</option>
-            <option value="high-dynamic">High dynamic</option>
-          </select>
-        </label>
         <button data-testid="site-rule-save" class="compact-button site-rule-save" type="button" @click="saveSiteRule">Save rule</button>
       </div>
       <p v-if="siteRuleError" class="error-text">{{ siteRuleError }}</p>
@@ -642,12 +613,10 @@ function buildSiteRulePatch(): SiteRule {
           <div>
             <strong>{{ rule.siteKey }}</strong>
             <span>
-              {{ rule.dynamicMode ?? "global" }}
-              <template v-if="typeof rule.autoTranslate === 'boolean'"> · auto {{ rule.autoTranslate ? "always" : "never" }}</template>
+              {{ typeof rule.autoTranslate === "boolean" ? (rule.autoTranslate ? "auto always" : "auto never") : "global" }}
               <template v-if="rule.displayMode"> · {{ rule.displayMode }}</template>
               <template v-if="rule.provider"> · {{ rule.provider }}</template>
               <template v-if="rule.fallbackProvider"> · fallback {{ rule.fallbackProvider }}</template>
-              <template v-if="rule.requestProfile"> · {{ rule.requestProfile }}</template>
             </span>
           </div>
           <button
@@ -663,48 +632,6 @@ function buildSiteRulePatch(): SiteRule {
       </div>
     </section>
 
-    <section class="panel" aria-label="Dynamic translation settings" :aria-busy="isLoading">
-      <div class="panel-heading">
-        <div>
-          <h2>Dynamic updates</h2>
-          <p>Control how the extension translates new content on feeds, comments, and infinite-scroll pages.</p>
-        </div>
-      </div>
-
-      <div class="profile-grid" role="group" aria-label="Request profile">
-        <button data-testid="request-profile-stable" type="button" :class="{ active: config.requestProfile === 'stable' }" @click="setRequestProfile('stable')">
-          <strong>Stable</strong>
-          <span>Smaller batches with the lowest pressure on dynamic pages.</span>
-        </button>
-        <button data-testid="request-profile-balanced" type="button" :class="{ active: config.requestProfile === 'balanced' }" @click="setRequestProfile('balanced')">
-          <strong>Balanced</strong>
-          <span>Default batching for most pages and providers.</span>
-        </button>
-        <button data-testid="request-profile-fast" type="button" :class="{ active: config.requestProfile === 'fast' }" @click="setRequestProfile('fast')">
-          <strong>Fast</strong>
-          <span>Higher concurrency for long static pages.</span>
-        </button>
-        <button data-testid="request-profile-high-dynamic" type="button" :class="{ active: config.requestProfile === 'high-dynamic' }" @click="setRequestProfile('high-dynamic')">
-          <strong>High dynamic</strong>
-          <span>Conservative updates for feeds and live comment pages.</span>
-        </button>
-      </div>
-
-      <div class="mode-grid" role="group" aria-label="Dynamic translation mode">
-        <button data-testid="options-dynamic-mode-off" type="button" :class="{ active: config.dynamicMode === 'off' }" @click="setDynamicMode('off')">
-          <strong>Off</strong>
-          <span>Translate only the content already scanned on the page.</span>
-        </button>
-        <button data-testid="options-dynamic-mode-conservative" type="button" :class="{ active: config.dynamicMode === 'conservative' }" @click="setDynamicMode('conservative')">
-          <strong>Safe</strong>
-          <span>Use slower, smaller batches for X, YouTube, Reddit, and other busy pages.</span>
-        </button>
-        <button data-testid="options-dynamic-mode-normal" type="button" :class="{ active: config.dynamicMode === 'normal' }" @click="setDynamicMode('normal')">
-          <strong>Normal</strong>
-          <span>Use more active updates for articles, docs, and search results.</span>
-        </button>
-      </div>
-    </section>
   </main>
 </template>
 
@@ -952,52 +879,6 @@ textarea {
   max-width: 100%;
 }
 
-.mode-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.mode-grid button,
-.profile-grid button {
-  min-height: 118px;
-  padding: 14px;
-  border: 1px solid rgba(15, 42, 95, 0.12);
-  border-radius: 8px;
-  color: #102a5f;
-  background: #f9fbfd;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-}
-
-.mode-grid button.active,
-.profile-grid button.active {
-  border-color: #1758db;
-  background: #eef5ff;
-  box-shadow: inset 0 0 0 1px #1758db;
-}
-
-.mode-grid strong,
-.profile-grid strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 15px;
-}
-
-.mode-grid span,
-.profile-grid span {
-  display: block;
-  color: #52627a;
-  line-height: 1.45;
-}
-
 @media (max-width: 720px) {
   .options {
     padding: 18px;
@@ -1009,9 +890,7 @@ textarea {
   .gemini-settings,
   .tuning-grid,
   .import-grid,
-  .site-rule-editor,
-  .profile-grid,
-  .mode-grid {
+  .site-rule-editor {
     grid-template-columns: 1fr;
   }
 }

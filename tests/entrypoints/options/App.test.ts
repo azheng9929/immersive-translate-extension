@@ -8,7 +8,7 @@ describe("options App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("saves the dynamic mode from the settings page", async () => {
+  it("hides dynamic mode presets from the settings page", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, dynamicMode: "normal" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -23,14 +23,10 @@ describe("options App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    await wrapper.find("[data-testid='options-dynamic-mode-conservative']").trigger("click");
-    await flushPromises();
-
-    expect(sendMessage).toHaveBeenCalledWith({
-      type: "IMT_UPDATE_CONFIG",
-      patch: { dynamicMode: "conservative" },
-    });
-    expect(wrapper.find("[data-testid='options-dynamic-mode-conservative']").classes()).toContain("active");
+    expect(wrapper.find("[data-testid='options-dynamic-mode-off']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='options-dynamic-mode-conservative']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='options-dynamic-mode-normal']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(false);
   });
 
   it("keeps input translation off by default and saves interaction toggles", async () => {
@@ -51,13 +47,16 @@ describe("options App", () => {
     const inputTranslator = wrapper.find<HTMLInputElement>("[data-testid='options-input-translator-toggle']");
     const floatingBall = wrapper.find<HTMLInputElement>("[data-testid='options-floating-ball-toggle']");
     const cache = wrapper.find<HTMLInputElement>("[data-testid='options-cache-toggle']");
+    const newContent = wrapper.find<HTMLInputElement>("[data-testid='options-new-content-toggle']");
     expect(inputTranslator.element.checked).toBe(false);
     expect(floatingBall.element.checked).toBe(true);
     expect(cache.element.checked).toBe(true);
+    expect(newContent.element.checked).toBe(true);
 
     await inputTranslator.setValue(true);
     await floatingBall.setValue(false);
     await cache.setValue(false);
+    await newContent.setValue(false);
     await flushPromises();
 
     expect(sendMessage).toHaveBeenCalledWith({
@@ -71,6 +70,10 @@ describe("options App", () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: { useCache: false },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { dynamicMode: "off" },
     });
   });
 
@@ -215,7 +218,7 @@ describe("options App", () => {
     });
   });
 
-  it("applies request presets and saves fallback provider", async () => {
+  it("saves fallback provider without exposing request presets", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -230,23 +233,10 @@ describe("options App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    await wrapper.find("[data-testid='request-profile-high-dynamic']").trigger("click");
+    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(false);
     await wrapper.find<HTMLSelectElement>("[data-testid='fallback-provider']").setValue("microsoft");
     await flushPromises();
 
-    expect(sendMessage).toHaveBeenCalledWith({
-      type: "IMT_UPDATE_CONFIG",
-      patch: expect.objectContaining({
-        requestProfile: "high-dynamic",
-        dynamicMode: "conservative",
-      openaiMaxConcurrentRequests: 2,
-      openaiMaxBatchItems: 3,
-      openaiMaxBatchChars: 1000,
-      geminiMaxConcurrentRequests: 2,
-      geminiMaxBatchItems: 3,
-      geminiMaxBatchChars: 1000,
-      }),
-    });
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: { fallbackProvider: "microsoft" },
@@ -315,7 +305,7 @@ describe("options App", () => {
     });
   });
 
-  it("manages site dynamic mode rules from settings", async () => {
+  it("manages site auto translate rules from settings", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteDynamicModes: { "x.com": "conservative" } };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -331,26 +321,24 @@ describe("options App", () => {
     await flushPromises();
 
     await wrapper.find<HTMLInputElement>("[data-testid='site-rule-host']").setValue("https://www.youtube.com/watch?v=abc");
-    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-mode']").setValue("off");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-auto-translate']").setValue("always");
     await wrapper.find("[data-testid='site-rule-save']").trigger("click");
     await flushPromises();
 
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: {
-        siteRules: { "youtube.com": { dynamicMode: "off" } },
-        siteDynamicModes: { "x.com": "conservative", "youtube.com": "off" },
+        siteRules: { "youtube.com": { autoTranslate: true } },
       },
     });
 
-    await wrapper.find("[data-testid='site-rule-remove-x.com']").trigger("click");
+    await wrapper.find("[data-testid='site-rule-remove-youtube.com']").trigger("click");
     await flushPromises();
 
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: {
-        siteRules: { "youtube.com": { dynamicMode: "off" } },
-        siteDynamicModes: { "youtube.com": "off" },
+        siteRules: {},
       },
     });
   });
@@ -371,11 +359,9 @@ describe("options App", () => {
     await flushPromises();
 
     await wrapper.find<HTMLInputElement>("[data-testid='site-rule-host']").setValue("https://reddit.com/r/typescript");
-    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-mode']").setValue("conservative");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-display-mode']").setValue("bilingual");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-provider']").setValue("gemini");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-fallback-provider']").setValue("microsoft");
-    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-request-profile']").setValue("high-dynamic");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-auto-translate']").setValue("always");
     await wrapper.find("[data-testid='site-rule-save']").trigger("click");
     await flushPromises();
@@ -386,14 +372,11 @@ describe("options App", () => {
         siteRules: {
           "reddit.com": {
             autoTranslate: true,
-            dynamicMode: "conservative",
             displayMode: "bilingual",
             provider: "gemini",
             fallbackProvider: "microsoft",
-            requestProfile: "high-dynamic",
           },
         },
-        siteDynamicModes: { "reddit.com": "conservative" },
       },
     });
   });

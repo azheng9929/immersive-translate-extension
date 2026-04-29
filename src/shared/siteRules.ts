@@ -1,30 +1,22 @@
 import type {
   DisplayMode,
-  DynamicMode,
   ExtensionProvider,
   FallbackProvider,
-  RequestProfile,
-  SiteDynamicModeOverrides,
 } from "./config";
 
-export type SiteDynamicModeChoice = DynamicMode | "auto";
 export type SiteAutoTranslateChoice = "global" | "always" | "never";
 export type SiteRule = {
   autoTranslate?: boolean;
-  dynamicMode?: DynamicMode;
   displayMode?: DisplayMode;
   provider?: ExtensionProvider;
   fallbackProvider?: FallbackProvider;
-  requestProfile?: RequestProfile;
 };
 export type SiteRules = Record<string, SiteRule>;
 
 const CANONICAL_SITE_KEYS = ["x.com", "twitter.com", "youtube.com", "reddit.com"] as const;
-const SUPPORTED_DYNAMIC_MODES = new Set<DynamicMode>(["off", "conservative", "normal"]);
 const SUPPORTED_DISPLAY_MODES = new Set<DisplayMode>(["smart", "bilingual", "translation-only"]);
 const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>(["fake", "microsoft", "openai-compatible", "gemini"]);
 const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>(["none", "fake", "microsoft", "openai-compatible", "gemini"]);
-const SUPPORTED_REQUEST_PROFILES = new Set<RequestProfile>(["stable", "balanced", "fast", "high-dynamic"]);
 
 export function normalizeSiteRuleKey(value: string): string {
   let host = value.trim().toLowerCase();
@@ -41,24 +33,6 @@ export function normalizeSiteRuleKey(value: string): string {
   }
 
   return host;
-}
-
-export function setSiteDynamicModeRule(
-  current: SiteDynamicModeOverrides,
-  site: string,
-  dynamicMode: SiteDynamicModeChoice,
-): SiteDynamicModeOverrides {
-  const siteKey = normalizeSiteRuleKey(site);
-  if (!siteKey) return { ...current };
-
-  const next = { ...current };
-  if (dynamicMode === "auto") {
-    delete next[siteKey];
-    return next;
-  }
-
-  next[siteKey] = dynamicMode;
-  return next;
 }
 
 export function normalizeSiteRules(value: unknown): SiteRules {
@@ -98,9 +72,6 @@ function normalizeSiteRule(value: unknown): SiteRule | undefined {
   if (typeof value.autoTranslate === "boolean") {
     rule.autoTranslate = value.autoTranslate;
   }
-  if (typeof value.dynamicMode === "string" && SUPPORTED_DYNAMIC_MODES.has(value.dynamicMode as DynamicMode)) {
-    rule.dynamicMode = value.dynamicMode as DynamicMode;
-  }
   if (typeof value.displayMode === "string" && SUPPORTED_DISPLAY_MODES.has(value.displayMode as DisplayMode)) {
     rule.displayMode = value.displayMode as DisplayMode;
   }
@@ -109,9 +80,6 @@ function normalizeSiteRule(value: unknown): SiteRule | undefined {
   }
   if (typeof value.fallbackProvider === "string" && SUPPORTED_FALLBACK_PROVIDERS.has(value.fallbackProvider as FallbackProvider)) {
     rule.fallbackProvider = value.fallbackProvider as FallbackProvider;
-  }
-  if (typeof value.requestProfile === "string" && SUPPORTED_REQUEST_PROFILES.has(value.requestProfile as RequestProfile)) {
-    rule.requestProfile = value.requestProfile as RequestProfile;
   }
 
   return Object.keys(rule).length > 0 ? rule : undefined;

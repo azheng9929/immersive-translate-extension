@@ -8,7 +8,7 @@ describe("popup App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows dynamic mode choices and saves the selected mode", async () => {
+  it("does not expose dynamic mode choices in the popup", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, dynamicMode: "normal" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -23,18 +23,13 @@ describe("popup App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='dynamic-mode-off']").exists()).toBe(true);
-    expect(wrapper.find("[data-testid='dynamic-mode-conservative']").exists()).toBe(true);
-    expect(wrapper.find("[data-testid='dynamic-mode-normal']").exists()).toBe(true);
-
-    await wrapper.find("[data-testid='dynamic-mode-off']").trigger("click");
-    await flushPromises();
-
-    expect(sendMessage).toHaveBeenCalledWith({
+    expect(wrapper.find("[data-testid='dynamic-mode-off']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='dynamic-mode-conservative']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='dynamic-mode-normal']").exists()).toBe(false);
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({
       type: "IMT_UPDATE_CONFIG",
-      patch: { dynamicMode: "off" },
-    });
-    expect(wrapper.find("[data-testid='dynamic-mode-off']").classes()).toContain("active");
+      patch: expect.objectContaining({ dynamicMode: expect.any(String) }),
+    }));
   });
 
   it("keeps input translation off by default and saves the popup toggle", async () => {
@@ -219,12 +214,12 @@ describe("popup App", () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: "IMT_POPUP_GET_ACTIVE_TAB_STATUS" });
     expect(wrapper.find("[data-testid='debug-status']").text()).toContain("Translated");
     expect(wrapper.find("[data-testid='debug-status']").text()).toContain("1 / 1 translated");
-    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Dynamic observing, 2 pending, 3 lazy");
+    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("New content observing, 2 pending, 3 lazy");
     expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Cache 0 hits, 1 miss");
     expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Provider 1 requested, 0 failed, 0 skipped");
   });
 
-  it("saves a dynamic mode override for the current site", async () => {
+  it("keeps current site controls focused on auto translate", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteDynamicModes: {} };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -263,15 +258,9 @@ describe("popup App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='site-mode-auto']").classes()).toContain("active");
-
-    await wrapper.find("[data-testid='site-mode-normal']").trigger("click");
-    await flushPromises();
-
-    expect(sendMessage).toHaveBeenCalledWith({
-      type: "IMT_UPDATE_CONFIG",
-      patch: { siteDynamicModes: { "youtube.com": "normal" } },
-    });
+    expect(wrapper.find("[data-testid='site-auto-translate-toggle']").exists()).toBe(true);
+    expect(wrapper.find("[data-testid='site-mode-auto']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='site-mode-normal']").exists()).toBe(false);
   });
 
   it("saves auto translate for the current site", async () => {
