@@ -90,14 +90,14 @@ const loadPageStatus = async () => {
     return;
   }
   pageStatus.value = undefined;
-  pageStatusError.value = response.ok ? "No page status available" : response.error;
+  pageStatusError.value = response.ok ? "暂无页面状态" : response.error;
 };
 
 const pageStatusSummary = computed(() => {
   if (pageStatusError.value) return pageStatusError.value;
   const status = pageStatus.value;
-  if (!status) return "No page status yet";
-  return `${statusLabel(status.phase)} - ${status.translated} / ${status.total} translated`;
+  if (!status) return "暂无页面状态";
+  return `${statusLabel(status.phase)} - 已翻译 ${status.translated} / ${status.total}`;
 });
 
 const pageDiagnosticsRows = computed(() => detailedDiagnosticsLabels(pageStatus.value));
@@ -112,20 +112,20 @@ const currentSiteAutoTranslate = computed(() => {
 
 const currentSiteSummary = computed(() => {
   const site = currentSite.value;
-  if (!site) return "No site policy available";
-  return `${site.siteKey} - new content handling is automatic`;
+  if (!site) return "暂无站点策略";
+  return `${site.siteKey} - 新内容自动处理`;
 });
 
 const openAIStatus = computed(() => {
-  if (config.provider !== "openai-compatible") return "Not selected";
-  return config.openaiApiKey ? `Ready - ${config.openaiModel}` : "API key required";
+  if (config.provider !== "openai-compatible") return "未选择";
+  return config.openaiApiKey ? `就绪 - ${config.openaiModel}` : "需要 API Key";
 });
 
 const openAIEndpointSummary = computed(() => endpointSummary(config.openaiEndpoint));
 
 const geminiStatus = computed(() => {
-  if (config.provider !== "gemini") return "Not selected";
-  return config.geminiApiKey ? `Ready - ${config.geminiModel}` : "API key required";
+  if (config.provider !== "gemini") return "未选择";
+  return config.geminiApiKey ? `就绪 - ${config.geminiModel}` : "需要 API Key";
 });
 
 const geminiEndpointSummary = computed(() => endpointSummary(config.geminiEndpoint));
@@ -139,24 +139,24 @@ onMounted(async () => {
 });
 
 function statusLabel(phase: PageTranslationStatus["phase"]): string {
-  if (phase === "translating") return "Translating";
-  if (phase === "updating") return "Updating";
-  if (phase === "translated") return "Translated";
-  if (phase === "partial") return "Partial";
-  if (phase === "failed") return "Failed";
-  return "Ready";
+  if (phase === "translating") return "翻译中";
+  if (phase === "updating") return "更新中";
+  if (phase === "translated") return "已翻译";
+  if (phase === "partial") return "部分完成";
+  if (phase === "failed") return "失败";
+  return "就绪";
 }
 
 function detailedDiagnosticsLabels(status: PageTranslationStatus | undefined): string[] {
   if (!status?.diagnostics) return [];
   const diagnostics = status.diagnostics;
   const rows = [
-    `New content ${status.observation}, ${status.pendingRoots} pending, ${status.observedRoots} lazy`,
-    `Text scan ${diagnostics.scan.text.seen} seen, ${diagnostics.scan.text.accepted} accepted, ${diagnostics.scan.text.skipped} skipped`,
-    `Attributes ${diagnostics.scan.attributes.seen} seen, ${diagnostics.scan.attributes.accepted} accepted, ${diagnostics.scan.attributes.skipped} skipped`,
-    `Units ${diagnostics.units.built} built, ${diagnostics.units.dropped} dropped`,
-    `Cache ${diagnostics.cache.hits} ${plural("hit", diagnostics.cache.hits)}, ${diagnostics.cache.misses} ${plural("miss", diagnostics.cache.misses)}`,
-    `Provider ${diagnostics.provider.requested} requested, ${diagnostics.provider.failed} failed, ${diagnostics.provider.skipped} skipped`,
+    `新内容${observationLabel(status.observation)}，${status.pendingRoots} 个待处理，${status.observedRoots} 个懒加载`,
+    `文本扫描 ${diagnostics.scan.text.seen}，接受 ${diagnostics.scan.text.accepted}，跳过 ${diagnostics.scan.text.skipped}`,
+    `属性扫描 ${diagnostics.scan.attributes.seen}，接受 ${diagnostics.scan.attributes.accepted}，跳过 ${diagnostics.scan.attributes.skipped}`,
+    `翻译单元 ${diagnostics.units.built}，丢弃 ${diagnostics.units.dropped}`,
+    `缓存 ${diagnostics.cache.hits} 命中，${diagnostics.cache.misses} 未命中`,
+    `服务请求 ${diagnostics.provider.requested}，失败 ${diagnostics.provider.failed}，跳过 ${diagnostics.provider.skipped}`,
   ];
   const skipped = diagnosticsLabel(diagnostics);
   if (skipped) rows.push(skipped);
@@ -173,7 +173,7 @@ function diagnosticsLabel(diagnostics: TranslationDiagnostics): string {
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .slice(0, 3)
     .map(([label, count]) => `${count} ${label}`);
-  return `Skipped: ${parts.join(", ")}`;
+  return `跳过：${parts.join("，")}`;
 }
 
 function addReasonCounts(target: Map<string, number>, reasons: DiagnosticReasonCounts): void {
@@ -185,17 +185,21 @@ function addReasonCounts(target: Map<string, number>, reasons: DiagnosticReasonC
 }
 
 function reasonLabel(reason: string): string {
-  if (reason === "target-language") return "target language";
-  if (reason === "global-selector" || reason === "site-selector") return "extension/site UI";
-  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "metadata/control text";
-  if (reason === "not-meaningful") return "short text";
-  if (reason === "hidden") return "hidden text";
-  if (reason === "empty") return "empty text";
+  if (reason === "target-language") return "目标语言";
+  if (reason === "global-selector" || reason === "site-selector") return "插件或站点界面";
+  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "元数据或控件文本";
+  if (reason === "not-meaningful") return "短文本";
+  if (reason === "hidden") return "隐藏文本";
+  if (reason === "empty") return "空文本";
   return reason.replaceAll("-", " ");
 }
 
-function plural(label: string, count: number): string {
-  return count === 1 ? label : `${label}s`;
+function observationLabel(observation: PageTranslationStatus["observation"]): string {
+  if (observation === "observing") return "观察中";
+  if (observation === "queued") return "排队中";
+  if (observation === "paused" || observation === "suspended") return "已暂停";
+  if (observation === "inactive") return "未启用";
+  return "空闲";
 }
 
 function endpointSummary(value: string): string {
@@ -203,7 +207,7 @@ function endpointSummary(value: string): string {
     const url = new URL(value);
     return `${url.host}${url.pathname}`;
   } catch {
-    return "Custom endpoint";
+    return "自定义地址";
   }
 }
 </script>
@@ -213,40 +217,40 @@ function endpointSummary(value: string): string {
     <header class="popup-header">
       <img src="/icons/icon-48.png" alt="" class="popup-icon" />
       <div>
-        <h1>Immersive Translate Lab</h1>
-        <p>Current page</p>
+        <h1>沉浸式翻译</h1>
+        <p>当前页面</p>
       </div>
     </header>
 
-    <section class="actions" aria-label="Current page actions">
+    <section class="actions" aria-label="当前页面操作">
       <button class="primary-action" type="button" @click="send({ type: 'IMT_POPUP_TRANSLATE_ACTIVE_TAB' })">
-        Translate page
+        翻译整页
       </button>
       <button class="secondary-action" type="button" @click="send({ type: 'IMT_POPUP_RESTORE_ACTIVE_TAB' })">
-        Restore original
+        恢复原文
       </button>
     </section>
 
-    <section class="debug-panel" aria-label="Current page diagnostics" :aria-busy="isLoading">
+    <section class="debug-panel" aria-label="当前页面诊断" :aria-busy="isLoading">
       <div class="debug-header">
         <div>
-          <h2>Page status</h2>
+          <h2>页面状态</h2>
           <p data-testid="debug-status">{{ pageStatusSummary }}</p>
         </div>
-        <button class="debug-refresh" type="button" @click="loadPageStatus">Refresh</button>
+        <button class="debug-refresh" type="button" @click="loadPageStatus">刷新</button>
       </div>
       <div v-if="pageDiagnosticsRows.length > 0" class="debug-details" data-testid="popup-debug-details">
         <p v-for="row in pageDiagnosticsRows" :key="row">{{ row }}</p>
       </div>
     </section>
 
-    <section v-if="currentSite" class="site-panel" aria-label="Current site controls">
+    <section v-if="currentSite" class="site-panel" aria-label="当前站点控制">
       <div>
-        <h2>Site controls</h2>
+        <h2>站点控制</h2>
         <p>{{ currentSiteSummary }}</p>
       </div>
       <label class="toggle-row">
-        <span>Auto translate this site</span>
+        <span>本站自动翻译</span>
         <input
           data-testid="site-auto-translate-toggle"
           type="checkbox"
@@ -256,29 +260,29 @@ function endpointSummary(value: string): string {
       </label>
     </section>
 
-    <section class="settings" aria-label="Basic settings" :aria-busy="isLoading">
+    <section class="settings" aria-label="基础设置" :aria-busy="isLoading">
       <label class="field">
-        <span>Target language</span>
+        <span>目标语言</span>
         <select :value="config.targetLang" @change="setTargetLang">
-          <option value="zh-Hans">Simplified Chinese</option>
-          <option value="zh-Hant">Traditional Chinese</option>
-          <option value="en">English</option>
-          <option value="ja">Japanese</option>
-          <option value="ko">Korean</option>
+          <option value="zh-Hans">简体中文</option>
+          <option value="zh-Hant">繁体中文</option>
+          <option value="en">英语</option>
+          <option value="ja">日语</option>
+          <option value="ko">韩语</option>
         </select>
       </label>
 
       <label class="field">
-        <span>Provider</span>
+        <span>翻译服务</span>
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
-          <option value="fake">Local test</option>
+          <option value="fake">本地测试</option>
         </select>
       </label>
 
-      <div v-if="config.provider === 'openai-compatible'" class="openai-quick" aria-label="OpenAI API settings">
+      <div v-if="config.provider === 'openai-compatible'" class="openai-quick" aria-label="OpenAI API 设置">
         <div class="openai-quick-header">
           <div>
             <h2>OpenAI API</h2>
@@ -288,7 +292,7 @@ function endpointSummary(value: string): string {
         </div>
 
         <label class="field">
-          <span>Endpoint</span>
+          <span>接口地址</span>
           <input
             data-testid="popup-openai-endpoint"
             type="url"
@@ -301,7 +305,7 @@ function endpointSummary(value: string): string {
 
         <div class="openai-grid">
           <label class="field">
-            <span>API key</span>
+            <span>API Key</span>
             <input
               data-testid="popup-openai-api-key"
               type="password"
@@ -313,7 +317,7 @@ function endpointSummary(value: string): string {
           </label>
 
           <label class="field">
-            <span>Model</span>
+            <span>模型</span>
             <input
               data-testid="popup-openai-model"
               type="text"
@@ -326,7 +330,7 @@ function endpointSummary(value: string): string {
         </div>
       </div>
 
-      <div v-if="config.provider === 'gemini'" class="openai-quick" aria-label="Gemini API settings">
+      <div v-if="config.provider === 'gemini'" class="openai-quick" aria-label="Gemini API 设置">
         <div class="openai-quick-header">
           <div>
             <h2>Google Gemini</h2>
@@ -336,7 +340,7 @@ function endpointSummary(value: string): string {
         </div>
 
         <label class="field">
-          <span>Endpoint</span>
+          <span>接口地址</span>
           <input
             data-testid="popup-gemini-endpoint"
             type="url"
@@ -349,7 +353,7 @@ function endpointSummary(value: string): string {
 
         <div class="openai-grid">
           <label class="field">
-            <span>API key</span>
+            <span>API Key</span>
             <input
               data-testid="popup-gemini-api-key"
               type="password"
@@ -361,7 +365,7 @@ function endpointSummary(value: string): string {
           </label>
 
           <label class="field">
-            <span>Model</span>
+            <span>模型</span>
             <input
               data-testid="popup-gemini-model"
               type="text"
@@ -375,20 +379,20 @@ function endpointSummary(value: string): string {
       </div>
 
       <div class="field">
-        <span>Display</span>
-        <div class="segmented" role="group" aria-label="Display mode">
-          <button type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">Smart</button>
-          <button type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">Bilingual</button>
-          <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">Translation</button>
+        <span>显示方式</span>
+        <div class="segmented" role="group" aria-label="显示方式">
+          <button type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">智能</button>
+          <button type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">双语</button>
+          <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">仅译文</button>
         </div>
       </div>
       <label class="toggle-row">
-        <span>Floating ball</span>
+        <span>悬浮球</span>
         <input type="checkbox" :checked="config.showFloatingBall" @change="updateConfig({ showFloatingBall: ($event.target as HTMLInputElement).checked })" />
       </label>
 
       <label class="toggle-row">
-        <span>Input translator</span>
+        <span>输入框翻译</span>
         <input
           data-testid="popup-input-translator-toggle"
           type="checkbox"
@@ -398,11 +402,11 @@ function endpointSummary(value: string): string {
       </label>
 
       <label class="toggle-row">
-        <span>Cache</span>
+        <span>缓存</span>
         <input type="checkbox" :checked="config.useCache" @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })" />
       </label>
 
-      <button class="settings-link" type="button" @click="openOptions">Open settings</button>
+      <button class="settings-link" type="button" @click="openOptions">打开设置</button>
     </section>
   </main>
 </template>

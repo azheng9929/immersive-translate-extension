@@ -282,7 +282,7 @@ export class SelectionTranslator {
       trigger.type = "button";
       trigger.className = "imt-selection-trigger";
       trigger.dataset.imtSelection = "trigger";
-      trigger.setAttribute("aria-label", "Translate selected text");
+      trigger.setAttribute("aria-label", "翻译选中文本");
       trigger.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -300,7 +300,7 @@ export class SelectionTranslator {
 
     const title = this.doc.createElement("p");
     title.className = "imt-selection-title";
-    title.textContent = "Selection";
+    title.textContent = "划词翻译";
 
     const status = this.doc.createElement("span");
     status.className = "imt-selection-status";
@@ -308,7 +308,7 @@ export class SelectionTranslator {
     status.textContent = stateLabel(this.state);
 
     const closeButton = this.createButton("x", "close", "imt-selection-close", () => this.hide());
-    closeButton.setAttribute("aria-label", "Close selection translation");
+    closeButton.setAttribute("aria-label", "关闭划词翻译");
 
     header.append(title, status, closeButton);
 
@@ -322,7 +322,7 @@ export class SelectionTranslator {
 
     if (this.state === "idle" || this.state === "failed") {
       const translateButton = this.createButton(
-        this.state === "failed" ? "Retry" : "Translate",
+        this.state === "failed" ? "重试" : "翻译",
         "translate",
         "imt-selection-button imt-selection-button-primary",
         () => {
@@ -333,7 +333,7 @@ export class SelectionTranslator {
     }
 
     if (this.translatedText) {
-      const copyButton = this.createButton("Copy", "copy", "imt-selection-button", () => {
+      const copyButton = this.createButton("复制", "copy", "imt-selection-button", () => {
         void this.copy();
       });
       actions.append(copyButton);
@@ -431,11 +431,11 @@ function isValidSelectionText(value: string): boolean {
 }
 
 function stateLabel(state: SelectionState): string {
-  if (state === "loading") return "Translating";
-  if (state === "translated") return "Translated";
-  if (state === "copied") return "Copied";
-  if (state === "failed") return "Failed";
-  return "Ready";
+  if (state === "loading") return "翻译中";
+  if (state === "translated") return "已翻译";
+  if (state === "copied") return "已复制";
+  if (state === "failed") return "失败";
+  return "就绪";
 }
 
 function clamp(value: number, min: number, max: number): number {

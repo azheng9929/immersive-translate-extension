@@ -286,7 +286,7 @@ export class InputTranslator {
 
     const title = this.doc.createElement("p");
     title.className = "imt-input-title";
-    title.textContent = "Input";
+    title.textContent = "输入框翻译";
 
     const status = this.doc.createElement("span");
     status.className = "imt-input-status";
@@ -294,7 +294,7 @@ export class InputTranslator {
     status.textContent = stateLabel(this.state);
 
     const closeButton = this.createButton("x", "close", "imt-input-close", () => this.hide());
-    closeButton.setAttribute("aria-label", "Close input translation");
+    closeButton.setAttribute("aria-label", "关闭输入框翻译");
 
     header.append(title, status, closeButton);
 
@@ -307,7 +307,7 @@ export class InputTranslator {
     actions.className = "imt-input-actions";
 
     const translateButton = this.createButton(
-      this.state === "loading" ? "Working" : "Translate",
+      this.state === "loading" ? "翻译中" : "翻译",
       "translate",
       "imt-input-button imt-input-button-primary",
       () => {
@@ -319,10 +319,10 @@ export class InputTranslator {
 
     if (this.translatedText) {
       actions.append(
-        this.createButton("Copy", "copy", "imt-input-button", () => {
+        this.createButton("复制", "copy", "imt-input-button", () => {
           void this.copy();
         }),
-        this.createButton("Replace", "replace", "imt-input-button", () => this.replace()),
+        this.createButton("替换", "replace", "imt-input-button", () => this.replace()),
       );
     }
 
@@ -391,12 +391,12 @@ function normalizeInputText(value: string): string {
 }
 
 function stateLabel(state: InputTranslatorState): string {
-  if (state === "loading") return "Translating";
-  if (state === "translated") return "Translated";
-  if (state === "copied") return "Copied";
-  if (state === "replaced") return "Replaced";
-  if (state === "failed") return "Failed";
-  return "Ready";
+  if (state === "loading") return "翻译中";
+  if (state === "translated") return "已翻译";
+  if (state === "copied") return "已复制";
+  if (state === "replaced") return "已替换";
+  if (state === "failed") return "失败";
+  return "就绪";
 }
 
 function clamp(value: number, min: number, max: number): number {

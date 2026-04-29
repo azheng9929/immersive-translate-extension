@@ -157,7 +157,7 @@ const importGlossary = () => {
 const saveSiteRule = () => {
   const siteKey = normalizeSiteRuleKey(siteRuleHost.value);
   if (!siteKey) {
-    siteRuleError.value = "Invalid site";
+    siteRuleError.value = "站点无效";
     return;
   }
   siteRuleError.value = "";
@@ -198,6 +198,26 @@ function buildSiteRulePatch(): SiteRule {
   if (siteRuleFallbackProvider.value !== "global") rule.fallbackProvider = siteRuleFallbackProvider.value;
   return rule;
 }
+
+function siteRuleAutoLabel(value: boolean | undefined): string {
+  if (value === true) return "自动翻译：总是";
+  if (value === false) return "自动翻译：从不";
+  return "自动翻译：跟随全局";
+}
+
+function displayModeLabel(value: DisplayMode): string {
+  if (value === "smart") return "智能";
+  if (value === "bilingual") return "双语";
+  return "仅译文";
+}
+
+function providerLabel(value: ExtensionProvider | FallbackProvider): string {
+  if (value === "openai-compatible") return "OpenAI API";
+  if (value === "gemini") return "Google Gemini";
+  if (value === "fake") return "本地测试";
+  if (value === "none") return "不使用";
+  return "Microsoft";
+}
 </script>
 
 <template>
@@ -205,44 +225,44 @@ function buildSiteRulePatch(): SiteRule {
     <header class="page-header">
       <img src="/icons/icon-48.png" alt="" class="page-icon" />
       <div>
-        <h1>Immersive Translate Lab</h1>
-        <p>Settings</p>
+        <h1>沉浸式翻译</h1>
+        <p>设置</p>
       </div>
-      <span v-if="savedAt" class="saved">Saved {{ savedAt }}</span>
+      <span v-if="savedAt" class="saved">已保存 {{ savedAt }}</span>
     </header>
 
-    <section class="panel" aria-label="Translation provider settings" :aria-busy="isLoading">
+    <section class="panel" aria-label="翻译服务设置" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
-          <h2>Translation provider</h2>
-          <p>Choose the service used by page, selection, and input translation.</p>
+          <h2>翻译服务</h2>
+          <p>选择整页、划词和输入框翻译使用的服务。</p>
         </div>
       </div>
 
       <label class="field">
-        <span>Provider</span>
+        <span>主服务</span>
         <select :value="config.provider" @change="setProvider">
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
-          <option value="fake">Local test</option>
+          <option value="fake">本地测试</option>
         </select>
       </label>
 
       <label class="field">
-        <span>Fallback provider</span>
+        <span>备用服务</span>
         <select data-testid="fallback-provider" :value="config.fallbackProvider" @change="setFallbackProvider">
-          <option value="none">None</option>
+          <option value="none">不使用</option>
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
-          <option value="fake">Local test</option>
+          <option value="fake">本地测试</option>
         </select>
       </label>
 
       <div v-if="config.provider === 'openai-compatible'" class="openai-settings">
         <label class="field">
-          <span>OpenAI API endpoint</span>
+          <span>OpenAI API 地址</span>
           <input
             data-testid="openai-endpoint"
             type="url"
@@ -254,7 +274,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="field">
-          <span>API key</span>
+          <span>API Key</span>
           <input
             data-testid="openai-api-key"
             type="password"
@@ -266,7 +286,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="field">
-          <span>Model</span>
+          <span>模型</span>
           <input
             data-testid="openai-model"
             type="text"
@@ -280,7 +300,7 @@ function buildSiteRulePatch(): SiteRule {
 
       <div v-if="config.provider === 'gemini'" class="gemini-settings">
         <label class="field">
-          <span>Gemini API endpoint</span>
+          <span>Gemini API 地址</span>
           <input
             data-testid="gemini-endpoint"
             type="url"
@@ -292,7 +312,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="field">
-          <span>API key</span>
+          <span>API Key</span>
           <input
             data-testid="gemini-api-key"
             type="password"
@@ -304,7 +324,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="field">
-          <span>Model</span>
+          <span>模型</span>
           <input
             data-testid="gemini-model"
             type="text"
@@ -316,11 +336,11 @@ function buildSiteRulePatch(): SiteRule {
         </label>
       </div>
 
-      <div v-if="config.provider === 'openai-compatible'" class="openai-advanced" aria-label="OpenAI API request settings">
-        <h3>OpenAI request design</h3>
+      <div v-if="config.provider === 'openai-compatible'" class="openai-advanced" aria-label="OpenAI API 请求设置">
+        <h3>OpenAI 请求设置</h3>
         <div class="tuning-grid">
           <label class="field">
-            <span>Concurrency</span>
+            <span>并发数</span>
             <input
               data-testid="openai-max-concurrent"
               type="number"
@@ -333,7 +353,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Max paragraphs</span>
+            <span>每批段落</span>
             <input
               data-testid="openai-max-batch-items"
               type="number"
@@ -346,7 +366,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Max text chars</span>
+            <span>每批字符</span>
             <input
               data-testid="openai-max-batch-chars"
               type="number"
@@ -359,7 +379,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Timeout ms</span>
+            <span>超时毫秒</span>
             <input
               data-testid="openai-request-timeout"
               type="number"
@@ -373,7 +393,7 @@ function buildSiteRulePatch(): SiteRule {
         </div>
 
         <label class="field prompt-field">
-          <span>System prompt</span>
+          <span>系统提示词</span>
           <textarea
             data-testid="openai-system-prompt"
             spellcheck="false"
@@ -383,11 +403,11 @@ function buildSiteRulePatch(): SiteRule {
         </label>
       </div>
 
-      <div v-if="config.provider === 'gemini'" class="gemini-advanced" aria-label="Gemini API request settings">
-        <h3>Gemini request design</h3>
+      <div v-if="config.provider === 'gemini'" class="gemini-advanced" aria-label="Gemini API 请求设置">
+        <h3>Gemini 请求设置</h3>
         <div class="tuning-grid">
           <label class="field">
-            <span>Concurrency</span>
+            <span>并发数</span>
             <input
               data-testid="gemini-max-concurrent"
               type="number"
@@ -400,7 +420,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Max paragraphs</span>
+            <span>每批段落</span>
             <input
               data-testid="gemini-max-batch-items"
               type="number"
@@ -413,7 +433,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Max text chars</span>
+            <span>每批字符</span>
             <input
               data-testid="gemini-max-batch-chars"
               type="number"
@@ -426,7 +446,7 @@ function buildSiteRulePatch(): SiteRule {
           </label>
 
           <label class="field">
-            <span>Timeout ms</span>
+            <span>超时毫秒</span>
             <input
               data-testid="gemini-request-timeout"
               type="number"
@@ -440,7 +460,7 @@ function buildSiteRulePatch(): SiteRule {
         </div>
 
         <label class="field prompt-field">
-          <span>System prompt</span>
+          <span>系统提示词</span>
           <textarea
             data-testid="gemini-system-prompt"
             spellcheck="false"
@@ -451,17 +471,17 @@ function buildSiteRulePatch(): SiteRule {
       </div>
     </section>
 
-    <section class="panel" aria-label="Interaction controls" :aria-busy="isLoading">
+    <section class="panel" aria-label="交互入口设置" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
-          <h2>Interaction controls</h2>
-          <p>Choose which page-level tools stay available while browsing.</p>
+          <h2>交互入口</h2>
+          <p>选择浏览网页时保留哪些页面工具。</p>
         </div>
       </div>
 
       <div class="toggle-list">
         <label class="toggle-row">
-          <span>Floating ball</span>
+          <span>悬浮球</span>
           <input
             data-testid="options-floating-ball-toggle"
             type="checkbox"
@@ -471,7 +491,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="toggle-row">
-          <span>Input translator</span>
+          <span>输入框翻译</span>
           <input
             data-testid="options-input-translator-toggle"
             type="checkbox"
@@ -481,7 +501,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="toggle-row">
-          <span>Cache</span>
+          <span>缓存</span>
           <input
             data-testid="options-cache-toggle"
             type="checkbox"
@@ -491,7 +511,7 @@ function buildSiteRulePatch(): SiteRule {
         </label>
 
         <label class="toggle-row">
-          <span>Translate new content</span>
+          <span>翻译新内容</span>
           <input
             data-testid="options-new-content-toggle"
             type="checkbox"
@@ -502,33 +522,33 @@ function buildSiteRulePatch(): SiteRule {
       </div>
     </section>
 
-    <section class="panel" aria-label="Personalization settings" :aria-busy="isLoading">
+    <section class="panel" aria-label="个性化设置" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
-          <h2>Personalization</h2>
-          <p>Keep product names, technical terms, and preferred translations consistent.</p>
+          <h2>个性化</h2>
+          <p>保持产品名、技术术语和偏好译法一致。</p>
         </div>
       </div>
 
       <label class="field prompt-field">
-        <span>Glossary</span>
+        <span>术语表</span>
         <textarea
           data-testid="glossary-text"
           spellcheck="false"
-          placeholder="OpenAI = OpenAI&#10;prompt = 提示词 # LLM term"
+          placeholder="OpenAI = OpenAI&#10;prompt = 提示词 # LLM 术语"
           :value="glossaryText"
           @input="setGlossaryText"
         />
       </label>
 
       <div class="action-row">
-        <button data-testid="glossary-export" class="compact-button" type="button" @click="exportGlossary">Export glossary</button>
-        <button data-testid="glossary-import" class="compact-button" type="button" @click="importGlossary">Import glossary</button>
+        <button data-testid="glossary-export" class="compact-button" type="button" @click="exportGlossary">导出术语表</button>
+        <button data-testid="glossary-import" class="compact-button" type="button" @click="importGlossary">导入术语表</button>
       </div>
 
       <div class="import-grid">
         <label class="field prompt-field">
-          <span>Import JSON or text</span>
+          <span>导入 JSON 或文本</span>
           <textarea
             data-testid="glossary-import-text"
             spellcheck="false"
@@ -537,25 +557,25 @@ function buildSiteRulePatch(): SiteRule {
           />
         </label>
         <label class="field prompt-field">
-          <span>Export JSON</span>
+          <span>导出 JSON</span>
           <textarea data-testid="glossary-export-text" readonly spellcheck="false" :value="glossaryExportText" />
         </label>
       </div>
       <p v-if="glossaryImportError" class="error-text">{{ glossaryImportError }}</p>
     </section>
 
-    <section class="panel" aria-label="Site rules settings" :aria-busy="isLoading">
+    <section class="panel" aria-label="站点规则设置" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
-          <h2>Site rules</h2>
-          <p>Set per-site auto translation and provider preferences.</p>
+          <h2>站点规则</h2>
+          <p>为不同站点设置自动翻译、显示方式和翻译服务。</p>
         </div>
-        <button v-if="siteRules.length > 0" class="compact-button danger-button" type="button" @click="clearSiteRules">Clear</button>
+        <button v-if="siteRules.length > 0" class="compact-button danger-button" type="button" @click="clearSiteRules">清空</button>
       </div>
 
       <div class="site-rule-editor">
         <label class="field">
-          <span>Site</span>
+          <span>站点</span>
           <input
             data-testid="site-rule-host"
             type="text"
@@ -567,44 +587,44 @@ function buildSiteRulePatch(): SiteRule {
           />
         </label>
         <label class="field">
-          <span>Auto translate</span>
+          <span>自动翻译</span>
           <select data-testid="site-rule-auto-translate" :value="siteRuleAutoTranslate" @change="siteRuleAutoTranslate = ($event.target as HTMLSelectElement).value as SiteAutoTranslateChoice">
-            <option value="global">Global</option>
-            <option value="always">Always</option>
-            <option value="never">Never</option>
+            <option value="global">跟随全局</option>
+            <option value="always">总是</option>
+            <option value="never">从不</option>
           </select>
         </label>
         <label class="field">
-          <span>Display</span>
+          <span>显示方式</span>
           <select data-testid="site-rule-display-mode" :value="siteRuleDisplayMode" @change="siteRuleDisplayMode = ($event.target as HTMLSelectElement).value as DisplayMode">
-            <option value="global">Global</option>
-            <option value="smart">Smart</option>
-            <option value="bilingual">Bilingual</option>
-            <option value="translation-only">Translation</option>
+            <option value="global">跟随全局</option>
+            <option value="smart">智能</option>
+            <option value="bilingual">双语</option>
+            <option value="translation-only">仅译文</option>
           </select>
         </label>
         <label class="field">
-          <span>Provider</span>
+          <span>主服务</span>
           <select data-testid="site-rule-provider" :value="siteRuleProvider" @change="siteRuleProvider = ($event.target as HTMLSelectElement).value as ExtensionProvider">
-            <option value="global">Global</option>
+            <option value="global">跟随全局</option>
             <option value="microsoft">Microsoft</option>
             <option value="openai-compatible">OpenAI API</option>
             <option value="gemini">Google Gemini</option>
-            <option value="fake">Local test</option>
+            <option value="fake">本地测试</option>
           </select>
         </label>
         <label class="field">
-          <span>Fallback</span>
+          <span>备用服务</span>
           <select data-testid="site-rule-fallback-provider" :value="siteRuleFallbackProvider" @change="siteRuleFallbackProvider = ($event.target as HTMLSelectElement).value as FallbackProvider">
-            <option value="global">Global</option>
-            <option value="none">None</option>
+            <option value="global">跟随全局</option>
+            <option value="none">不使用</option>
             <option value="microsoft">Microsoft</option>
             <option value="openai-compatible">OpenAI API</option>
             <option value="gemini">Google Gemini</option>
-            <option value="fake">Local test</option>
+            <option value="fake">本地测试</option>
           </select>
         </label>
-        <button data-testid="site-rule-save" class="compact-button site-rule-save" type="button" @click="saveSiteRule">Save rule</button>
+        <button data-testid="site-rule-save" class="compact-button site-rule-save" type="button" @click="saveSiteRule">保存规则</button>
       </div>
       <p v-if="siteRuleError" class="error-text">{{ siteRuleError }}</p>
 
@@ -613,10 +633,10 @@ function buildSiteRulePatch(): SiteRule {
           <div>
             <strong>{{ rule.siteKey }}</strong>
             <span>
-              {{ typeof rule.autoTranslate === "boolean" ? (rule.autoTranslate ? "auto always" : "auto never") : "global" }}
-              <template v-if="rule.displayMode"> · {{ rule.displayMode }}</template>
-              <template v-if="rule.provider"> · {{ rule.provider }}</template>
-              <template v-if="rule.fallbackProvider"> · fallback {{ rule.fallbackProvider }}</template>
+              {{ siteRuleAutoLabel(rule.autoTranslate) }}
+              <template v-if="rule.displayMode">，{{ displayModeLabel(rule.displayMode) }}</template>
+              <template v-if="rule.provider">，{{ providerLabel(rule.provider) }}</template>
+              <template v-if="rule.fallbackProvider">，备用 {{ providerLabel(rule.fallbackProvider) }}</template>
             </span>
           </div>
           <button
@@ -625,10 +645,10 @@ function buildSiteRulePatch(): SiteRule {
             :data-testid="`site-rule-remove-${rule.siteKey}`"
             @click="removeSiteRule(rule.siteKey)"
           >
-            Remove
+            删除
           </button>
         </div>
-        <p v-if="siteRules.length === 0" class="empty-text">No site rules</p>
+        <p v-if="siteRules.length === 0" class="empty-text">暂无站点规则</p>
       </div>
     </section>
 

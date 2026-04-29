@@ -5,12 +5,12 @@ export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({
       id: "imt-translate-page",
-      title: "Translate page",
+      title: "翻译整页",
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: "imt-restore-page",
-      title: "Restore original",
+      title: "恢复原文",
       contexts: ["page"],
     });
   });

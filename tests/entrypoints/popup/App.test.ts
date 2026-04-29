@@ -78,7 +78,7 @@ describe("popup App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='popup-openai-status']").text()).toBe("API key required");
+    expect(wrapper.find("[data-testid='popup-openai-status']").text()).toBe("需要 API Key");
 
     await wrapper.find<HTMLInputElement>("[data-testid='popup-openai-endpoint']").setValue("https://api.example.test/v1/chat/completions");
     await wrapper.find<HTMLInputElement>("[data-testid='popup-openai-api-key']").setValue("sk-test");
@@ -118,7 +118,7 @@ describe("popup App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='popup-gemini-status']").text()).toBe("API key required");
+    expect(wrapper.find("[data-testid='popup-gemini-status']").text()).toBe("需要 API Key");
 
     await wrapper.find<HTMLInputElement>("[data-testid='popup-gemini-endpoint']").setValue("https://generativelanguage.googleapis.com/v1beta");
     await wrapper.find<HTMLInputElement>("[data-testid='popup-gemini-api-key']").setValue("gem-test");
@@ -212,11 +212,11 @@ describe("popup App", () => {
     await flushPromises();
 
     expect(sendMessage).toHaveBeenCalledWith({ type: "IMT_POPUP_GET_ACTIVE_TAB_STATUS" });
-    expect(wrapper.find("[data-testid='debug-status']").text()).toContain("Translated");
-    expect(wrapper.find("[data-testid='debug-status']").text()).toContain("1 / 1 translated");
-    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("New content observing, 2 pending, 3 lazy");
-    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Cache 0 hits, 1 miss");
-    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("Provider 1 requested, 0 failed, 0 skipped");
+    expect(wrapper.find("[data-testid='debug-status']").text()).toContain("已翻译");
+    expect(wrapper.find("[data-testid='debug-status']").text()).toContain("已翻译 1 / 1");
+    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("新内容观察中，2 个待处理，3 个懒加载");
+    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("缓存 0 命中，1 未命中");
+    expect(wrapper.find("[data-testid='popup-debug-details']").text()).toContain("服务请求 1，失败 0，跳过 0");
   });
 
   it("keeps current site controls focused on auto translate", async () => {

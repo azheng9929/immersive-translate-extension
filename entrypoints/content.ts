@@ -163,7 +163,7 @@ async function translateSingleText(config: ExtensionConfig, scope: "selection" |
 
   const result = results[0];
   if (!result || result.status !== "ok") {
-    throw new Error(result?.error ?? "Translation failed");
+    throw new Error(result?.error ?? "翻译失败");
   }
   return result.text;
 }
@@ -186,7 +186,7 @@ async function sendProviderBatch(
   });
 
   if (response?.ok && "items" in response && Array.isArray(response.items)) return response.items;
-  const error = response?.error ?? "Translation failed";
+  const error = response?.error ?? "翻译失败";
   return items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error }));
 }
 
@@ -262,7 +262,7 @@ async function copyToClipboard(text: string): Promise<void> {
   textarea.select();
   const ok = document.execCommand("copy");
   textarea.remove();
-  if (!ok) throw new Error("Copy failed");
+  if (!ok) throw new Error("复制失败");
 }
 
 declare global {

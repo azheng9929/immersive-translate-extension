@@ -30,7 +30,7 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='panel-controls']")).not.toBeNull();
     expect(document.querySelector("[data-imt-action='collapse']")).not.toBeNull();
     expect(document.querySelector("[data-imt-action='hide']")).not.toBeNull();
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Ready");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("就绪");
   });
 
   it("docks at the right center and can collapse into an edge handle", () => {
@@ -54,7 +54,7 @@ describe("FloatingTranslationControl", () => {
 
     expect(document.querySelector<HTMLElement>("[data-imt-control='root']")?.dataset.collapsed).toBe("true");
     expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
-    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-label")).toBe("Show translation controls");
+    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-label")).toBe("显示翻译控制台");
 
     document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
 
@@ -88,11 +88,11 @@ describe("FloatingTranslationControl", () => {
 
     ball?.click();
 
-    expect(document.querySelector("[data-imt-control='panel-title']")?.textContent).toBe("Page translator");
+    expect(document.querySelector("[data-imt-control='panel-title']")?.textContent).toBe("整页翻译");
     expect(document.querySelector("[data-imt-control='progress']")?.getAttribute("aria-valuenow")).toBe("63");
-    expect(document.querySelector("[data-imt-control='metric-translated']")?.textContent).toContain("5 translated");
-    expect(document.querySelector("[data-imt-control='metric-failed']")?.textContent).toContain("1 failed");
-    expect(document.querySelector("[data-imt-control='metric-pending']")?.textContent).toContain("2 pending");
+    expect(document.querySelector("[data-imt-control='metric-translated']")?.textContent).toContain("5 已翻译");
+    expect(document.querySelector("[data-imt-control='metric-failed']")?.textContent).toContain("1 失败");
+    expect(document.querySelector("[data-imt-control='metric-pending']")?.textContent).toContain("2 待处理");
   });
 
   it("runs page translation and shows the translated summary", async () => {
@@ -109,9 +109,9 @@ describe("FloatingTranslationControl", () => {
     await Promise.resolve();
 
     expect(translatePage).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Partial");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("2 / 3 translated");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 failed");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("部分完成");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("已翻译 2 / 3");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("失败 1");
   });
 
   it("reflects page session status updates", () => {
@@ -140,9 +140,9 @@ describe("FloatingTranslationControl", () => {
       lastError: undefined,
     });
 
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Updating");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 / 2 translated");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("1 new content update");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("更新中");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("已翻译 1 / 2");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("新内容更新 1 次");
   });
 
   it("shows paused and suspended new content status", () => {
@@ -170,8 +170,8 @@ describe("FloatingTranslationControl", () => {
       dynamicRuns: 0,
       lastError: undefined,
     });
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Paused");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("new content paused");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("已暂停");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("新内容已暂停");
 
     listener?.({
       phase: "translated",
@@ -185,8 +185,8 @@ describe("FloatingTranslationControl", () => {
       dynamicRuns: 0,
       lastError: "Dynamic translation paused because this page is changing too quickly.",
     });
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Suspended");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("changing too quickly");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("已暂停");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toContain("页面变化过快");
   });
 
   it("shows compact diagnostics for skipped content", () => {
@@ -252,8 +252,8 @@ describe("FloatingTranslationControl", () => {
       },
     });
 
-    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("Skipped: 3 target language");
-    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("2 extension/site UI");
+    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("跳过：3 目标语言");
+    expect(document.querySelector("[data-imt-control='diagnostics']")?.textContent).toContain("2 插件或站点界面");
   });
 
   it("expands detailed diagnostics from the floating panel", () => {
@@ -324,11 +324,11 @@ describe("FloatingTranslationControl", () => {
     document.querySelector<HTMLButtonElement>("[data-imt-action='toggle-debug-details']")?.click();
 
     const details = document.querySelector("[data-imt-control='diagnostics-details']")?.textContent;
-    expect(details).toContain("New content observing, 2 pending, 3 lazy");
-    expect(details).toContain("Text scan 4 seen, 1 accepted, 3 skipped");
-    expect(details).toContain("Units 1 built, 1 dropped");
-    expect(details).toContain("Cache 0 hits, 1 miss");
-    expect(details).toContain("Provider 1 requested, 0 failed, 0 skipped");
+    expect(details).toContain("新内容观察中，2 个待处理，3 个懒加载");
+    expect(details).toContain("文本扫描 4，接受 1，跳过 3");
+    expect(details).toContain("翻译单元 1，丢弃 1");
+    expect(details).toContain("缓存 0 命中，1 未命中");
+    expect(details).toContain("服务请求 1，失败 0，跳过 0");
   });
 
   it("runs restore and returns to ready state", async () => {
@@ -346,8 +346,8 @@ describe("FloatingTranslationControl", () => {
     document.querySelector<HTMLButtonElement>("[data-imt-action='restore']")?.click();
 
     expect(restorePage).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Ready");
-    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toBe("No page translation yet");
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("就绪");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toBe("暂无整页翻译");
   });
 
   it("hides the floating control for the current page session", () => {

@@ -42,7 +42,7 @@ describe("SelectionTranslator", () => {
     await Promise.resolve();
 
     expect(translateText).toHaveBeenCalledWith("Hello world");
-    expect(document.querySelector("[data-imt-selection-status]")?.textContent).toBe("Translated");
+    expect(document.querySelector("[data-imt-selection-status]")?.textContent).toBe("已翻译");
     expect(document.querySelector("[data-imt-selection='source']")?.textContent).toBe("Hello world");
     expect(document.querySelector("[data-imt-selection='result']")?.textContent).toBe("[zh-Hans] Hello world");
   });

@@ -24,7 +24,7 @@ describe("InputTranslator", () => {
     expect(root).not.toBeNull();
     expect(root?.dataset.imtManaged).toBe("true");
     expect(document.querySelector("[data-imt-input='source']")?.textContent).toBe("Hello world");
-    expect(document.querySelector("[data-imt-input-status]")?.textContent).toBe("Ready");
+    expect(document.querySelector("[data-imt-input-status]")?.textContent).toBe("就绪");
   });
 
   it("translates input content without changing the input value", async () => {

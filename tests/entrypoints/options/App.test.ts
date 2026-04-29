@@ -23,6 +23,11 @@ describe("options App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
+    expect(wrapper.text()).toContain("设置");
+    expect(wrapper.text()).toContain("翻译服务");
+    expect(wrapper.text()).toContain("交互入口");
+    expect(wrapper.text()).toContain("术语表");
+    expect(wrapper.text()).toContain("站点规则");
     expect(wrapper.find("[data-testid='options-dynamic-mode-off']").exists()).toBe(false);
     expect(wrapper.find("[data-testid='options-dynamic-mode-conservative']").exists()).toBe(false);
     expect(wrapper.find("[data-testid='options-dynamic-mode-normal']").exists()).toBe(false);

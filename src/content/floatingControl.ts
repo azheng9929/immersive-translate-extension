@@ -489,7 +489,7 @@ export class FloatingTranslationControl {
     ball.type = "button";
     ball.className = "imt-floating-ball";
     ball.dataset.imtControl = "ball";
-    ball.setAttribute("aria-label", this.collapsed ? "Show translation controls" : this.expanded ? "Close translation controls" : "Open translation controls");
+    ball.setAttribute("aria-label", this.collapsed ? "显示翻译控制台" : this.expanded ? "关闭翻译控制台" : "打开翻译控制台");
     ball.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
     const grip = document.createElement("span");
     grip.className = "imt-floating-grip";
@@ -535,7 +535,7 @@ export class FloatingTranslationControl {
     const title = document.createElement("p");
     title.className = "imt-floating-title";
     title.dataset.imtControl = "panel-title";
-    title.textContent = "Page translator";
+    title.textContent = "整页翻译";
 
     const subtitle = document.createElement("p");
     subtitle.className = "imt-floating-subtitle";
@@ -553,8 +553,8 @@ export class FloatingTranslationControl {
     panelControls.className = "imt-floating-panel-controls";
     panelControls.dataset.imtControl = "panel-controls";
     panelControls.append(
-      this.createIconButton("Minimize controls", "collapse", "minus", () => this.collapseToEdge()),
-      this.createIconButton("Hide on this page", "hide", "x", () => this.hide()),
+      this.createIconButton("收起控制台", "collapse", "minus", () => this.collapseToEdge()),
+      this.createIconButton("在本页隐藏", "hide", "x", () => this.hide()),
     );
 
     header.append(brand, status, panelControls);
@@ -582,20 +582,20 @@ export class FloatingTranslationControl {
     metrics.className = "imt-floating-metrics";
     const metricValues = statusMetrics(this.summary);
     metrics.append(
-      createMetric("translated", metricValues.translated, "translated"),
-      createMetric("failed", metricValues.failed, "failed"),
-      createMetric("pending", metricValues.pending, "pending"),
+      createMetric("translated", metricValues.translated, "已翻译"),
+      createMetric("failed", metricValues.failed, "失败"),
+      createMetric("pending", metricValues.pending, "待处理"),
     );
 
     const actions = document.createElement("div");
     actions.className = "imt-floating-actions";
 
-    const translateButton = this.createButton("Translate", "translate", "imt-floating-button imt-floating-button-primary", () => {
+    const translateButton = this.createButton("翻译", "translate", "imt-floating-button imt-floating-button-primary", () => {
       void this.translate();
     });
     translateButton.disabled = this.state === "translating" || this.state === "updating";
 
-    const restoreButton = this.createButton("Restore", "restore", "imt-floating-button", () => this.restore());
+    const restoreButton = this.createButton("恢复", "restore", "imt-floating-button", () => this.restore());
 
     actions.append(translateButton, restoreButton);
     panel.append(header, summary, progress, metrics);
@@ -608,7 +608,7 @@ export class FloatingTranslationControl {
       panel.append(diagnosticsNode);
 
       const detailsButton = this.createButton(
-        this.detailsExpanded ? "Hide details" : "Details",
+        this.detailsExpanded ? "收起详情" : "详情",
         "toggle-debug-details",
         "imt-floating-button imt-floating-button-subtle",
         () => this.toggleDetails(),
@@ -743,9 +743,9 @@ function progressPercent(summary: FloatingStatus | undefined): number {
 }
 
 function statusSubtitle(summary: FloatingStatus | undefined): string {
-  if (!summary) return "Quiet controls for this page";
-  if ("observation" in summary) return `New content ${summary.observation}`;
-  return "Page translation report";
+  if (!summary) return "当前页面的安静控制";
+  if ("observation" in summary) return `新内容${observationLabel(summary.observation)}`;
+  return "页面翻译报告";
 }
 
 function floatingStateFromStatus(status: PageTranslationStatus): FloatingState {
@@ -770,38 +770,37 @@ function stateFromSummary(summary: TranslationPageSummary): FloatingState {
 }
 
 function statusLabel(state: FloatingState): string {
-  if (state === "translating") return "Translating";
-  if (state === "updating") return "Updating";
-  if (state === "translated") return "Translated";
-  if (state === "partial") return "Partial";
-  if (state === "failed") return "Failed";
-  if (state === "paused") return "Paused";
-  if (state === "suspended") return "Suspended";
-  return "Ready";
+  if (state === "translating") return "翻译中";
+  if (state === "updating") return "更新中";
+  if (state === "translated") return "已翻译";
+  if (state === "partial") return "部分完成";
+  if (state === "failed") return "失败";
+  if (state === "paused" || state === "suspended") return "已暂停";
+  return "就绪";
 }
 
 function summaryLabel(summary: FloatingStatus | undefined): string {
-  if (!summary) return "No page translation yet";
-  if (summary.total === 0) return "No translatable text found";
+  if (!summary) return "暂无整页翻译";
+  if (summary.total === 0) return "未发现可翻译文本";
 
-  const parts = [`${summary.translated} / ${summary.total} translated`];
-  if (summary.failed > 0) parts.push(`${summary.failed} failed`);
-  if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
+  const parts = [`已翻译 ${summary.translated} / ${summary.total}`];
+  if (summary.failed > 0) parts.push(`失败 ${summary.failed}`);
+  if (summary.skipped > 0) parts.push(`跳过 ${summary.skipped}`);
   if ("dynamicRuns" in summary && summary.dynamicRuns > 0) {
-    parts.push(`${summary.dynamicRuns} new content ${summary.dynamicRuns === 1 ? "update" : "updates"}`);
+    parts.push(`新内容更新 ${summary.dynamicRuns} 次`);
   }
   if ("observation" in summary && summary.observation === "paused") {
-    parts.push("new content paused");
+    parts.push("新内容已暂停");
   }
   if ("observation" in summary && summary.observation === "suspended") {
-    parts.push("new content suspended");
+    parts.push("新内容已暂停");
   }
-  return parts.join(", ");
+  return parts.join("，");
 }
 
 function userFacingError(error: string): string {
   if (error.startsWith("Dynamic translation paused because")) {
-    return error.replace("Dynamic translation", "New content");
+    return "新内容已暂停，因为页面变化过快。";
   }
   return error;
 }
@@ -817,22 +816,22 @@ function diagnosticsLabel(summary: FloatingStatus | undefined): string {
     .slice(0, 3)
     .map(([label, count]) => `${count} ${label}`);
 
-  return `Skipped: ${parts.join(", ")}`;
+  return `跳过：${parts.join("，")}`;
 }
 
 function detailedDiagnosticsLabels(summary: FloatingStatus | undefined): string[] {
   if (!summary || !("diagnostics" in summary) || !summary.diagnostics) return [];
   const diagnostics = summary.diagnostics;
   const rows = [
-    `Text scan ${diagnostics.scan.text.seen} seen, ${diagnostics.scan.text.accepted} accepted, ${diagnostics.scan.text.skipped} skipped`,
-    `Attributes ${diagnostics.scan.attributes.seen} seen, ${diagnostics.scan.attributes.accepted} accepted, ${diagnostics.scan.attributes.skipped} skipped`,
-    `Units ${diagnostics.units.built} built, ${diagnostics.units.dropped} dropped`,
-    `Cache ${diagnostics.cache.hits} ${plural("hit", diagnostics.cache.hits)}, ${diagnostics.cache.misses} ${plural("miss", diagnostics.cache.misses)}`,
-    `Provider ${diagnostics.provider.requested} requested, ${diagnostics.provider.failed} failed, ${diagnostics.provider.skipped} skipped`,
+    `文本扫描 ${diagnostics.scan.text.seen}，接受 ${diagnostics.scan.text.accepted}，跳过 ${diagnostics.scan.text.skipped}`,
+    `属性扫描 ${diagnostics.scan.attributes.seen}，接受 ${diagnostics.scan.attributes.accepted}，跳过 ${diagnostics.scan.attributes.skipped}`,
+    `翻译单元 ${diagnostics.units.built}，丢弃 ${diagnostics.units.dropped}`,
+    `缓存 ${diagnostics.cache.hits} 命中，${diagnostics.cache.misses} 未命中`,
+    `服务请求 ${diagnostics.provider.requested}，失败 ${diagnostics.provider.failed}，跳过 ${diagnostics.provider.skipped}`,
   ];
 
   if ("observation" in summary) {
-    rows.unshift(`New content ${summary.observation}, ${summary.pendingRoots} pending, ${summary.observedRoots} lazy`);
+    rows.unshift(`新内容${observationLabel(summary.observation)}，${summary.pendingRoots} 个待处理，${summary.observedRoots} 个懒加载`);
   }
 
   const skipped = diagnosticsLabel(summary);
@@ -857,15 +856,19 @@ function addReasonCounts(target: Map<string, number>, reasons: DiagnosticReasonC
 }
 
 function reasonLabel(reason: string): string {
-  if (reason === "target-language") return "target language";
-  if (reason === "global-selector" || reason === "site-selector") return "extension/site UI";
-  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "metadata/control text";
-  if (reason === "not-meaningful") return "short text";
-  if (reason === "hidden") return "hidden text";
-  if (reason === "empty") return "empty text";
+  if (reason === "target-language") return "目标语言";
+  if (reason === "global-selector" || reason === "site-selector") return "插件或站点界面";
+  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "元数据或控件文本";
+  if (reason === "not-meaningful") return "短文本";
+  if (reason === "hidden") return "隐藏文本";
+  if (reason === "empty") return "空文本";
   return reason.replaceAll("-", " ");
 }
 
-function plural(label: string, count: number): string {
-  return count === 1 ? label : `${label}s`;
+function observationLabel(observation: PageTranslationStatus["observation"]): string {
+  if (observation === "observing") return "观察中";
+  if (observation === "queued") return "排队中";
+  if (observation === "paused" || observation === "suspended") return "已暂停";
+  if (observation === "inactive") return "未启用";
+  return "空闲";
 }
