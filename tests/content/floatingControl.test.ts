@@ -56,6 +56,39 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
   });
 
+  it("renders a polished handle with status metrics instead of a raw text glyph", () => {
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 0, translated: 0, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      getStatus: () => ({
+        phase: "updating",
+        observation: "observing",
+        pendingRoots: 2,
+        observedRoots: 6,
+        total: 8,
+        translated: 5,
+        failed: 1,
+        skipped: 0,
+        dynamicRuns: 3,
+        lastError: undefined,
+      }),
+    });
+
+    control.mount(document.body);
+
+    const ball = document.querySelector<HTMLButtonElement>("[data-imt-control='ball']");
+    expect(ball?.querySelector("[data-imt-control='logo']")).not.toBeNull();
+    expect(ball?.textContent?.trim()).toBe("");
+
+    ball?.click();
+
+    expect(document.querySelector("[data-imt-control='panel-title']")?.textContent).toBe("Page translator");
+    expect(document.querySelector("[data-imt-control='progress']")?.getAttribute("aria-valuenow")).toBe("63");
+    expect(document.querySelector("[data-imt-control='metric-translated']")?.textContent).toContain("5 translated");
+    expect(document.querySelector("[data-imt-control='metric-failed']")?.textContent).toContain("1 failed");
+    expect(document.querySelector("[data-imt-control='metric-pending']")?.textContent).toContain("2 pending");
+  });
+
   it("runs page translation and shows the translated summary", async () => {
     const translatePage = vi.fn().mockResolvedValue({ total: 3, translated: 2, failed: 1, skipped: 0 });
     const control = new FloatingTranslationControl({

@@ -14,6 +14,14 @@ type FloatingTranslationControlOptions = {
 
 const STYLE_TEXT = `
 .imt-floating-root {
+  --imt-accent: #1f7ae0;
+  --imt-accent-2: #18a999;
+  --imt-ink: #10243f;
+  --imt-muted: #62708a;
+  --imt-line: rgba(16, 36, 63, 0.12);
+  --imt-surface: rgba(255, 255, 255, 0.94);
+  --imt-state: #8ca0bd;
+  --imt-state-soft: rgba(140, 160, 189, 0.12);
   position: fixed;
   top: 50%;
   right: 0;
@@ -25,116 +33,231 @@ const STYLE_TEXT = `
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
 }
+.imt-floating-root,
+.imt-floating-root * {
+  box-sizing: border-box;
+}
+.imt-floating-root[data-state="translating"] {
+  --imt-state: #f0a11a;
+  --imt-state-soft: rgba(240, 161, 26, 0.14);
+}
+.imt-floating-root[data-state="updating"] {
+  --imt-state: #1f7ae0;
+  --imt-state-soft: rgba(31, 122, 224, 0.13);
+}
+.imt-floating-root[data-state="translated"] {
+  --imt-state: #18a999;
+  --imt-state-soft: rgba(24, 169, 153, 0.14);
+}
+.imt-floating-root[data-state="partial"] {
+  --imt-state: #e68a00;
+  --imt-state-soft: rgba(230, 138, 0, 0.14);
+}
+.imt-floating-root[data-state="failed"],
+.imt-floating-root[data-state="suspended"] {
+  --imt-state: #d83b45;
+  --imt-state-soft: rgba(216, 59, 69, 0.14);
+}
+.imt-floating-root[data-state="paused"] {
+  --imt-state: #7b8798;
+  --imt-state-soft: rgba(123, 135, 152, 0.14);
+}
 .imt-floating-ball {
   position: relative;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-right: 12px;
-  border: 1px solid rgba(255,255,255,0.72);
+  width: 46px;
+  height: 58px;
+  margin-right: 0;
+  border: 1px solid rgba(16, 36, 63, 0.12);
+  border-right: 0;
+  border-radius: 18px 0 0 18px;
+  color: var(--imt-ink);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,248,252,0.94) 100%);
+  box-shadow: 0 18px 42px rgba(16, 36, 63, 0.18), 0 2px 8px rgba(16, 36, 63, 0.12);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 180ms ease, width 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+}
+.imt-floating-ball::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--imt-state);
+}
+.imt-floating-logo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   color: #ffffff;
-  background: linear-gradient(135deg, #1758db 0%, #12b8a5 100%);
-  box-shadow: 0 12px 32px rgba(15, 42, 95, 0.22), 0 3px 10px rgba(15, 42, 95, 0.18);
-  cursor: pointer;
-  font-size: 17px;
-  font-weight: 700;
-  transition: transform 160ms ease, width 160ms ease, margin 160ms ease, border-radius 160ms ease, opacity 160ms ease;
+  background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 7px 16px rgba(31, 122, 224, 0.26);
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+.imt-floating-logo svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 .imt-floating-ball:hover {
-  transform: translateX(-2px);
+  transform: translateX(-4px);
+  box-shadow: 0 22px 48px rgba(16, 36, 63, 0.22), 0 4px 10px rgba(16, 36, 63, 0.13);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-ball {
-  width: 28px;
-  height: 44px;
+  width: 22px;
+  height: 56px;
   margin-right: 0;
-  border-right: 0;
-  border-radius: 14px 0 0 14px;
-  box-shadow: 0 10px 24px rgba(15, 42, 95, 0.18);
-  opacity: 0.86;
+  opacity: 0.78;
+  box-shadow: 0 10px 24px rgba(16, 36, 63, 0.14);
+}
+.imt-floating-root[data-collapsed="true"] .imt-floating-logo {
+  opacity: 0;
+  transform: translateX(12px) scale(0.9);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-ball:hover {
-  transform: translateX(-3px);
+  transform: translateX(-5px);
+  opacity: 0.96;
 }
 .imt-floating-dot {
   position: absolute;
-  right: 2px;
-  bottom: 3px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid #ffffff;
+  right: 7px;
+  bottom: 10px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #ffffff;
   border-radius: 999px;
-  background: #8ca0bd;
-}
-.imt-floating-root[data-state="translating"] .imt-floating-dot {
-  background: #f6b840;
-}
-.imt-floating-root[data-state="updating"] .imt-floating-dot {
-  background: #38bdf8;
-}
-.imt-floating-root[data-state="translated"] .imt-floating-dot {
-  background: #12b8a5;
-}
-.imt-floating-root[data-state="partial"],
-.imt-floating-root[data-state="failed"] {
-  color: #1f2937;
-}
-.imt-floating-root[data-state="partial"] .imt-floating-dot {
-  background: #f59e0b;
-}
-.imt-floating-root[data-state="failed"] .imt-floating-dot {
-  background: #ef4444;
-}
-.imt-floating-root[data-state="paused"] .imt-floating-dot {
-  background: #94a3b8;
-}
-.imt-floating-root[data-state="suspended"] .imt-floating-dot {
-  background: #ef4444;
+  background: var(--imt-state);
+  box-shadow: 0 0 0 3px var(--imt-state-soft);
 }
 .imt-floating-panel {
   position: absolute;
   top: 50%;
-  right: 64px;
+  right: 58px;
   transform: translateY(-50%);
-  width: 248px;
+  width: 296px;
   max-height: calc(100vh - 32px);
   overflow: auto;
-  padding: 12px;
-  border: 1px solid rgba(15, 42, 95, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 44px rgba(15, 42, 95, 0.18);
-  backdrop-filter: blur(14px);
+  padding: 0;
+  border: 1px solid rgba(16, 36, 63, 0.12);
+  border-radius: 16px;
+  background: var(--imt-surface);
+  box-shadow: 0 24px 62px rgba(16, 36, 63, 0.2), 0 6px 18px rgba(16, 36, 63, 0.12);
+  backdrop-filter: blur(18px) saturate(1.15);
+  animation: imt-panel-in 160ms ease-out;
 }
 .imt-floating-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 10px;
+  padding: 14px 14px 10px;
+}
+.imt-floating-brand {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.imt-floating-panel-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 8px 18px rgba(31, 122, 224, 0.22);
+}
+.imt-floating-panel-mark svg {
+  width: 19px;
+  height: 19px;
+  display: block;
 }
 .imt-floating-title {
   margin: 0;
+  color: var(--imt-ink);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 760;
+  line-height: 1.2;
+}
+.imt-floating-subtitle {
+  margin: 3px 0 0;
+  color: var(--imt-muted);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .imt-floating-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--imt-state-soft);
+  color: var(--imt-state);
   font-size: 12px;
-  font-weight: 650;
-  color: #119985;
+  font-weight: 700;
 }
 .imt-floating-summary {
-  margin: 0 0 12px;
-  color: #52627a;
+  margin: 0;
+  padding: 0 14px 10px;
+  color: var(--imt-muted);
   font-size: 12px;
   line-height: 1.4;
 }
+.imt-floating-progress {
+  position: relative;
+  height: 5px;
+  margin: 0 14px 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 36, 63, 0.08);
+}
+.imt-floating-progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--imt-accent) 0%, var(--imt-state) 100%);
+  transition: width 220ms ease;
+}
+.imt-floating-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 14px 12px;
+}
+.imt-floating-metric {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(16, 36, 63, 0.08);
+  border-radius: 9px;
+  background: rgba(244, 248, 252, 0.72);
+  color: var(--imt-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imt-floating-metric strong {
+  color: var(--imt-ink);
+  font-weight: 760;
+}
 .imt-floating-diagnostics {
-  margin: -4px 0 12px;
+  margin: 0 14px 12px;
   padding: 8px;
   border-radius: 8px;
-  color: #52627a;
+  color: var(--imt-muted);
   background: #f4f7fb;
   font-size: 11px;
   line-height: 1.35;
@@ -142,12 +265,12 @@ const STYLE_TEXT = `
 .imt-floating-details {
   display: grid;
   gap: 5px;
-  margin: -4px 0 12px;
+  margin: 0 14px 12px;
   padding: 8px;
-  border: 1px solid rgba(15, 42, 95, 0.1);
+  border: 1px solid rgba(16, 36, 63, 0.1);
   border-radius: 8px;
   background: #ffffff;
-  color: #52627a;
+  color: var(--imt-muted);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -158,13 +281,16 @@ const STYLE_TEXT = `
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid rgba(16, 36, 63, 0.08);
+  background: rgba(248, 251, 253, 0.8);
 }
 .imt-floating-button {
   min-height: 34px;
-  border: 1px solid rgba(15, 42, 95, 0.14);
+  border: 1px solid rgba(16, 36, 63, 0.12);
   border-radius: 9px;
   background: #ffffff;
-  color: #102a5f;
+  color: var(--imt-ink);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -172,6 +298,7 @@ const STYLE_TEXT = `
 }
 .imt-floating-button:hover {
   background: #f5f9ff;
+  border-color: rgba(31, 122, 224, 0.24);
 }
 .imt-floating-button:disabled {
   cursor: wait;
@@ -180,10 +307,11 @@ const STYLE_TEXT = `
 .imt-floating-button-primary {
   border-color: transparent;
   color: #ffffff;
-  background: linear-gradient(135deg, #1758db 0%, #14a896 100%);
+  background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
+  box-shadow: 0 8px 18px rgba(31, 122, 224, 0.18);
 }
 .imt-floating-button-primary:hover {
-  background: linear-gradient(135deg, #164fc3 0%, #129887 100%);
+  background: linear-gradient(135deg, #176bd0 0%, #149886 100%);
 }
 .imt-floating-button-subtle {
   grid-column: span 2;
@@ -194,6 +322,16 @@ const STYLE_TEXT = `
 }
 .imt-floating-button-subtle:hover {
   background: #f4f7fb;
+}
+@keyframes imt-panel-in {
+  from {
+    opacity: 0;
+    transform: translate(8px, -50%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, -50%) scale(1);
+  }
 }
 @media (max-height: 520px) {
   .imt-floating-panel {
@@ -295,7 +433,11 @@ export class FloatingTranslationControl {
     ball.dataset.imtControl = "ball";
     ball.setAttribute("aria-label", this.collapsed ? "Show translation controls" : this.expanded ? "Close translation controls" : "Open translation controls");
     ball.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
-    ball.textContent = "A";
+    const logo = document.createElement("span");
+    logo.className = "imt-floating-logo";
+    logo.dataset.imtControl = "logo";
+    logo.append(createTranslateIcon());
+    ball.append(logo);
     ball.addEventListener("click", () => this.toggleExpanded());
 
     const dot = document.createElement("span");
@@ -316,21 +458,62 @@ export class FloatingTranslationControl {
     const header = document.createElement("div");
     header.className = "imt-floating-header";
 
+    const brand = document.createElement("div");
+    brand.className = "imt-floating-brand";
+
+    const panelMark = document.createElement("span");
+    panelMark.className = "imt-floating-panel-mark";
+    panelMark.dataset.imtControl = "panel-logo";
+    panelMark.append(createTranslateIcon());
+
+    const titleBlock = document.createElement("div");
+
     const title = document.createElement("p");
     title.className = "imt-floating-title";
-    title.textContent = "Page translation";
+    title.dataset.imtControl = "panel-title";
+    title.textContent = "Page translator";
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "imt-floating-subtitle";
+    subtitle.textContent = statusSubtitle(this.summary);
+
+    titleBlock.append(title, subtitle);
+    brand.append(panelMark, titleBlock);
 
     const status = document.createElement("span");
     status.className = "imt-floating-status";
     status.dataset.imtControl = "status";
     status.textContent = statusLabel(this.state);
 
-    header.append(title, status);
+    header.append(brand, status);
 
     const summary = document.createElement("p");
     summary.className = "imt-floating-summary";
     summary.dataset.imtControl = "summary";
     summary.textContent = this.error ?? summaryLabel(this.summary);
+
+    const progressValue = progressPercent(this.summary);
+    const progress = document.createElement("div");
+    progress.className = "imt-floating-progress";
+    progress.dataset.imtControl = "progress";
+    progress.setAttribute("role", "progressbar");
+    progress.setAttribute("aria-valuemin", "0");
+    progress.setAttribute("aria-valuemax", "100");
+    progress.setAttribute("aria-valuenow", String(progressValue));
+
+    const progressBar = document.createElement("span");
+    progressBar.className = "imt-floating-progress-bar";
+    progressBar.style.width = `${progressValue}%`;
+    progress.append(progressBar);
+
+    const metrics = document.createElement("div");
+    metrics.className = "imt-floating-metrics";
+    const metricValues = statusMetrics(this.summary);
+    metrics.append(
+      createMetric("translated", metricValues.translated, "translated"),
+      createMetric("failed", metricValues.failed, "failed"),
+      createMetric("pending", metricValues.pending, "pending"),
+    );
 
     const actions = document.createElement("div");
     actions.className = "imt-floating-actions";
@@ -345,7 +528,7 @@ export class FloatingTranslationControl {
     const hideButton = this.createButton("Hide on this page", "hide", "imt-floating-button imt-floating-button-subtle", () => this.hide());
 
     actions.append(translateButton, restoreButton, collapseButton, hideButton);
-    panel.append(header, summary);
+    panel.append(header, summary, progress, metrics);
     const diagnostics = diagnosticsLabel(this.summary);
     if (diagnostics) {
       const diagnosticsNode = document.createElement("p");
@@ -400,6 +583,71 @@ export class FloatingTranslationControl {
     this.detailsExpanded = !this.detailsExpanded;
     this.render();
   }
+}
+
+function createTranslateIcon(): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+
+  const source = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  source.setAttribute(
+    "d",
+    "M4 4.75h7.8M7.9 3v1.75M6 8.2c.85 1.55 2.05 2.95 3.55 4.05M10.9 6.75c-.72 2.05-2.15 4-4.45 5.92",
+  );
+  source.setAttribute("stroke", "currentColor");
+  source.setAttribute("stroke-width", "1.8");
+  source.setAttribute("stroke-linecap", "round");
+  source.setAttribute("stroke-linejoin", "round");
+
+  const target = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  target.setAttribute("d", "M13.25 20l1.05-2.65h4.25L19.6 20M15.05 15.45l1.38-3.45 1.38 3.45");
+  target.setAttribute("stroke", "currentColor");
+  target.setAttribute("stroke-width", "1.8");
+  target.setAttribute("stroke-linecap", "round");
+  target.setAttribute("stroke-linejoin", "round");
+
+  const frame = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  frame.setAttribute("d", "M5 15.4v1.1A2.5 2.5 0 0 0 7.5 19H10M19 8.6V7.5A2.5 2.5 0 0 0 16.5 5H14");
+  frame.setAttribute("stroke", "currentColor");
+  frame.setAttribute("stroke-width", "1.8");
+  frame.setAttribute("stroke-linecap", "round");
+
+  svg.append(source, target, frame);
+  return svg;
+}
+
+function createMetric(kind: "translated" | "failed" | "pending", value: number, label: string): HTMLElement {
+  const metric = document.createElement("span");
+  metric.className = "imt-floating-metric";
+  metric.dataset.imtControl = `metric-${kind}`;
+
+  const strong = document.createElement("strong");
+  strong.textContent = String(value);
+
+  metric.append(strong, ` ${label}`);
+  return metric;
+}
+
+function statusMetrics(summary: FloatingStatus | undefined): { translated: number; failed: number; pending: number } {
+  if (!summary) return { translated: 0, failed: 0, pending: 0 };
+  return {
+    translated: summary.translated,
+    failed: summary.failed,
+    pending: "pendingRoots" in summary ? summary.pendingRoots : 0,
+  };
+}
+
+function progressPercent(summary: FloatingStatus | undefined): number {
+  if (!summary || summary.total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((summary.translated / summary.total) * 100)));
+}
+
+function statusSubtitle(summary: FloatingStatus | undefined): string {
+  if (!summary) return "Quiet controls for this page";
+  if ("observation" in summary) return `Dynamic updates ${summary.observation}`;
+  return "Page translation report";
 }
 
 function floatingStateFromStatus(status: PageTranslationStatus): FloatingState {
