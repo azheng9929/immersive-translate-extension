@@ -52,7 +52,7 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
     return { ok: true, config };
   }
   if (message.type === "IMT_GET_WEB_RULES") {
-    return { ok: true, webRules: getWebRulesForUrl(message.url) };
+    return { ok: true, webRules: await getWebRulesForUrl(message.url) };
   }
   if (message.type === "IMT_UPDATE_CONFIG") {
     const config = await createConfigStore().update(message.patch);

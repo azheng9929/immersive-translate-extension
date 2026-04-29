@@ -18,6 +18,19 @@ export function selectWebTranslationRulesForContent(
   return matchedUrlRule ? [...selectorRules, matchedUrlRule] : selectorRules;
 }
 
+export function selectPotentialWebTranslationRulesForUrl(
+  url: string,
+  rules: readonly WebTranslationRule[],
+): WebTranslationRule[] {
+  return rules.filter((rule) => mayWebTranslationRuleMatchUrl(url, rule));
+}
+
+export function mayWebTranslationRuleMatchUrl(url: string, rule: WebTranslationRule): boolean {
+  if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  return Boolean(rule.matches?.length || hasSelectorConditions(rule));
+}
+
 function matchesRule(url: string, doc: Document | undefined, rule: WebTranslationRule): boolean {
   if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
   if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;

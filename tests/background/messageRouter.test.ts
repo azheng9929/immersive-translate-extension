@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleBackgroundMessage, toggleActiveTabTranslation } from "@/background/messageRouter";
+import { stubImportedRulesResource } from "../helpers/importedRulesResource";
 
 describe("handleBackgroundMessage", () => {
   it("runs translation batch messages through the selected provider", async () => {
@@ -63,6 +64,8 @@ describe("handleBackgroundMessage", () => {
   });
 
   it("returns only URL-relevant web translation rules for the current page", async () => {
+    stubImportedRulesResource();
+
     const response = await handleBackgroundMessage({
       type: "IMT_GET_WEB_RULES",
       url: "https://medium.com/@writer/story",
@@ -76,6 +79,8 @@ describe("handleBackgroundMessage", () => {
     expect(response.webRules.some((rule) => rule.id === "medium")).toBe(true);
     expect(response.webRules.some((rule) => rule.id === "github")).toBe(false);
     expect(response.webRules.some((rule) => rule.selectorMatches?.length)).toBe(true);
+
+    vi.unstubAllGlobals();
   });
 
   it("forwards active tab page status requests from popup", async () => {
