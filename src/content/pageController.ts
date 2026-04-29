@@ -7,6 +7,7 @@ import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
+import type { SiteContentSelector } from "./sitePolicy";
 import {
   cloneTranslationDiagnostics,
   createTranslationDiagnostics,
@@ -38,6 +39,8 @@ type ControllerOptions = {
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
   preferredScanRootSelectors?: readonly string[];
+  excludeSelectors?: readonly string[];
+  contentSelectors?: readonly SiteContentSelector[];
   allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
   progressiveBatchItems?: number;
@@ -112,6 +115,7 @@ export class PageController {
       if (!candidate.isConnected) continue;
       if (!isNearViewport(candidate, margin)) continue;
       if (isSkippableElement(candidate, { ...(this.options.allowTooltip ? { allowTooltip: true } : {}) })) continue;
+      if (matchesClosestSelector(candidate, this.options.excludeSelectors)) continue;
       const text = normalizeVisibleText(candidate.textContent ?? "");
       if (!isMeaningfulText(text, classifyViewportCandidate(candidate))) continue;
       addRoot(roots, candidate);
@@ -200,6 +204,8 @@ export class PageController {
     const scanOptions = {
       ...(hostname ? { hostname } : {}),
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
+      ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
+      ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
       targetLang: this.options.targetLang,
       diagnostics,
     };
@@ -218,6 +224,8 @@ export class PageController {
       targetLang: this.options.targetLang,
       hostname,
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
+      ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
+      ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
       diagnostics,
     });
   }
@@ -560,6 +568,18 @@ function classifyViewportCandidate(element: HTMLElement): UnitCategory {
   if (element.matches("h1,h2,h3,h4,h5,h6")) return "heading";
   if (element.matches("p,blockquote,figcaption")) return "content-block";
   return "fallback";
+}
+
+function matchesClosestSelector(element: HTMLElement, selectors: readonly string[] | undefined): boolean {
+  if (!selectors?.length) return false;
+  for (const selector of selectors) {
+    try {
+      if (element.closest(selector)) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {

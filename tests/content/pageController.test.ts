@@ -200,6 +200,31 @@ describe("PageController", () => {
     expect(roots).toEqual([document.querySelector("#visible")]);
   });
 
+  it("skips rule-excluded roots during the first translation wave", () => {
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible paragraph.</p>
+        <aside class="recommendations"><p id="sidebar">Recommended stories and sidebar links.</p></aside>
+      </main>
+    `;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(document.querySelector("#sidebar")!, { top: 80, bottom: 120, left: 0, right: 200 });
+
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      excludeSelectors: [".recommendations"],
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    const roots = controller.collectViewportTranslatableRoots(document.body, {
+      rootMargin: "100px",
+      maxRoots: 10,
+    });
+
+    expect(roots).toEqual([document.querySelector("#visible")]);
+  });
+
   it("uses cached translations instead of requesting the same text twice", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
     const cache = new MemoryTranslationCache();
@@ -643,6 +668,57 @@ describe("PageController", () => {
       skipped: 0,
     });
     expect(requestedTexts).toEqual([]);
+  });
+
+  it("honors rule-driven exclude selectors during page scans", async () => {
+    document.body.innerHTML = `
+      <main>
+        <p>Readable article paragraph.</p>
+        <aside class="recommendations">Recommended stories and sidebar links.</aside>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      excludeSelectors: [".recommendations"],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Readable article paragraph."]);
+    expect(document.querySelector(".recommendations")?.textContent).toBe("Recommended stories and sidebar links.");
+  });
+
+  it("lets rule-driven exclude selectors win over content selectors", async () => {
+    document.body.innerHTML = `
+      <main>
+        <article class="story">
+          <p>Readable article paragraph.</p>
+          <aside class="recommendations">
+            <p>Recommended story teaser.</p>
+          </aside>
+        </article>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      excludeSelectors: [".recommendations"],
+      contentSelectors: [{ selector: ".story", category: "content-block" }],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Readable article paragraph."]);
+    expect(document.querySelector(".recommendations")?.textContent?.trim()).toBe("Recommended story teaser.");
   });
 
   it("does not send Chinese text with English terminology to the translator when target is Chinese", async () => {

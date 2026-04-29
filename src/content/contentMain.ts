@@ -31,7 +31,7 @@ export async function runContentMain(): Promise<void> {
   try {
     await waitForDocumentBody();
     let config = await loadConfig();
-    const sitePolicy = resolveSitePolicy(window.location.hostname, config.dynamicMode);
+    const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document });
     injectSitePolicyCss(sitePolicy);
     let pageSession = createPageSession(config);
     let selectionTranslator = createSelectionTranslator(config);
@@ -69,7 +69,7 @@ export async function runContentMain(): Promise<void> {
         pageSession.restorePage();
         pageSession.dispose();
         config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
-        injectSitePolicyCss(resolveSitePolicy(window.location.hostname, config.dynamicMode));
+        injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document }));
         pageSession = createPageSession(config);
         cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
         selectionTranslator.unmount();
@@ -133,6 +133,8 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
+    excludeSelectors: sitePolicy.excludeSelectors,
+    contentSelectors: sitePolicy.contentSelectors,
     allowTooltip: sitePolicy.allowTooltip,
     getPageTitle: readPageTitleContext,
     ...progressivePageBatchOptions(config),
@@ -148,8 +150,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
 }
 
 function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  const hostname = window.location.hostname;
-  const sitePolicy = resolveSitePolicy(hostname, config.dynamicMode);
+  const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document });
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,

@@ -20,6 +20,8 @@ type BuildInput = {
   targetLang: string;
   hostname?: string;
   allowTooltip?: boolean;
+  contentSelectors?: GranularityOptions["contentSelectors"];
+  excludeSelectors?: GranularityOptions["excludeSelectors"];
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -50,6 +52,8 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     const collected = collectUnitText(root, textNodes, {
       ...(input.hostname ? { hostname: input.hostname } : {}),
       ...(input.allowTooltip ? { allowTooltip: true } : {}),
+      ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
+      ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
       targetLang: input.targetLang,
     });
     if (!collected.text) {

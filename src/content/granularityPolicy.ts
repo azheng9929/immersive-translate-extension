@@ -6,6 +6,8 @@ export type GranularityOptions = {
   hostname?: string;
   targetLang?: string;
   allowTooltip?: boolean;
+  contentSelectors?: readonly ContentRule[];
+  excludeSelectors?: readonly string[];
 };
 
 export type TextGranularityDecision = {
@@ -345,6 +347,19 @@ export function resolveTextGranularity(
   if (matchesClosest(element, globalSkipSelectors(options))) return { skip: true, reason: "global-selector" };
   if (matchesAnyPattern(text, GLOBAL_SKIP_TEXT_PATTERNS)) return { skip: true, reason: "global-text" };
   if (shouldSkipForTargetLanguage(text, options.targetLang)) return { skip: true, reason: "target-language" };
+
+  if (options.excludeSelectors?.length && matchesClosest(element, options.excludeSelectors)) {
+    return { skip: true, reason: "rule-selector" };
+  }
+
+  const configuredContentRule = findContentRule(element, options.contentSelectors ?? []);
+  if (configuredContentRule) {
+    return {
+      skip: false,
+      root: configuredContentRule.root,
+      category: configuredContentRule.category,
+    };
+  }
 
   const policy = resolvePolicy(options.hostname);
   if (!policy) return { skip: false };
