@@ -416,6 +416,59 @@ describe("PageTranslationSession", () => {
     expect(session.getStatus()).toMatchObject({ phase: "translated", total: 2, translated: 2 });
   });
 
+  it("updates lazy translation status while progressive chunks are still running", async () => {
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="first">First lazy paragraph.</p>
+        <p id="second">Second lazy paragraph.</p>
+      </main>
+    `;
+    let resolveSecondBatch: (() => void) | undefined;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      progressiveBatchItems: 1,
+      progressiveConcurrentBatches: 2,
+      translateBatch: async (items) => {
+        if (items.some((item) => item.text === "Second lazy paragraph.")) {
+          return new Promise((resolve) => {
+            resolveSecondBatch = () => {
+              resolve(items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })));
+            };
+          });
+        }
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+    });
+
+    await session.translatePage();
+    FakeIntersectionObserver.instances[0]?.triggerMany([
+      document.querySelector("#first")!,
+      document.querySelector("#second")!,
+    ]);
+    await waitFor(() => session!.getStatus().translated === 1);
+
+    expect(session.getStatus()).toMatchObject({
+      phase: "updating",
+      total: 2,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(document.querySelector("#first .imt-translation-block")?.textContent).toBe("[zh-Hans] First lazy paragraph.");
+    expect(document.querySelector("#second .imt-translation-block")).toBeNull();
+
+    resolveSecondBatch?.();
+    await waitFor(() => session!.getStatus().translated === 2);
+
+    expect(session.getStatus()).toMatchObject({ phase: "translated", total: 2, translated: 2 });
+  });
+
   it("eagerly translates near-viewport lazy roots before intersection callbacks", async () => {
     const FakeIntersectionObserver = createFakeIntersectionObserver();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);

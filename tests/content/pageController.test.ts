@@ -21,6 +21,14 @@ class MemoryTranslationCache implements TranslationCache {
   }
 }
 
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 20; index += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  expect(predicate()).toBe(true);
+}
+
 describe("PageController", () => {
   it("translates and restores a mixed page using fake translation", async () => {
     document.body.innerHTML = `
@@ -71,6 +79,39 @@ describe("PageController", () => {
 
     expect(document.querySelector(".imt-translation-block")).toBeNull();
     expect(document.querySelector("p")?.textContent).toBe("Hello world.");
+  });
+
+  it("renders progressive provider chunks as soon as each chunk returns", async () => {
+    document.body.innerHTML = `<main><p id="first">First paragraph.</p><p id="second">Second paragraph.</p></main>`;
+    let resolveSecondBatch: (() => void) | undefined;
+    const batchTexts: string[][] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      progressiveBatchItems: 1,
+      progressiveConcurrentBatches: 2,
+      translateBatch: async (items) => {
+        batchTexts.push(items.map((item) => item.text));
+        if (items.some((item) => item.text === "Second paragraph.")) {
+          return new Promise((resolve) => {
+            resolveSecondBatch = () => {
+              resolve(items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })));
+            };
+          });
+        }
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const translatePromise = controller.translatePage();
+    await waitFor(() => document.querySelector("#first .imt-translation-block")?.textContent === "[zh-Hans] First paragraph.");
+
+    expect(batchTexts).toEqual([["First paragraph."], ["Second paragraph."]]);
+    expect(document.querySelector("#second .imt-translation-block")).toBeNull();
+
+    resolveSecondBatch?.();
+    await translatePromise;
+
+    expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Second paragraph.");
   });
 
   it("uses cached translations instead of requesting the same text twice", async () => {

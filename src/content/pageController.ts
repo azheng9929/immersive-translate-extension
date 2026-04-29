@@ -15,6 +15,9 @@ import {
 
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
+type MissingUnit = { unit: TranslationUnit; item: BatchItem };
+export type TranslationProgressDelta = TranslationPageSummary;
+export type TranslationProgressListener = (delta: TranslationProgressDelta) => void;
 type TranslationRetryOptions = {
   maxAttempts: number;
   delayMs: number;
@@ -30,6 +33,9 @@ type ControllerOptions = {
   attributeNames?: readonly TranslatableAttributeName[];
   preferredScanRootSelectors?: readonly string[];
   getPageTitle?: () => string | undefined;
+  progressiveBatchItems?: number;
+  progressiveBatchChars?: number;
+  progressiveConcurrentBatches?: number;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -49,17 +55,26 @@ export class PageController {
 
   constructor(private readonly options: ControllerOptions) {}
 
-  async translatePage(root: ParentNode = document.body): Promise<TranslationPageSummary> {
+  async translatePage(
+    root: ParentNode = document.body,
+    onProgress?: TranslationProgressListener,
+  ): Promise<TranslationPageSummary> {
     this.restorePage();
-    return this.translateRoots([root]);
+    return this.translateRoots([root], onProgress);
   }
 
-  async translateNewContent(root: ParentNode): Promise<TranslationPageSummary> {
-    return this.translateRoots([root]);
+  async translateNewContent(
+    root: ParentNode,
+    onProgress?: TranslationProgressListener,
+  ): Promise<TranslationPageSummary> {
+    return this.translateRoots([root], onProgress);
   }
 
-  async translateNewContents(roots: readonly ParentNode[]): Promise<TranslationPageSummary> {
-    return this.translateRoots(roots);
+  async translateNewContents(
+    roots: readonly ParentNode[],
+    onProgress?: TranslationProgressListener,
+  ): Promise<TranslationPageSummary> {
+    return this.translateRoots(roots, onProgress);
   }
 
   collectTranslatableRoots(root: ParentNode = document.body): HTMLElement[] {
@@ -80,7 +95,10 @@ export class PageController {
     return cloneTranslationDiagnostics(this.diagnostics);
   }
 
-  private async translateRoots(roots: readonly ParentNode[]): Promise<TranslationPageSummary> {
+  private async translateRoots(
+    roots: readonly ParentNode[],
+    onProgress?: TranslationProgressListener,
+  ): Promise<TranslationPageSummary> {
     if (roots.length === 0) return { total: 0, translated: 0, failed: 0, skipped: 0 };
 
     const revision = this.revision + 1;
@@ -117,40 +135,24 @@ export class PageController {
       }
     }
     recordCacheUsage(this.diagnostics, cacheHitsCount, cacheMissesCount);
-
-    const batch = missingUnits.map((unit) => ({
-      id: unit.id,
-      text: unit.originalText,
-      category: unit.category,
-    }));
-
-    if (batch.length === 0) return summary;
-
-    const results = await this.translateBatchWithRetries(batch);
-    if (revision !== this.revision) return summary;
-    recordProviderUsage(
-      this.diagnostics,
-      batch.length,
-      results.filter((result) => result.status === "failed").length,
-      results.filter((result) => result.status === "skipped").length,
-    );
-
-    const resultById = new Map(results.map((result) => [result.id, result]));
+    notifyProgress(onProgress, { total: units.length, translated: cacheHitsCount, failed: 0, skipped: 0 });
 
     const cacheWrites: TranslationCacheWrite[] = [];
-    for (const unit of missingUnits) {
-      const result = resultById.get(unit.id);
-      if (!result || result.status !== "ok") {
-        unit.state = result?.status === "skipped" ? "skipped" : "failed";
-        if (unit.state === "skipped") summary.skipped += 1;
-        else summary.failed += 1;
-        continue;
-      }
-      this.applyTranslation(unit, result.text);
-      summary.translated += 1;
-      const lookup = lookupByUnitId.get(unit.id);
-      if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
-    }
+    await this.translateMissingUnits(
+      missingUnits.map((unit) => ({
+        unit,
+        item: {
+          id: unit.id,
+          text: unit.originalText,
+          category: unit.category,
+        },
+      })),
+      lookupByUnitId,
+      cacheWrites,
+      summary,
+      revision,
+      onProgress,
+    );
 
     await this.writeCache(cacheWrites);
     return summary;
@@ -289,6 +291,91 @@ export class PageController {
       unit.renderMode = displayMode === "translation-only" ? translationOnlyMode(unit) : bilingualMode(unit);
     }
   }
+
+  private async translateMissingUnits(
+    missingUnits: MissingUnit[],
+    lookupByUnitId: Map<string, TranslationCacheLookup>,
+    cacheWrites: TranslationCacheWrite[],
+    summary: TranslationPageSummary,
+    revision: number,
+    onProgress: TranslationProgressListener | undefined,
+  ): Promise<void> {
+    if (missingUnits.length === 0) return;
+
+    const chunks = chunkMissingUnits(
+      missingUnits,
+      this.progressiveBatchItems(missingUnits.length),
+      this.progressiveBatchChars(),
+    );
+    const workerCount = Math.min(this.progressiveConcurrentBatches(), chunks.length);
+    let nextChunkIndex = 0;
+
+    const runWorker = async (): Promise<void> => {
+      while (revision === this.revision) {
+        const chunk = chunks[nextChunkIndex];
+        nextChunkIndex += 1;
+        if (!chunk) return;
+        await this.translateMissingUnitChunk(chunk, lookupByUnitId, cacheWrites, summary, revision, onProgress);
+      }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, runWorker));
+  }
+
+  private async translateMissingUnitChunk(
+    missingUnits: MissingUnit[],
+    lookupByUnitId: Map<string, TranslationCacheLookup>,
+    cacheWrites: TranslationCacheWrite[],
+    summary: TranslationPageSummary,
+    revision: number,
+    onProgress: TranslationProgressListener | undefined,
+  ): Promise<void> {
+    const batch = missingUnits.map((entry) => entry.item);
+    const results = await this.translateBatchWithRetries(batch);
+    if (revision !== this.revision) return;
+
+    const failed = results.filter((result) => result.status === "failed").length;
+    const skipped = results.filter((result) => result.status === "skipped").length;
+    recordProviderUsage(this.diagnostics, batch.length, failed, skipped);
+
+    const resultById = new Map(results.map((result) => [result.id, result]));
+    const delta: TranslationProgressDelta = { total: 0, translated: 0, failed: 0, skipped: 0 };
+
+    for (const { unit } of missingUnits) {
+      const result = resultById.get(unit.id);
+      if (!result || result.status !== "ok") {
+        unit.state = result?.status === "skipped" ? "skipped" : "failed";
+        if (unit.state === "skipped") {
+          summary.skipped += 1;
+          delta.skipped += 1;
+        } else {
+          summary.failed += 1;
+          delta.failed += 1;
+        }
+        continue;
+      }
+
+      this.applyTranslation(unit, result.text);
+      summary.translated += 1;
+      delta.translated += 1;
+      const lookup = lookupByUnitId.get(unit.id);
+      if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
+    }
+
+    notifyProgress(onProgress, delta);
+  }
+
+  private progressiveBatchItems(fallback: number): number {
+    return normalizeInteger(this.options.progressiveBatchItems, fallback, 1, 80);
+  }
+
+  private progressiveBatchChars(): number {
+    return normalizeInteger(this.options.progressiveBatchChars, Number.MAX_SAFE_INTEGER, 1, Number.MAX_SAFE_INTEGER);
+  }
+
+  private progressiveConcurrentBatches(): number {
+    return normalizeInteger(this.options.progressiveConcurrentBatches, 1, 1, 8);
+  }
 }
 
 function translationOnlyMode(unit: TranslationUnit): RenderMode {
@@ -312,6 +399,41 @@ function createSessionId(): string {
 
 function sleep(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function chunkMissingUnits(missingUnits: MissingUnit[], maxItems: number, maxChars: number): MissingUnit[][] {
+  const chunks: MissingUnit[][] = [];
+  let chunk: MissingUnit[] = [];
+  let chunkChars = 0;
+
+  for (const entry of missingUnits) {
+    const itemChars = entry.item.text.length;
+    const wouldOverflowItems = chunk.length >= maxItems;
+    const wouldOverflowChars = chunk.length > 0 && chunkChars + itemChars > maxChars;
+    if (wouldOverflowItems || wouldOverflowChars) {
+      chunks.push(chunk);
+      chunk = [];
+      chunkChars = 0;
+    }
+
+    chunk.push(entry);
+    chunkChars += itemChars;
+  }
+
+  if (chunk.length > 0) chunks.push(chunk);
+  return chunks;
+}
+
+function notifyProgress(listener: TranslationProgressListener | undefined, delta: TranslationProgressDelta): void {
+  if (!listener) return;
+  if (delta.total === 0 && delta.translated === 0 && delta.failed === 0 && delta.skipped === 0) return;
+  listener(delta);
+}
+
+function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : Number.NaN;
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.min(Math.max(Math.round(numberValue), min), max);
 }
 
 function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[] | undefined): ParentNode[] {
@@ -339,7 +461,6 @@ function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[
       continue;
     }
   }
-
   return roots;
 }
 

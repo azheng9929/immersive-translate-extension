@@ -93,6 +93,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     attributeNames: sitePolicy.attributeNames,
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
     getPageTitle: readPageTitleContext,
+    ...progressivePageBatchOptions(config),
     retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: (items) => translateBatchWithProviderFallback(
       config,
@@ -214,6 +215,30 @@ function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProv
     maxBatchChars: config.openaiMaxBatchChars,
     requestTimeoutMs: config.openaiRequestTimeoutMs,
     systemPrompt: buildGlossarySystemPrompt(config.openaiSystemPrompt, config.glossary),
+  };
+}
+
+function progressivePageBatchOptions(config: ExtensionConfig) {
+  if (config.provider === "openai-compatible") {
+    return {
+      progressiveBatchItems: Math.min(config.openaiMaxBatchItems, 8),
+      progressiveBatchChars: config.openaiMaxBatchChars,
+      progressiveConcurrentBatches: config.openaiMaxConcurrentRequests,
+    };
+  }
+
+  if (config.provider === "gemini") {
+    return {
+      progressiveBatchItems: Math.min(config.geminiMaxBatchItems, 8),
+      progressiveBatchChars: config.geminiMaxBatchChars,
+      progressiveConcurrentBatches: config.geminiMaxConcurrentRequests,
+    };
+  }
+
+  return {
+    progressiveBatchItems: 16,
+    progressiveBatchChars: 6000,
+    progressiveConcurrentBatches: 4,
   };
 }
 

@@ -23,6 +23,7 @@ const sites = [
   { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
   { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
+  { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
 ];
 const siteFilter = parseCsv(process.env.IMT_REGRESSION_SITE_FILTER ?? "").map((item) => item.toLowerCase());
 const selectedSites = siteFilter.length === 0

@@ -1,4 +1,4 @@
-import type { PageController, TranslationPageSummary } from "./pageController";
+import type { PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
 import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicModeSource, type DynamicTranslationMode } from "./sitePolicy";
 import type { TranslationDiagnostics } from "./translationDiagnostics";
 
@@ -399,10 +399,24 @@ export class PageTranslationSession {
     this.setStatus({ ...this.status, phase: "updating", observation: "observing", lastError: undefined });
 
     try {
-      const dynamicSummary = await this.controller.translateNewContents(roots);
+      let reportedSummary: TranslationPageSummary = { ...EMPTY_SUMMARY };
+      const reportProgress = (delta: TranslationProgressDelta): void => {
+        if (operationId !== this.operationId) return;
+        reportedSummary = mergeSummary(reportedSummary, delta);
+        const nextSummary = mergeSummary(this.status, delta);
+        this.setStatus({
+          ...nextSummary,
+          phase: isSummaryComplete(nextSummary) ? phaseFromSummary(nextSummary) : "updating",
+          observation: "observing",
+          dynamicRuns: this.status.dynamicRuns,
+          lastError: undefined,
+        });
+      };
+
+      const dynamicSummary = await this.controller.translateNewContents(roots, reportProgress);
 
       if (operationId !== this.operationId) return;
-      const summary = mergeSummary(this.status, dynamicSummary);
+      const summary = mergeSummary(this.status, subtractSummary(dynamicSummary, reportedSummary));
       const dynamicRuns = countDynamicRun && dynamicSummary.total > 0 ? this.status.dynamicRuns + 1 : this.status.dynamicRuns;
       const phase = phaseFromSummary(summary);
       this.setStatus({
@@ -545,12 +559,25 @@ function phaseFromSummary(summary: TranslationPageSummary): PageTranslationPhase
   return "translated";
 }
 
+function isSummaryComplete(summary: TranslationPageSummary): boolean {
+  return summary.total > 0 && summary.translated + summary.failed + summary.skipped >= summary.total;
+}
+
 function mergeSummary(left: TranslationPageSummary, right: TranslationPageSummary): TranslationPageSummary {
   return {
     total: left.total + right.total,
     translated: left.translated + right.translated,
     failed: left.failed + right.failed,
     skipped: left.skipped + right.skipped,
+  };
+}
+
+function subtractSummary(left: TranslationPageSummary, right: TranslationPageSummary): TranslationPageSummary {
+  return {
+    total: Math.max(0, left.total - right.total),
+    translated: Math.max(0, left.translated - right.translated),
+    failed: Math.max(0, left.failed - right.failed),
+    skipped: Math.max(0, left.skipped - right.skipped),
   };
 }
 
