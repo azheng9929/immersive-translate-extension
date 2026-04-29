@@ -5,6 +5,7 @@ import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
 import { OriginalTextTooltip } from "./originalTextTooltip";
 import { PageController } from "./pageController";
 import { PageTranslationSession } from "./pageTranslationSession";
+import { shouldHandleContentMessage } from "./contentMessagePolicy";
 import {
   providerChainId,
   translateBatchWithProviderFallback,
@@ -48,7 +49,10 @@ export async function runContentMain(): Promise<void> {
     inputTranslator?.mount();
     originalTextTooltip?.mount();
 
+    const isTopFrame = isCurrentTopFrame();
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (!shouldHandleContentMessage(message, isTopFrame)) return undefined;
+
       if (message?.type === "IMT_TRANSLATE_PAGE") {
         pageSession.translatePage().then(() => sendResponse({ ok: true }));
         return true;
@@ -84,6 +88,14 @@ export async function runContentMain(): Promise<void> {
     window.__IMT_CONTENT_READY__ = true;
   } finally {
     window.__IMT_CONTENT_MAIN_LOADING__ = false;
+  }
+}
+
+function isCurrentTopFrame(): boolean {
+  try {
+    return window.top === window;
+  } catch {
+    return false;
   }
 }
 
