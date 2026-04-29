@@ -1,5 +1,5 @@
 import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
-import { renderTranslation } from "./renderEngine";
+import { removeTranslationLoading, renderTranslation, renderTranslationLoading } from "./renderEngine";
 import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
 import type { DisplayMode } from "../shared/config";
@@ -331,6 +331,11 @@ export class PageController {
     onProgress: TranslationProgressListener | undefined,
   ): Promise<void> {
     const batch = missingUnits.map((entry) => entry.item);
+    for (const { unit } of missingUnits) {
+      this.records.push(...renderTranslationLoading(unit));
+      unit.state = "loading";
+    }
+
     const results = await this.translateBatchWithRetries(batch);
     if (revision !== this.revision) return;
 
@@ -343,6 +348,7 @@ export class PageController {
 
     for (const { unit } of missingUnits) {
       const result = resultById.get(unit.id);
+      removeTranslationLoading(unit);
       if (!result || result.status !== "ok") {
         unit.state = result?.status === "skipped" ? "skipped" : "failed";
         if (unit.state === "skipped") {

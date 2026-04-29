@@ -78,7 +78,52 @@ describe("PageController", () => {
     await translatePromise;
 
     expect(document.querySelector(".imt-translation-block")).toBeNull();
+    expect(document.querySelector(".imt-translation-loading")).toBeNull();
     expect(document.querySelector("p")?.textContent).toBe("Hello world.");
+  });
+
+  it("shows a loading dot while a text unit is translating and removes it after rendering", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    let resolveBatch: (() => void) | undefined;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        new Promise((resolve) => {
+          resolveBatch = () => {
+            resolve(items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })));
+          };
+        }),
+    });
+
+    const translatePromise = controller.translatePage();
+    await waitFor(() => document.querySelector(".imt-translation-loading") !== null);
+
+    const loading = document.querySelector<HTMLElement>(".imt-translation-loading");
+    expect(loading?.getAttribute("data-imt-managed")).toBe("true");
+    expect(loading?.getAttribute("aria-label")).toBe("Translating");
+    expect(document.querySelector("p")?.getAttribute("data-imt-state")).toBe("loading");
+
+    resolveBatch?.();
+    await translatePromise;
+
+    expect(document.querySelector(".imt-translation-loading")).toBeNull();
+    expect(document.querySelector("p")?.getAttribute("data-imt-state")).toBe("translated");
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+  });
+
+  it("removes loading dots when translation fails", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: "", status: "failed" as const, error: "provider failed" })),
+    });
+
+    await controller.translatePage();
+
+    expect(document.querySelector(".imt-translation-loading")).toBeNull();
+    expect(document.querySelector("p")?.getAttribute("data-imt-state")).toBeNull();
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
 
   it("renders progressive provider chunks as soon as each chunk returns", async () => {

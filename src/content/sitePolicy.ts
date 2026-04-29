@@ -33,6 +33,7 @@ export type SitePolicyOptions = {
 export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
   '[data-imt-managed="true"]',
   '[data-imt-skip="true"]',
+  '[data-imt-state="loading"]',
   '[data-imt-state="translated"]',
   '[translate="no"]',
   ".notranslate",
