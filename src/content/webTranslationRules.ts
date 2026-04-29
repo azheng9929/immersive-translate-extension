@@ -1,10 +1,12 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import type { DynamicMode } from "../shared/config";
+import { matchWebTranslationRule } from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
 import type { RuleArrayValue, RuleContentSelector, WebTranslationRule } from "../shared/webRuleTypes";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
 
 export type { RuleArrayValue, RuleContentSelector, WebTranslationRule };
+export { matchWebTranslationRule, selectWebTranslationRulesForContent } from "../shared/webRuleMatcher";
 
 type ResolvedWebTranslationRule = Omit<
   WebTranslationRule,
@@ -443,24 +445,6 @@ shreddit-comment,
 
 export const BUILTIN_WEB_TRANSLATION_RULES = CORE_WEB_TRANSLATION_RULES;
 
-export function matchWebTranslationRule(
-  url: string,
-  doc: Document | undefined = globalThis.document,
-  rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
-): WebTranslationRule | undefined {
-  return rules.find((rule) => hasSelectorConditions(rule) && matchesRule(url, doc, rule)) ??
-    rules.find((rule) => !hasSelectorConditions(rule) && matchesRule(url, doc, rule));
-}
-
-export function selectWebTranslationRulesForContent(
-  url: string,
-  rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
-): WebTranslationRule[] {
-  const selectorRules = rules.filter(hasSelectorConditions);
-  const matchedUrlRule = rules.find((rule) => !hasSelectorConditions(rule) && matchesUrlOnly(url, rule));
-  return matchedUrlRule ? [...selectorRules, matchedUrlRule] : selectorRules;
-}
-
 export function resolveWebTranslationRule(
   url: string,
   doc: Document | undefined = globalThis.document,
@@ -622,73 +606,6 @@ function contentSelectorKey(item: RuleContentSelector): string {
   return `${item.selector}:${item.category}`;
 }
 
-function matchesRule(url: string, doc: Document | undefined, rule: WebTranslationRule): boolean {
-  if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (rule.selectorMatches?.length && (!doc || !rule.selectorMatches.some((selector) => hasSelector(doc, selector)))) return false;
-  if (doc && rule.excludeSelectorMatches?.some((selector) => hasSelector(doc, selector))) return false;
-  return true;
-}
-
-function matchesUrlOnly(url: string, rule: WebTranslationRule): boolean {
-  if (!rule.matches?.length) return false;
-  if (!rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  return !rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern));
-}
-
-function hasSelectorConditions(rule: WebTranslationRule): boolean {
-  return Boolean(rule.selectorMatches?.length || rule.excludeSelectorMatches?.length);
-}
-
-function matchesUrlPattern(url: string, pattern: string): boolean {
-  const parsed = parseUrl(url);
-  if (!parsed) return false;
-  const normalizedPattern = pattern.trim().toLowerCase();
-
-  if (!normalizedPattern.includes("://")) {
-    return matchesHostPattern(parsed, normalizedPattern);
-  }
-
-  const escaped = normalizedPattern.split("*").map(escapeRegExp).join(".*");
-  return new RegExp(`^${escaped}$`, "i").test(parsed.href.toLowerCase());
-}
-
-function matchesHostPattern(parsed: URL, pattern: string): boolean {
-  const host = parsed.hostname.toLowerCase();
-  const hostAndPath = `${host}${parsed.pathname}${parsed.search}${parsed.hash}`.toLowerCase();
-
-  if (pattern.includes("/")) {
-    return wildcardPatternToRegExp(pattern).test(hostAndPath);
-  }
-
-  const normalizedHost = host.replace(/^www\./, "");
-  const normalizedPattern = pattern.replace(/^www\./, "");
-
-  if (normalizedPattern.startsWith("*.")) {
-    const domain = normalizedPattern.slice(2);
-    return host === domain || host.endsWith(`.${domain}`);
-  }
-
-  if (normalizedPattern.includes("*")) {
-    return wildcardPatternToRegExp(normalizedPattern).test(normalizedHost);
-  }
-
-  return normalizedHost === normalizedPattern || normalizedHost.endsWith(`.${normalizedPattern}`);
-}
-
-function wildcardPatternToRegExp(pattern: string): RegExp {
-  const escaped = pattern.split("*").map(escapeRegExp).join(".*");
-  return new RegExp(`^${escaped}$`, "i");
-}
-
-function hasSelector(doc: Document, selector: string): boolean {
-  try {
-    return Boolean(doc.querySelector(selector));
-  } catch {
-    return false;
-  }
-}
-
 function applyDynamicMode(policy: SitePolicy, dynamicMode: DynamicMode): SitePolicy {
   if (dynamicMode === "off") return { ...policy, dynamicMode: "off" };
   if (dynamicMode === "conservative") return { ...policy, ...DYNAMIC_PRESETS.conservative };
@@ -709,8 +626,4 @@ function urlFromHostnameFallback(value: string, hostname: string): string {
 
 function normalizeHostname(hostname: string): string {
   return hostname.trim().toLowerCase().replace(/:\d+$/, "");
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 }
