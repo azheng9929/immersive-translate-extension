@@ -10,6 +10,12 @@ export default defineConfig({
     description: "Intelligent full-page immersive translation.",
     permissions: ["storage", "contextMenus", "activeTab"],
     host_permissions: ["<all_urls>"],
+    web_accessible_resources: [
+      {
+        resources: ["content-main.js", "chunks/*.js"],
+        matches: ["<all_urls>"],
+      },
+    ],
     icons: {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

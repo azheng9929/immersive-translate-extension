@@ -25,6 +25,7 @@ export type SitePolicy = {
   maxMutationNodesPerWindow: number;
   mutationWindowMs: number;
   excludedDynamicSelectors: readonly string[];
+  injectedCss: readonly string[];
 };
 
 export type SitePolicyOptions = {
@@ -87,9 +88,27 @@ const TWITTER_PREFERRED_SCAN_ROOT_SELECTORS = [
   'article[data-testid="tweet"] div[data-testid="tweetText"]',
   'div[data-testid="tweetText"]',
   'div[data-testid="UserDescription"]',
+  '[data-testid="birdwatch-pivot"]',
+  '[data-testid="tweetTextarea_0RichTextInputContainer"]',
   '[data-testid="card.layoutSmall.detail"] > div:nth-child(2)',
   '[data-testid="developerBuiltCardContainer"] > div:nth-child(2)',
   '[data-testid="card.layoutLarge.detail"] > div:nth-child(2)',
+] as const;
+
+const TWITTER_INJECTED_CSS = [
+  `
+[data-testid="tweetText"],
+[data-testid="tweetText"] *,
+[data-testid="UserDescription"],
+[data-testid="UserDescription"] *,
+[data-testid="card.layoutSmall.detail"],
+[data-testid="card.layoutLarge.detail"] {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
 ] as const;
 
 const YOUTUBE_EXCLUDED_DYNAMIC_SELECTORS = [
@@ -105,6 +124,33 @@ const YOUTUBE_EXCLUDED_DYNAMIC_SELECTORS = [
   "#hover-overlays",
 ] as const;
 
+const YOUTUBE_PREFERRED_SCAN_ROOT_SELECTORS = [
+  "ytd-watch-metadata h1",
+  "#video-title",
+  "#description-inline-expander",
+  "#description",
+  "#content-text",
+  "ytd-comment-view-model #content-text",
+  "ytd-transcript-segment-renderer",
+  "yt-formatted-string.ytd-channel-name",
+] as const;
+
+const YOUTUBE_INJECTED_CSS = [
+  `
+#video-title,
+#description,
+#description-inline-expander,
+#content-text,
+ytd-watch-metadata h1,
+ytd-transcript-segment-renderer {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
+] as const;
+
 const REDDIT_EXCLUDED_DYNAMIC_SELECTORS = [
   ...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   "faceplate-hovercard",
@@ -113,6 +159,29 @@ const REDDIT_EXCLUDED_DYNAMIC_SELECTORS = [
   "shreddit-comment-overflow-menu",
   "faceplate-tracker",
   "faceplate-number",
+] as const;
+
+const REDDIT_PREFERRED_SCAN_ROOT_SELECTORS = [
+  'shreddit-post [slot="title"]',
+  'shreddit-post [slot="text-body"]',
+  "shreddit-comment",
+  "[data-testid='post-content']",
+  "[data-test-id='comment']",
+] as const;
+
+const REDDIT_INJECTED_CSS = [
+  `
+shreddit-post [slot="title"],
+shreddit-post [slot="text-body"],
+shreddit-comment,
+[data-testid="post-content"],
+[data-test-id="comment"] {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
 ] as const;
 
 const DEFAULT_SITE_POLICY: SitePolicy = {
@@ -135,6 +204,7 @@ const DEFAULT_SITE_POLICY: SitePolicy = {
   maxMutationNodesPerWindow: 1000,
   mutationWindowMs: 5000,
   excludedDynamicSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
+  injectedCss: [],
 };
 
 const CONSERVATIVE_DYNAMIC_LIMITS = {
@@ -202,18 +272,23 @@ const TWITTER_SITE_POLICY: SitePolicy = {
   preferredScanRootSelectors: TWITTER_PREFERRED_SCAN_ROOT_SELECTORS,
   allowTooltip: false,
   excludedDynamicSelectors: TWITTER_EXCLUDED_DYNAMIC_SELECTORS,
+  injectedCss: TWITTER_INJECTED_CSS,
 };
 
 const YOUTUBE_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
   ...CONSERVATIVE_DYNAMIC_LIMITS,
+  preferredScanRootSelectors: YOUTUBE_PREFERRED_SCAN_ROOT_SELECTORS,
   excludedDynamicSelectors: YOUTUBE_EXCLUDED_DYNAMIC_SELECTORS,
+  injectedCss: YOUTUBE_INJECTED_CSS,
 };
 
 const REDDIT_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
   ...CONSERVATIVE_DYNAMIC_LIMITS,
+  preferredScanRootSelectors: REDDIT_PREFERRED_SCAN_ROOT_SELECTORS,
   excludedDynamicSelectors: REDDIT_EXCLUDED_DYNAMIC_SELECTORS,
+  injectedCss: REDDIT_INJECTED_CSS,
 };
 
 const METATFT_SITE_POLICY: SitePolicy = {

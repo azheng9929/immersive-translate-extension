@@ -32,6 +32,7 @@ describe("sitePolicy", () => {
       expect(policy.excludedDynamicSelectors).toContain('[role="tooltip"]');
       expect(policy.excludedDynamicSelectors).toContain('[data-testid="sidebarColumn"]');
       expect(policy.preferredScanRootSelectors).toContain('div[data-testid="tweetText"]');
+      expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
     }
   });
 
@@ -43,6 +44,7 @@ describe("sitePolicy", () => {
       expect(policy.dynamicModeSource).toBe("site-default");
       expect(policy.isHighDynamic).toBe(true);
       expect(policy.maxQueueSize).toBeLessThan(resolveSitePolicy("example.com").maxQueueSize);
+      expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
     }
   });
 
