@@ -407,6 +407,16 @@ function endpointSummary(value: string): string {
       </label>
 
       <label class="toggle-row">
+        <span>Input translator</span>
+        <input
+          data-testid="popup-input-translator-toggle"
+          type="checkbox"
+          :checked="config.showInputTranslator"
+          @change="updateConfig({ showInputTranslator: ($event.target as HTMLInputElement).checked })"
+        />
+      </label>
+
+      <label class="toggle-row">
         <span>Cache</span>
         <input type="checkbox" :checked="config.useCache" @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })" />
       </label>

@@ -45,6 +45,7 @@ export type ExtensionConfig = {
   siteRules: SiteRules;
   siteDynamicModes: SiteDynamicModeOverrides;
   showFloatingBall: boolean;
+  showInputTranslator: boolean;
   useCache: boolean;
 };
 
@@ -77,6 +78,7 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   siteRules: {},
   siteDynamicModes: {},
   showFloatingBall: true,
+  showInputTranslator: false,
   useCache: true,
 };
 
@@ -153,6 +155,7 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     siteRules: normalizeSiteRules(input.siteRules),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
     showFloatingBall: normalizeBoolean(input.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall),
+    showInputTranslator: normalizeBoolean(input.showInputTranslator, DEFAULT_EXTENSION_CONFIG.showInputTranslator),
     useCache: normalizeBoolean(input.useCache, DEFAULT_EXTENSION_CONFIG.useCache),
   };
 }
@@ -187,6 +190,7 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("siteRules" in value) patch.siteRules = normalizeSiteRules(value.siteRules);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
   if ("showFloatingBall" in value) patch.showFloatingBall = normalizeBoolean(value.showFloatingBall, DEFAULT_EXTENSION_CONFIG.showFloatingBall);
+  if ("showInputTranslator" in value) patch.showInputTranslator = normalizeBoolean(value.showInputTranslator, DEFAULT_EXTENSION_CONFIG.showInputTranslator);
   if ("useCache" in value) patch.useCache = normalizeBoolean(value.useCache, DEFAULT_EXTENSION_CONFIG.useCache);
   return patch;
 }

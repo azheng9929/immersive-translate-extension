@@ -37,6 +37,33 @@ describe("popup App", () => {
     expect(wrapper.find("[data-testid='dynamic-mode-off']").classes()).toContain("active");
   });
 
+  it("keeps input translation off by default and saves the popup toggle", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const toggle = wrapper.find<HTMLInputElement>("[data-testid='popup-input-translator-toggle']");
+    expect(toggle.element.checked).toBe(false);
+
+    await toggle.setValue(true);
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { showInputTranslator: true },
+    });
+  });
+
   it("shows and saves OpenAI API settings from the popup", async () => {
     let config: ExtensionConfig = {
       ...DEFAULT_EXTENSION_CONFIG,

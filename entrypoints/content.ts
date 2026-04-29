@@ -29,7 +29,7 @@ export default defineContentScript({
     let config = await loadConfig();
     let pageSession = createPageSession(config);
     let selectionTranslator = createSelectionTranslator(config);
-    let inputTranslator = createInputTranslator(config);
+    let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
     const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => pageSession.translatePage(),
@@ -39,7 +39,7 @@ export default defineContentScript({
     });
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
-    inputTranslator.mount();
+    inputTranslator?.mount();
     originalTextTooltip?.mount();
 
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -62,9 +62,9 @@ export default defineContentScript({
         selectionTranslator.unmount();
         selectionTranslator = createSelectionTranslator(config);
         selectionTranslator.mount();
-        inputTranslator.unmount();
-        inputTranslator = createInputTranslator(config);
-        inputTranslator.mount();
+        inputTranslator?.unmount();
+        inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
+        inputTranslator?.mount();
         floatingControl.hide();
         if (config.showFloatingBall) floatingControl.mount();
         sendResponse({ ok: true });

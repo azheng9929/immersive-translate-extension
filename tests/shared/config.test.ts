@@ -49,6 +49,7 @@ describe("normalizeExtensionConfig", () => {
           "bad.example": "aggressive",
         },
         showFloatingBall: false,
+        showInputTranslator: true,
         useCache: false,
       }),
     ).toEqual({
@@ -91,6 +92,7 @@ describe("normalizeExtensionConfig", () => {
         "x.com": "off",
       },
       showFloatingBall: false,
+      showInputTranslator: true,
       useCache: false,
     });
   });
@@ -109,6 +111,7 @@ describe("normalizeExtensionConfig", () => {
         },
         siteDynamicModes: "youtube.com",
         showFloatingBall: "yes",
+        showInputTranslator: "yes",
         useCache: "no",
       }),
     ).toEqual(DEFAULT_EXTENSION_CONFIG);

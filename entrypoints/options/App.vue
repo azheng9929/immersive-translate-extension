@@ -466,6 +466,47 @@ function buildSiteRulePatch(): SiteRule {
       </div>
     </section>
 
+    <section class="panel" aria-label="Interaction controls" :aria-busy="isLoading">
+      <div class="panel-heading">
+        <div>
+          <h2>Interaction controls</h2>
+          <p>Choose which page-level tools stay available while browsing.</p>
+        </div>
+      </div>
+
+      <div class="toggle-list">
+        <label class="toggle-row">
+          <span>Floating ball</span>
+          <input
+            data-testid="options-floating-ball-toggle"
+            type="checkbox"
+            :checked="config.showFloatingBall"
+            @change="updateConfig({ showFloatingBall: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+
+        <label class="toggle-row">
+          <span>Input translator</span>
+          <input
+            data-testid="options-input-translator-toggle"
+            type="checkbox"
+            :checked="config.showInputTranslator"
+            @change="updateConfig({ showInputTranslator: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+
+        <label class="toggle-row">
+          <span>Cache</span>
+          <input
+            data-testid="options-cache-toggle"
+            type="checkbox"
+            :checked="config.useCache"
+            @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+      </div>
+    </section>
+
     <section class="panel" aria-label="Personalization settings" :aria-busy="isLoading">
       <div class="panel-heading">
         <div>
@@ -816,6 +857,25 @@ p {
   gap: 6px;
 }
 
+.toggle-list {
+  display: grid;
+  gap: 10px;
+}
+
+.toggle-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 2px;
+}
+
+.toggle-row > span {
+  color: #52627a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .field > span {
   color: #52627a;
   font-size: 12px;
@@ -838,6 +898,12 @@ select,
 input {
   min-height: 36px;
   padding: 0 10px;
+}
+
+input[type="checkbox"] {
+  width: 38px;
+  height: 22px;
+  accent-color: #14a896;
 }
 
 textarea {

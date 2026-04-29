@@ -33,6 +33,47 @@ describe("options App", () => {
     expect(wrapper.find("[data-testid='options-dynamic-mode-conservative']").classes()).toContain("active");
   });
 
+  it("keeps input translation off by default and saves interaction toggles", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const inputTranslator = wrapper.find<HTMLInputElement>("[data-testid='options-input-translator-toggle']");
+    const floatingBall = wrapper.find<HTMLInputElement>("[data-testid='options-floating-ball-toggle']");
+    const cache = wrapper.find<HTMLInputElement>("[data-testid='options-cache-toggle']");
+    expect(inputTranslator.element.checked).toBe(false);
+    expect(floatingBall.element.checked).toBe(true);
+    expect(cache.element.checked).toBe(true);
+
+    await inputTranslator.setValue(true);
+    await floatingBall.setValue(false);
+    await cache.setValue(false);
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { showInputTranslator: true },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { showFloatingBall: false },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { useCache: false },
+    });
+  });
+
   it("saves OpenAI-compatible API settings from the settings page", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
     const sendMessage = vi.fn(async (message) => {
