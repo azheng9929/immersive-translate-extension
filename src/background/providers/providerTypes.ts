@@ -20,6 +20,7 @@ export type ProviderRequest = {
   systemPrompt?: string;
   sourceLang?: string;
   targetLang: string;
+  pageTitle?: string | undefined;
   items: ProviderRequestItem[];
 };
 

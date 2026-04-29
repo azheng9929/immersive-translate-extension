@@ -29,6 +29,7 @@ type ControllerOptions = {
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
   preferredScanRootSelectors?: readonly string[];
+  getPageTitle?: () => string | undefined;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -198,6 +199,7 @@ export class PageController {
 
   private buildCacheLookups(units: TranslationUnit[]): Map<string, TranslationCacheLookup> {
     const provider = this.options.providerId ?? "default";
+    const pageTitle = this.options.getPageTitle?.();
     return new Map(
       units.map((unit) => [
         unit.id,
@@ -205,6 +207,7 @@ export class PageController {
           provider,
           sourceLang: unit.sourceLang ?? "auto",
           targetLang: unit.targetLang,
+          pageTitle,
           normalizedText: unit.normalizedText,
         }),
       ]),

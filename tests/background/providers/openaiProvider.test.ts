@@ -346,6 +346,27 @@ describe("openaiProvider", () => {
     const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(body.messages[0].content).toBe("Translate from en to zh-Hans.");
   });
+  it("injects page title context into Immersive-style title prompts", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(openAIResponse([{ id: "u-1", text: "best-comps-zh", status: "ok" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await openaiProvider.translate({
+      provider: "openai-compatible",
+      endpoint: "https://api.example.test/v1/chat/completions",
+      apiKey: "secret",
+      systemPrompt: "Rules.{{title_prompt}}\nRaw title: {{imt_title}}",
+      sourceLang: "en",
+      targetLang: "zh-Hans",
+      pageTitle: "MetaTFT - Best TFT Comps",
+      items: [{ id: "u-1", text: "Best comps", category: "heading" }],
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.messages[0].content).toContain("Title: 《MetaTFT - Best TFT Comps》");
+    expect(body.messages[0].content).toContain("Raw title: MetaTFT - Best TFT Comps");
+    expect(body.messages[0].content).not.toContain("{{title_prompt}}");
+    expect(body.messages[0].content).not.toContain("{{imt_title}}");
+  });
 });
 
 function openAIResponse(

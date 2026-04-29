@@ -3,6 +3,7 @@ export type TranslationCacheLookup = {
   provider: string;
   sourceLang: string;
   targetLang: string;
+  pageTitle: string;
   normalizedText: string;
 };
 
@@ -32,6 +33,7 @@ type LookupInput = {
   provider: string;
   sourceLang?: string;
   targetLang: string;
+  pageTitle?: string | undefined;
   normalizedText: string;
 };
 
@@ -44,13 +46,15 @@ export function createTranslationCacheLookup(input: LookupInput): TranslationCac
   const provider = normalizeCachePart(input.provider || "default");
   const sourceLang = normalizeCachePart(input.sourceLang || "auto");
   const targetLang = normalizeCachePart(input.targetLang);
+  const pageTitle = normalizeContext(input.pageTitle);
   const normalizedText = input.normalizedText;
 
   return {
-    key: ["imt-v1", provider, sourceLang, targetLang, hashText(normalizedText)].join(KEY_SEPARATOR),
+    key: ["imt-v2", provider, sourceLang, targetLang, hashText(pageTitle), hashText(normalizedText)].join(KEY_SEPARATOR),
     provider,
     sourceLang,
     targetLang,
+    pageTitle,
     normalizedText,
   };
 }
@@ -88,7 +92,12 @@ export class IndexedDbTranslationCache implements TranslationCache {
       const stored = storedEntries[index];
       if (!stored) continue;
       if (stored.normalizedText !== lookup.normalizedText) continue;
-      if (stored.provider !== lookup.provider || stored.sourceLang !== lookup.sourceLang || stored.targetLang !== lookup.targetLang) continue;
+      if (
+        stored.provider !== lookup.provider ||
+        stored.sourceLang !== lookup.sourceLang ||
+        stored.targetLang !== lookup.targetLang ||
+        stored.pageTitle !== lookup.pageTitle
+      ) continue;
       if (now - stored.createdAt > this.maxAgeMs) continue;
       hits.set(lookup.key, stored.translatedText);
     }
@@ -160,6 +169,10 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 
 function normalizeCachePart(value: string): string {
   return value.trim().toLowerCase() || "auto";
+}
+
+function normalizeContext(value: string | undefined): string {
+  return value?.replace(/\s+/g, " ").trim().slice(0, 200) ?? "";
 }
 
 function hashText(value: string): string {

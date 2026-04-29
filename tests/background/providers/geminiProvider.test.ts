@@ -196,6 +196,27 @@ describe("geminiProvider", () => {
     const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(body.system_instruction.parts[0].text).toBe("Translate from en to zh-Hans.");
   });
+  it("injects page title context into Immersive-style title prompts", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(geminiResponse([{ id: "u-1", text: "best-comps-zh", status: "ok" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await geminiProvider.translate({
+      provider: "gemini",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta",
+      apiKey: "gemini-secret",
+      systemPrompt: "Rules.{{title_prompt}}\nRaw title: {{imt_title}}",
+      sourceLang: "en",
+      targetLang: "zh-Hans",
+      pageTitle: "MetaTFT - Best TFT Comps",
+      items: [{ id: "u-1", text: "Best comps", category: "heading" }],
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.system_instruction.parts[0].text).toContain("Title: 《MetaTFT - Best TFT Comps》");
+    expect(body.system_instruction.parts[0].text).toContain("Raw title: MetaTFT - Best TFT Comps");
+    expect(body.system_instruction.parts[0].text).not.toContain("{{title_prompt}}");
+    expect(body.system_instruction.parts[0].text).not.toContain("{{imt_title}}");
+  });
 });
 
 function geminiResponse(items: Array<{ id: string; text: string; status: string }>) {

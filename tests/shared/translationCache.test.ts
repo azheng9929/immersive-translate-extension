@@ -92,4 +92,31 @@ describe("TranslationCache", () => {
     const hits = await cache.getMany([{ ...lookup, normalizedText: "different text" }]);
     expect(hits.has(lookup.key)).toBe(false);
   });
+
+  it("does not reuse entries across different page titles", async () => {
+    const cache = new IndexedDbTranslationCache({
+      dbName: `imt-cache-${crypto.randomUUID()}`,
+      indexedDB: indexedDB as unknown as IDBFactory,
+    });
+    const metatftLookup = createTranslationCacheLookup({
+      provider: "mock",
+      sourceLang: "auto",
+      targetLang: "zh-Hans",
+      pageTitle: "MetaTFT - Best TFT Comps",
+      normalizedText: "Comps",
+    });
+    const githubLookup = createTranslationCacheLookup({
+      provider: "mock",
+      sourceLang: "auto",
+      targetLang: "zh-Hans",
+      pageTitle: "GitHub Pull Requests",
+      normalizedText: "Comps",
+    });
+
+    await cache.putMany([{ ...metatftLookup, translatedText: "TFT阵容" }]);
+
+    const hits = await cache.getMany([metatftLookup, githubLookup]);
+    expect(hits.get(metatftLookup.key)).toBe("TFT阵容");
+    expect(hits.has(githubLookup.key)).toBe(false);
+  });
 });

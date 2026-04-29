@@ -95,6 +95,30 @@ describe("PageController", () => {
     expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
   });
 
+  it("keys cached translations by page title context", async () => {
+    document.body.innerHTML = `<main><p>Comps</p></main>`;
+    const cache = new MemoryTranslationCache();
+    let pageTitle = "MetaTFT - Best TFT Comps";
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      providerId: "mock",
+      cache,
+      getPageTitle: () => pageTitle,
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) => ({ id: item.id, text: `[${pageTitle}] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    pageTitle = "GitHub Pull Requests";
+    await controller.translatePage();
+
+    expect(batchCalls).toBe(2);
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[GitHub Pull Requests] Comps");
+  });
+
   it("does not cache failed translation results", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
     const cache = new MemoryTranslationCache();

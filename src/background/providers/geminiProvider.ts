@@ -59,6 +59,7 @@ async function translateChunk(
             text: renderTranslationPromptTemplate(options.systemPrompt, {
               sourceLang: request.sourceLang,
               targetLang: request.targetLang,
+              pageTitle: request.pageTitle,
             }),
           },
         ],

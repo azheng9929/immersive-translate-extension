@@ -92,6 +92,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
+    getPageTitle: readPageTitleContext,
     retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: (items) => translateBatchWithProviderFallback(
       config,
@@ -178,6 +179,7 @@ async function sendProviderBatch(
       ...providerRequestOptions(config, provider),
       sourceLang: "auto",
       targetLang: config.targetLang,
+      pageTitle: readPageTitleContext(),
       items,
     },
   });
@@ -213,6 +215,11 @@ function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProv
     requestTimeoutMs: config.openaiRequestTimeoutMs,
     systemPrompt: buildGlossarySystemPrompt(config.openaiSystemPrompt, config.glossary),
   };
+}
+
+function readPageTitleContext(): string | undefined {
+  const title = document.title.replace(/\s+/g, " ").trim();
+  return title.length > 0 ? title.slice(0, 200) : undefined;
 }
 
 async function copyToClipboard(text: string): Promise<void> {

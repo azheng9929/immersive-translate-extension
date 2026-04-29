@@ -122,6 +122,7 @@ function openAIRequestBody(
         content: renderTranslationPromptTemplate(options.systemPrompt, {
           sourceLang: request.sourceLang,
           targetLang: request.targetLang,
+          pageTitle: request.pageTitle,
         }),
       },
       {
