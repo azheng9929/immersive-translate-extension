@@ -64,4 +64,47 @@ describe("microsoftProvider", () => {
       }),
     ).rejects.toThrow("Microsoft auth failed: 403");
   });
+
+  it("splits large requests while reusing one auth token", async () => {
+    const translateBatchSizes: number[] = [];
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      if (String(input) === "https://edge.microsoft.com/translate/auth") {
+        return {
+          ok: true,
+          text: async () => "edge-token",
+        };
+      }
+
+      const body = JSON.parse(String(init?.body ?? "[]")) as Array<{ Text: string }>;
+      translateBatchSizes.push(body.length);
+      return {
+        ok: true,
+        json: async () =>
+          body.map((item) => ({
+            detectedLanguage: { language: "en" },
+            translations: [{ text: `zh:${item.Text}`, to: "zh-Hans" }],
+          })),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = Array.from({ length: 55 }, (_, index) => ({
+      id: `u-${index}`,
+      text: `Text ${index}`,
+      category: "content-block" as const,
+    }));
+
+    const result = await microsoftProvider.translate({
+      provider: "microsoft",
+      targetLang: "zh-Hans",
+      maxConcurrentRequests: 1,
+      items,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(translateBatchSizes).toEqual([50, 5]);
+    expect(result).toHaveLength(55);
+    expect(result[0]).toEqual({ id: "u-0", text: "zh:Text 0", detectedLang: "en", status: "ok" });
+    expect(result[54]).toEqual({ id: "u-54", text: "zh:Text 54", detectedLang: "en", status: "ok" });
+  });
 });

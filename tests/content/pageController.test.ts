@@ -238,6 +238,38 @@ describe("PageController", () => {
     expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
 
+  it("translates multiple supplemental roots in one provider batch", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const batchSizes: number[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        batchSizes.push(items.length);
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+    const firstLateParagraph = document.createElement("p");
+    firstLateParagraph.textContent = "First late content.";
+    const secondLateParagraph = document.createElement("p");
+    secondLateParagraph.textContent = "Second late content.";
+    document.querySelector("main")?.append(firstLateParagraph, secondLateParagraph);
+
+    const result = await controller.translateNewContents([firstLateParagraph, secondLateParagraph]);
+
+    expect(result).toEqual({
+      total: 2,
+      translated: 2,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(batchSizes).toEqual([1, 2]);
+    expect(requestedTexts).toEqual(["Hello world.", "First late content.", "Second late content."]);
+  });
+
   it("skips already translated areas during supplemental scans", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
     let batchCalls = 0;

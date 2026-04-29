@@ -22,7 +22,18 @@ const sites = [
   { name: "X", host: "x.com", url: "https://x.com/explore" },
   { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
+  { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
 ];
+const siteFilter = parseCsv(process.env.IMT_REGRESSION_SITE_FILTER ?? "").map((item) => item.toLowerCase());
+const selectedSites = siteFilter.length === 0
+  ? sites
+  : sites.filter((site) =>
+      siteFilter.some((filter) =>
+        site.name.toLowerCase().includes(filter) ||
+        site.host.toLowerCase().includes(filter) ||
+        site.url.toLowerCase().includes(filter),
+      )
+    );
 
 const baseConfig = {
   targetLang: "zh-Hans",
@@ -87,6 +98,7 @@ async function main() {
     provider,
     dynamicModes,
     config: publicConfig(baseConfig),
+    siteFilter,
     sites: [],
   };
 
@@ -99,7 +111,7 @@ async function main() {
     for (const dynamicMode of dynamicModes) {
       const config = { ...baseConfig, dynamicMode };
       await setExtensionConfig(serviceWorkerSession, config);
-      for (const site of sites) {
+      for (const site of selectedSites) {
         const siteResult = await runSiteRegression(browserSession, serviceWorkerSession, extensionId, site, config);
         report.sites.push(siteResult);
         console.log(`${siteResult.ok ? "PASS" : "FAIL"} ${site.name} [${dynamicMode}]: ${siteResult.summary}`);
@@ -526,6 +538,7 @@ function validateProviderConfig(config) {
     if (!supportedDynamicModes.has(dynamicMode)) throw new Error(`Unsupported IMT_REGRESSION_DYNAMIC_MODES value: ${dynamicMode}`);
   }
   if (dynamicModes.length === 0) throw new Error("IMT_REGRESSION_DYNAMIC_MODES must include at least one mode");
+  if (selectedSites.length === 0) throw new Error(`IMT_REGRESSION_SITE_FILTER matched no sites: ${siteFilter.join(", ")}`);
   if (config.provider === "openai-compatible" && !config.openaiApiKey) {
     throw new Error("IMT_REGRESSION_OPENAI_API_KEY is required when IMT_REGRESSION_PROVIDER=openai-compatible");
   }

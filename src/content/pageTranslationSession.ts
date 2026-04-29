@@ -374,11 +374,7 @@ export class PageTranslationSession {
     this.setStatus({ ...this.status, phase: "updating", observation: "observing", lastError: undefined });
 
     try {
-      let dynamicSummary: TranslationPageSummary = { ...EMPTY_SUMMARY };
-      for (const root of roots) {
-        if (operationId !== this.operationId) return;
-        dynamicSummary = mergeSummary(dynamicSummary, await this.controller.translateNewContent(root));
-      }
+      const dynamicSummary = await this.controller.translateNewContents(roots);
 
       if (operationId !== this.operationId) return;
       const summary = mergeSummary(this.status, dynamicSummary);

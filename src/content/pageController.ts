@@ -50,11 +50,15 @@ export class PageController {
 
   async translatePage(root: ParentNode = document.body): Promise<TranslationPageSummary> {
     this.restorePage();
-    return this.translateRoot(root);
+    return this.translateRoots([root]);
   }
 
   async translateNewContent(root: ParentNode): Promise<TranslationPageSummary> {
-    return this.translateRoot(root);
+    return this.translateRoots([root]);
+  }
+
+  async translateNewContents(roots: readonly ParentNode[]): Promise<TranslationPageSummary> {
+    return this.translateRoots(roots);
   }
 
   collectTranslatableRoots(root: ParentNode = document.body): HTMLElement[] {
@@ -75,11 +79,13 @@ export class PageController {
     return cloneTranslationDiagnostics(this.diagnostics);
   }
 
-  private async translateRoot(root: ParentNode): Promise<TranslationPageSummary> {
+  private async translateRoots(roots: readonly ParentNode[]): Promise<TranslationPageSummary> {
+    if (roots.length === 0) return { total: 0, translated: 0, failed: 0, skipped: 0 };
+
     const revision = this.revision + 1;
     this.revision = revision;
 
-    const units = this.buildUnits(root, this.revision, this.diagnostics);
+    const units = this.buildUnitsForRoots(roots, this.revision, this.diagnostics);
     this.applyDisplayMode(units);
     this.units.push(...units);
 
@@ -150,13 +156,23 @@ export class PageController {
   }
 
   private buildUnits(root: ParentNode, revision: number, diagnostics: TranslationDiagnostics): TranslationUnit[] {
+    return this.buildUnitsForRoots([root], revision, diagnostics);
+  }
+
+  private buildUnitsForRoots(
+    roots: readonly ParentNode[],
+    revision: number,
+    diagnostics: TranslationDiagnostics,
+  ): TranslationUnit[] {
     const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
     const scanOptions = {
       ...(hostname ? { hostname } : {}),
       targetLang: this.options.targetLang,
       diagnostics,
     };
-    const scanRoots = collectScanRoots(root, this.options.preferredScanRootSelectors);
+    const scanRoots = dedupeParentNodes(
+      roots.flatMap((root) => collectScanRoots(root, this.options.preferredScanRootSelectors)),
+    );
     const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
     const attributes = scanRoots.flatMap((scanRoot) =>
       scanTranslatableAttributes(scanRoot, this.options.attributeNames, scanOptions),
@@ -322,4 +338,32 @@ function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[
   }
 
   return roots;
+}
+
+function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {
+  const accepted: ParentNode[] = [];
+
+  for (const candidate of roots) {
+    if (!(candidate instanceof Node)) {
+      accepted.push(candidate);
+      continue;
+    }
+
+    let shouldSkip = false;
+    for (const existing of [...accepted]) {
+      if (!(existing instanceof Node)) continue;
+      if (existing === candidate || existing.contains(candidate)) {
+        shouldSkip = true;
+        break;
+      }
+      if (candidate.contains(existing)) {
+        const index = accepted.indexOf(existing);
+        if (index >= 0) accepted.splice(index, 1);
+      }
+    }
+
+    if (!shouldSkip) accepted.push(candidate);
+  }
+
+  return accepted;
 }

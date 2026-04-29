@@ -379,6 +379,42 @@ describe("PageTranslationSession", () => {
       skipped: 0,
     });
   });
+
+  it("batches multiple visible lazy roots into one supplemental request", async () => {
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="first">First lazy paragraph.</p>
+        <p id="second">Second lazy paragraph.</p>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const batchSizes: number[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        batchSizes.push(items.length);
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+    });
+
+    await session.translatePage();
+    FakeIntersectionObserver.instances[0]?.triggerMany([
+      document.querySelector("#first")!,
+      document.querySelector("#second")!,
+    ]);
+    await waitFor(() => session!.getStatus().translated === 2);
+
+    expect(batchSizes).toEqual([2]);
+    expect(requestedTexts).toEqual(["First lazy paragraph.", "Second lazy paragraph."]);
+    expect(session.getStatus()).toMatchObject({ phase: "translated", total: 2, translated: 2 });
+  });
 });
 
 function createFakeIntersectionObserver() {
@@ -411,18 +447,22 @@ function createFakeIntersectionObserver() {
     }
 
     trigger(target: Element, isIntersecting = true): void {
+      this.triggerMany([target], isIntersecting);
+    }
+
+    triggerMany(targets: Element[], isIntersecting = true): void {
       this.callback(
-        [
-          {
-            target,
+        targets.map((target) =>
+          ({
             isIntersecting,
+            target,
             intersectionRatio: isIntersecting ? 1 : 0,
             boundingClientRect: target.getBoundingClientRect(),
             intersectionRect: target.getBoundingClientRect(),
             rootBounds: null,
             time: 0,
-          } as IntersectionObserverEntry,
-        ],
+          }) as IntersectionObserverEntry,
+        ),
         this as unknown as IntersectionObserver,
       );
     }
