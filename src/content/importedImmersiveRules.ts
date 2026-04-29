@@ -1,4 +1,4 @@
-import type { WebTranslationRule } from "./webTranslationRules";
+import type { WebTranslationRule } from "../shared/webRuleTypes";
 
 // Derived from the local chrome-immersive-translate-1_28_5 package.
 // Only webpage-translation fields are retained; PDF, OCR, image, subtitle, and product-platform fields are intentionally omitted.

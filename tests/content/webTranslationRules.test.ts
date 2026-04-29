@@ -152,26 +152,64 @@ describe("webTranslationRules", () => {
     ]);
   });
 
-  it("ships a scaled imported rule library with DOM-shape guarded rules", () => {
-    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeGreaterThan(80);
+  it("keeps imported rules out of content defaults but accepts page candidate rules", () => {
+    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeLessThan(20);
+
+    const mediumRule: WebTranslationRule = {
+      id: "medium",
+      siteKey: "medium.com",
+      matches: ["medium.com", "*.medium.com"],
+      selectorMatches: ["meta[property='al:ios:url'][content^='medium://']"],
+      selectors: ["article p"],
+      contentSelectors: [{ selector: "article p", category: "content-block" }],
+      isHighDynamic: true,
+    };
 
     document.head.innerHTML = "";
     document.body.innerHTML = `<article><p>Looks like an article, but not Medium.</p></article>`;
-    expect(resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", { document })).toMatchObject({
+    expect(
+      resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", {
+        document,
+        rules: [mediumRule],
+      }),
+    ).toMatchObject({
       isHighDynamic: false,
       preferredScanRootSelectors: [],
     });
 
     document.head.innerHTML = `<meta property="al:ios:url" content="medium://p/example">`;
-    expect(resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", { document })).toMatchObject({
+    expect(
+      resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", {
+        document,
+        rules: [mediumRule],
+      }),
+    ).toMatchObject({
       siteKey: "medium.com",
       isHighDynamic: true,
     });
   });
 
   it("maps imported always-on advanceMergeConfig rules to chat-style scheduling", () => {
-    const discordPolicy = resolveWebTranslationPolicy("https://discord.com/channels/1/2", "normal");
-    const telegramPolicy = resolveWebTranslationPolicy("https://web.telegram.org/z/#-123", "normal");
+    const chatRules: WebTranslationRule[] = [
+      {
+        id: "discord",
+        siteKey: "discord.com",
+        matches: ["https://discord.com/channels/*"],
+        advanceMergeConfig: [{ condition: "true", advanceConfig: { dynamicPreset: "chat-stream", isHighDynamic: true } }],
+      },
+      {
+        id: "telegram",
+        siteKey: "web.telegram.org",
+        matches: ["web.telegram.org/z/*"],
+        advanceMergeConfig: [{ condition: "true", advanceConfig: { dynamicPreset: "chat-stream", isHighDynamic: true } }],
+      },
+    ];
+    const discordPolicy = resolveWebTranslationPolicy("https://discord.com/channels/1/2", "normal", {
+      rules: chatRules,
+    });
+    const telegramPolicy = resolveWebTranslationPolicy("https://web.telegram.org/z/#-123", "normal", {
+      rules: chatRules,
+    });
 
     expect(discordPolicy).toMatchObject({
       siteKey: "discord.com",

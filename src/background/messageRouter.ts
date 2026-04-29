@@ -3,6 +3,7 @@ import { fakeProvider } from "./providers/fakeProvider";
 import { geminiProvider } from "./providers/geminiProvider";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
+import { getWebRulesForUrl } from "./webRuleStore";
 import type { ProviderRequest, ProviderResponseItem, TranslationProvider } from "./providers/providerTypes";
 import type { BackgroundMessage, ContentMessage, MessageResponse } from "../shared/messages";
 
@@ -49,6 +50,9 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
   if (message.type === "IMT_GET_CONFIG") {
     const config = await createConfigStore().load();
     return { ok: true, config };
+  }
+  if (message.type === "IMT_GET_WEB_RULES") {
+    return { ok: true, webRules: getWebRulesForUrl(message.url) };
   }
   if (message.type === "IMT_UPDATE_CONFIG") {
     const config = await createConfigStore().update(message.patch);

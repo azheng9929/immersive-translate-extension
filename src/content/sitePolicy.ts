@@ -1,5 +1,6 @@
 import type { DynamicMode } from "../shared/config";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
+import type { WebTranslationRule } from "../shared/webRuleTypes";
 import {
   DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   resolveWebTranslationPolicy,
@@ -43,6 +44,7 @@ export type SitePolicy = {
 export type SitePolicyOptions = {
   siteDynamicMode?: DynamicMode;
   document?: Document;
+  rules?: readonly WebTranslationRule[];
 };
 
 export function resolveSitePolicy(

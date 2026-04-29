@@ -62,6 +62,22 @@ describe("handleBackgroundMessage", () => {
     vi.unstubAllGlobals();
   });
 
+  it("returns only URL-relevant web translation rules for the current page", async () => {
+    const response = await handleBackgroundMessage({
+      type: "IMT_GET_WEB_RULES",
+      url: "https://medium.com/@writer/story",
+    });
+
+    expect(response).toMatchObject({ ok: true });
+    if (!response.ok || !("webRules" in response)) throw new Error("Expected webRules response");
+
+    expect(response.webRules.length).toBeGreaterThan(1);
+    expect(response.webRules.length).toBeLessThan(40);
+    expect(response.webRules.some((rule) => rule.id === "medium")).toBe(true);
+    expect(response.webRules.some((rule) => rule.id === "github")).toBe(false);
+    expect(response.webRules.some((rule) => rule.selectorMatches?.length)).toBe(true);
+  });
+
   it("forwards active tab page status requests from popup", async () => {
     const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
     const sendMessage = vi.fn().mockResolvedValue({

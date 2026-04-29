@@ -23,6 +23,7 @@ import {
 } from "../shared/config";
 import { buildGlossarySystemPrompt } from "../shared/glossary";
 import { IndexedDbTranslationCache } from "../shared/translationCache";
+import type { WebTranslationRule } from "../shared/webRuleTypes";
 
 export async function runContentMain(): Promise<void> {
   if (window.__IMT_CONTENT_READY__ || window.__IMT_CONTENT_MAIN_LOADING__) return;
@@ -31,9 +32,10 @@ export async function runContentMain(): Promise<void> {
   try {
     await waitForDocumentBody();
     let config = await loadConfig();
-    const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document });
+    let pageRules = await loadWebRules(window.location.href);
+    const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
     injectSitePolicyCss(sitePolicy);
-    let pageSession = createPageSession(config);
+    let pageSession = createPageSession(config, pageRules);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
     let cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
@@ -65,22 +67,26 @@ export async function runContentMain(): Promise<void> {
         sendResponse({ ok: true, status: pageSession.getStatus() });
       }
       if (message?.type === "IMT_CONFIG_UPDATED") {
-        cancelAutoTranslate?.();
-        pageSession.restorePage();
-        pageSession.dispose();
-        config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
-        injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document }));
-        pageSession = createPageSession(config);
-        cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
-        selectionTranslator.unmount();
-        selectionTranslator = createSelectionTranslator(config);
-        selectionTranslator.mount();
-        inputTranslator?.unmount();
-        inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
-        inputTranslator?.mount();
-        floatingControl.hide();
-        if (config.showFloatingBall) floatingControl.mount();
-        sendResponse({ ok: true });
+        void (async () => {
+          cancelAutoTranslate?.();
+          pageSession.restorePage();
+          pageSession.dispose();
+          config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
+          pageRules = await loadWebRules(window.location.href);
+          injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules }));
+          pageSession = createPageSession(config, pageRules);
+          cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
+          selectionTranslator.unmount();
+          selectionTranslator = createSelectionTranslator(config);
+          selectionTranslator.mount();
+          inputTranslator?.unmount();
+          inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
+          inputTranslator?.mount();
+          floatingControl.hide();
+          if (config.showFloatingBall) floatingControl.mount();
+          sendResponse({ ok: true });
+        })().catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        return true;
       }
       return undefined;
     });
@@ -125,6 +131,16 @@ async function loadConfig(): Promise<ExtensionConfig> {
   );
 }
 
+async function loadWebRules(url: string): Promise<WebTranslationRule[]> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "IMT_GET_WEB_RULES", url });
+    if (response?.ok && "webRules" in response && Array.isArray(response.webRules)) return response.webRules;
+  } catch {
+    // Core rules are bundled in content_main; imported rules are an optimization layer.
+  }
+  return [];
+}
+
 function createController(config: ExtensionConfig, sitePolicy: SitePolicy): PageController {
   const options: ConstructorParameters<typeof PageController>[0] = {
     targetLang: config.targetLang,
@@ -149,8 +165,8 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
   return new PageController(config.useCache ? { ...options, cache: new IndexedDbTranslationCache() } : options);
 }
 
-function createPageSession(config: ExtensionConfig): PageTranslationSession {
-  const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document });
+function createPageSession(config: ExtensionConfig, pageRules: readonly WebTranslationRule[]): PageTranslationSession {
+  const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,

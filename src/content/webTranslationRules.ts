@@ -1,55 +1,10 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import type { DynamicMode } from "../shared/config";
-import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
+import type { TranslatableAttributeName } from "../shared/types";
+import type { RuleArrayValue, RuleContentSelector, WebTranslationRule } from "../shared/webRuleTypes";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
-import { IMPORTED_IMMERSIVE_WEB_RULES } from "./importedImmersiveRules";
 
-export type RuleArrayValue<T> = readonly T[] | {
-  replace?: readonly T[];
-  add?: readonly T[];
-  remove?: readonly T[];
-};
-
-export type RuleContentSelector = {
-  selector: string;
-  category: UnitCategory;
-};
-
-export type WebTranslationRule = {
-  id: string;
-  siteKey?: string;
-  matches?: readonly string[];
-  excludeMatches?: readonly string[];
-  selectorMatches?: readonly string[];
-  excludeSelectorMatches?: readonly string[];
-  selectors?: RuleArrayValue<string>;
-  excludeSelectors?: RuleArrayValue<string>;
-  mutationExcludeSelectors?: RuleArrayValue<string>;
-  injectedCss?: RuleArrayValue<string>;
-  contentSelectors?: RuleArrayValue<RuleContentSelector>;
-  attributeNames?: RuleArrayValue<TranslatableAttributeName>;
-  dynamicPreset?: "normal" | "conservative" | "twitter-fast" | "metatft-fast" | "tactics-fast" | "chat-stream";
-  isHighDynamic?: boolean;
-  allowTooltip?: boolean;
-  paragraphMinTextCount?: number;
-  paragraphMinWordCount?: number;
-  blockMinTextCount?: number;
-  blockMinWordCount?: number;
-  debounceMs?: number;
-  lazyRootMargin?: string;
-  lazyThreshold?: number;
-  eagerLazyRootMargin?: string;
-  maxEagerLazyRoots?: number;
-  maxQueueSize?: number;
-  maxRootsPerFlush?: number;
-  maxObservedRoots?: number;
-  maxMutationNodesPerWindow?: number;
-  mutationWindowMs?: number;
-  advanceMergeConfig?: readonly {
-    condition: "always" | "true";
-    advanceConfig: Omit<WebTranslationRule, "id" | "matches" | "excludeMatches" | "selectorMatches" | "excludeSelectorMatches" | "advanceMergeConfig">;
-  }[];
-};
+export type { RuleArrayValue, RuleContentSelector, WebTranslationRule };
 
 type ResolvedWebTranslationRule = Omit<
   WebTranslationRule,
@@ -195,7 +150,7 @@ export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
   blockMinWordCount: 4,
 };
 
-const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
+export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
   {
     id: "x",
     siteKey: "x.com",
@@ -486,10 +441,7 @@ shreddit-comment,
   },
 ] as const;
 
-export const BUILTIN_WEB_TRANSLATION_RULES = [
-  ...CORE_WEB_TRANSLATION_RULES,
-  ...IMPORTED_IMMERSIVE_WEB_RULES,
-] as const satisfies readonly WebTranslationRule[];
+export const BUILTIN_WEB_TRANSLATION_RULES = CORE_WEB_TRANSLATION_RULES;
 
 export function matchWebTranslationRule(
   url: string,
@@ -512,11 +464,12 @@ export function selectWebTranslationRulesForContent(
 export function resolveWebTranslationRule(
   url: string,
   doc: Document | undefined = globalThis.document,
+  rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
 ): ResolvedWebTranslationRule {
-  const match = matchWebTranslationRule(url, doc);
+  const match = matchWebTranslationRule(url, doc, rules);
   if (!match) return mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" });
   const base = match.id === "twitter"
-    ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, BUILTIN_WEB_TRANSLATION_RULES[0]!)
+    ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, CORE_WEB_TRANSLATION_RULES[0]!)
     : GENERAL_WEB_TRANSLATION_RULE;
   return mergeWebTranslationRules(base, match);
 }
@@ -587,12 +540,13 @@ export function compileRulePolicy(
 export function resolveWebTranslationPolicy(
   url: string,
   preferredDynamicMode: DynamicMode = "normal",
-  options: { siteDynamicMode?: DynamicMode; document?: Document } = {},
+  options: { siteDynamicMode?: DynamicMode; document?: Document; rules?: readonly WebTranslationRule[] } = {},
 ): SitePolicy {
   const parsed = parseUrl(url);
   const hostname = parsed?.hostname ?? normalizeHostname(url);
+  const rules = options.rules ? [...CORE_WEB_TRANSLATION_RULES, ...options.rules] : BUILTIN_WEB_TRANSLATION_RULES;
   return compileRulePolicy(
-    resolveWebTranslationRule(urlFromHostnameFallback(url, hostname), options.document),
+    resolveWebTranslationRule(urlFromHostnameFallback(url, hostname), options.document, rules),
     hostname,
     preferredDynamicMode,
     options,
