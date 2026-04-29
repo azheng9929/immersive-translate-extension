@@ -27,6 +27,35 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("Ready");
   });
 
+  it("docks at the right center and can collapse into an edge handle", () => {
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 0, translated: 0, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+    });
+
+    control.mount(document.body);
+
+    const root = document.querySelector<HTMLElement>("[data-imt-control='root']");
+    expect(root?.dataset.imtDock).toBe("right-center");
+    expect(root?.dataset.collapsed).toBe("false");
+    expect(root?.querySelector("style")?.textContent).toContain("top: 50%");
+    expect(root?.querySelector("style")?.textContent).toContain("right: 0");
+
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
+
+    document.querySelector<HTMLButtonElement>("[data-imt-action='collapse']")?.click();
+
+    expect(document.querySelector<HTMLElement>("[data-imt-control='root']")?.dataset.collapsed).toBe("true");
+    expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
+    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-label")).toBe("Show translation controls");
+
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    expect(document.querySelector<HTMLElement>("[data-imt-control='root']")?.dataset.collapsed).toBe("false");
+    expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
+  });
+
   it("runs page translation and shows the translated summary", async () => {
     const translatePage = vi.fn().mockResolvedValue({ total: 3, translated: 2, failed: 1, skipped: 0 });
     const control = new FloatingTranslationControl({

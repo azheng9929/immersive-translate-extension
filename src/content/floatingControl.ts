@@ -15,9 +15,12 @@ type FloatingTranslationControlOptions = {
 const STYLE_TEXT = `
 .imt-floating-root {
   position: fixed;
-  right: 20px;
-  bottom: 22px;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
   z-index: 2147483646;
+  display: grid;
+  justify-items: end;
   color: #0f2a5f;
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
@@ -28,6 +31,7 @@ const STYLE_TEXT = `
   place-items: center;
   width: 44px;
   height: 44px;
+  margin-right: 12px;
   border: 1px solid rgba(255,255,255,0.72);
   border-radius: 999px;
   color: #ffffff;
@@ -36,9 +40,22 @@ const STYLE_TEXT = `
   cursor: pointer;
   font-size: 17px;
   font-weight: 700;
+  transition: transform 160ms ease, width 160ms ease, margin 160ms ease, border-radius 160ms ease, opacity 160ms ease;
 }
 .imt-floating-ball:hover {
-  transform: translateY(-1px);
+  transform: translateX(-2px);
+}
+.imt-floating-root[data-collapsed="true"] .imt-floating-ball {
+  width: 28px;
+  height: 44px;
+  margin-right: 0;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+  box-shadow: 0 10px 24px rgba(15, 42, 95, 0.18);
+  opacity: 0.86;
+}
+.imt-floating-root[data-collapsed="true"] .imt-floating-ball:hover {
+  transform: translateX(-3px);
 }
 .imt-floating-dot {
   position: absolute;
@@ -77,9 +94,12 @@ const STYLE_TEXT = `
 }
 .imt-floating-panel {
   position: absolute;
-  right: 0;
-  bottom: 54px;
+  top: 50%;
+  right: 64px;
+  transform: translateY(-50%);
   width: 248px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
   padding: 12px;
   border: 1px solid rgba(15, 42, 95, 0.12);
   border-radius: 14px;
@@ -175,11 +195,19 @@ const STYLE_TEXT = `
 .imt-floating-button-subtle:hover {
   background: #f4f7fb;
 }
+@media (max-height: 520px) {
+  .imt-floating-panel {
+    top: auto;
+    bottom: -22px;
+    transform: none;
+  }
+}
 `;
 
 export class FloatingTranslationControl {
   private root: HTMLElement | undefined;
   private expanded = false;
+  private collapsed = false;
   private state: FloatingState = "idle";
   private summary: FloatingStatus | undefined;
   private error: string | undefined;
@@ -235,7 +263,19 @@ export class FloatingTranslationControl {
   }
 
   private toggleExpanded(): void {
+    if (this.collapsed) {
+      this.collapsed = false;
+      this.expanded = true;
+      this.render();
+      return;
+    }
     this.expanded = !this.expanded;
+    this.render();
+  }
+
+  private collapseToEdge(): void {
+    this.collapsed = true;
+    this.expanded = false;
     this.render();
   }
 
@@ -243,6 +283,8 @@ export class FloatingTranslationControl {
     if (!this.root) return;
     this.root.textContent = "";
     this.root.dataset.state = this.state;
+    this.root.dataset.imtDock = "right-center";
+    this.root.dataset.collapsed = String(this.collapsed);
 
     const style = document.createElement("style");
     style.textContent = STYLE_TEXT;
@@ -251,8 +293,8 @@ export class FloatingTranslationControl {
     ball.type = "button";
     ball.className = "imt-floating-ball";
     ball.dataset.imtControl = "ball";
-    ball.setAttribute("aria-label", this.expanded ? "Close translation controls" : "Open translation controls");
-    ball.setAttribute("aria-expanded", String(this.expanded));
+    ball.setAttribute("aria-label", this.collapsed ? "Show translation controls" : this.expanded ? "Close translation controls" : "Open translation controls");
+    ball.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
     ball.textContent = "A";
     ball.addEventListener("click", () => this.toggleExpanded());
 
@@ -262,7 +304,7 @@ export class FloatingTranslationControl {
     ball.append(dot);
 
     this.root.append(style);
-    if (this.expanded) this.root.append(this.createPanel());
+    if (this.expanded && !this.collapsed) this.root.append(this.createPanel());
     this.root.append(ball);
   }
 
@@ -299,9 +341,10 @@ export class FloatingTranslationControl {
     translateButton.disabled = this.state === "translating" || this.state === "updating";
 
     const restoreButton = this.createButton("Restore", "restore", "imt-floating-button", () => this.restore());
+    const collapseButton = this.createButton("Minimize", "collapse", "imt-floating-button imt-floating-button-subtle", () => this.collapseToEdge());
     const hideButton = this.createButton("Hide on this page", "hide", "imt-floating-button imt-floating-button-subtle", () => this.hide());
 
-    actions.append(translateButton, restoreButton, hideButton);
+    actions.append(translateButton, restoreButton, collapseButton, hideButton);
     panel.append(header, summary);
     const diagnostics = diagnosticsLabel(this.summary);
     if (diagnostics) {
