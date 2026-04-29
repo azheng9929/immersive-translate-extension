@@ -1,12 +1,13 @@
 import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { removeTranslationLoading, renderTranslation, renderTranslationLoading } from "./renderEngine";
-import { restoreAll } from "./restoreEngine";
+import { restoreAll, restoreRecords } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
 import type { DisplayMode } from "../shared/config";
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
+import type { CompiledFilterRule } from "./compiledFilterRule";
 import type { SiteContentSelector } from "./sitePolicy";
 import {
   cloneTranslationDiagnostics,
@@ -41,6 +42,7 @@ type ControllerOptions = {
   preferredScanRootSelectors?: readonly string[];
   excludeSelectors?: readonly string[];
   contentSelectors?: readonly SiteContentSelector[];
+  filterRule?: CompiledFilterRule;
   allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
   progressiveBatchItems?: number;
@@ -136,6 +138,7 @@ export class PageController {
 
     const revision = this.revision + 1;
     this.revision = revision;
+    this.restoreExactTranslatedRoots(roots);
 
     const units = this.buildUnitsForRoots(roots, this.revision, this.diagnostics);
     this.applyDisplayMode(units);
@@ -206,6 +209,7 @@ export class PageController {
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
       ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
       ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
+      ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),
       targetLang: this.options.targetLang,
       diagnostics,
     };
@@ -226,6 +230,7 @@ export class PageController {
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
       ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
       ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
+      ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),
       diagnostics,
     });
   }
@@ -236,6 +241,25 @@ export class PageController {
     this.units = [];
     this.diagnostics = createTranslationDiagnostics();
     this.revision += 1;
+  }
+
+  private restoreExactTranslatedRoots(roots: readonly ParentNode[]): void {
+    const translatedRoots = roots.filter(
+      (root): root is HTMLElement => root instanceof HTMLElement && root.getAttribute("data-imt-state") === "translated",
+    );
+    if (translatedRoots.length === 0) return;
+
+    const remaining: RestoreRecord[] = [];
+    const restoring: RestoreRecord[] = [];
+
+    for (const record of this.records) {
+      if (recordBelongsToRoots(record, translatedRoots)) restoring.push(record);
+      else remaining.push(record);
+    }
+
+    restoreRecords(restoring);
+    this.records = remaining;
+    this.units = this.units.filter((unit) => !translatedRoots.some((root) => root === unit.root));
   }
 
   private buildCacheLookups(units: TranslationUnit[]): Map<string, TranslationCacheLookup> {
@@ -608,6 +632,19 @@ function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {
   }
 
   return accepted;
+}
+
+function recordBelongsToRoots(record: RestoreRecord, roots: readonly HTMLElement[]): boolean {
+  const node = restoreRecordNode(record);
+  return Boolean(node && roots.some((root) => root === node || root.contains(node)));
+}
+
+function restoreRecordNode(record: RestoreRecord): Node | undefined {
+  if (record.type === "inserted-node") return record.node.parentElement ?? record.node;
+  if (record.type === "text-replace") return record.textNode.parentElement ?? record.textNode;
+  if (record.type === "attribute-replace") return record.element;
+  if (record.type === "style-change") return record.element;
+  return undefined;
 }
 
 function isNearViewport(element: HTMLElement, rootMargin: string): boolean {

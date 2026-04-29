@@ -1,5 +1,5 @@
 import { IMPORTED_IMMERSIVE_RULE_CATALOG } from "./data/importedImmersiveRuleCatalog";
-import { selectPotentialWebTranslationRulesForUrl } from "./webRuleMatcher";
+import { mayWebTranslationRuleMatchUrl, selectPotentialWebTranslationRulesForUrl } from "./webRuleMatcher";
 import type { WebTranslationRule } from "./webRuleTypes";
 
 export function selectPotentialImportedWebRuleCatalogForUrl(url: string): WebTranslationRule[] {
@@ -7,5 +7,7 @@ export function selectPotentialImportedWebRuleCatalogForUrl(url: string): WebTra
 }
 
 export function shouldLoadImportedWebRulesForUrl(url: string): boolean {
-  return selectPotentialImportedWebRuleCatalogForUrl(url).length > 0;
+  return (IMPORTED_IMMERSIVE_RULE_CATALOG as readonly WebTranslationRule[]).some((rule) =>
+    Boolean(rule.matches?.length) && mayWebTranslationRuleMatchUrl(url, rule)
+  );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scanDocumentText, scanTranslatableAttributes } from "@/content/domScanner";
 import { createTranslationDiagnostics } from "@/content/translationDiagnostics";
+import { compileFilterRule } from "@/content/compiledFilterRule";
 import { buildTranslationUnits } from "@/content/unitBuilder";
 import { mountFixture } from "@/test/domFixtures";
 
@@ -164,5 +165,46 @@ describe("buildTranslationUnits", () => {
         "target-language": 1,
       },
     });
+  });
+
+  it("uses compiled atomic, extra block, extra inline, and stay-original rule metadata", () => {
+    mountFixture(`
+      <article>
+        <div itemprop="description"><span>Compact</span> <span>description text.</span></div>
+        <p>Hello <g-emoji>rocket</g-emoji> world <code>const value = 1</code>.</p>
+        <span class="headline">Card headline text.</span>
+        <p><span class="math">x^2</span></p>
+      </article>
+    `);
+    const filterRule = compileFilterRule({
+      selectors: [],
+      excludeSelectors: [],
+      mutationExcludeSelectors: [],
+      injectedCss: [],
+      contentSelectors: [],
+      attributeNames: [],
+      extraInlineSelectors: ["g-emoji"],
+      extraBlockSelectors: [".headline"],
+      atomicBlockSelectors: ["[itemprop=description]"],
+      stayOriginalTags: ["CODE"],
+      stayOriginalSelectors: [".math"],
+    });
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, { filterRule }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      filterRule,
+    });
+
+    expect(units.map((unit) => unit.originalText)).toEqual([
+      "Compact description text.",
+      "Hello rocket world.",
+      "Card headline text.",
+    ]);
+    expect(units[0]!.root).toBe(document.querySelector("[itemprop=description]"));
+    expect(units[2]!.root).toBe(document.querySelector(".headline"));
   });
 });

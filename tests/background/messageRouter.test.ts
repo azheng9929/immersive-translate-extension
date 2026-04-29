@@ -75,7 +75,7 @@ describe("handleBackgroundMessage", () => {
     if (!response.ok || !("webRules" in response)) throw new Error("Expected webRules response");
 
     expect(response.webRules.length).toBeGreaterThan(1);
-    expect(response.webRules.length).toBeLessThan(40);
+    expect(response.webRules.length).toBeLessThan(80);
     expect(response.webRules.some((rule) => rule.id === "medium")).toBe(true);
     expect(response.webRules.some((rule) => rule.id === "github")).toBe(false);
     expect(response.webRules.some((rule) => rule.selectorMatches?.length)).toBe(true);

@@ -3,6 +3,8 @@ import { fakeProvider } from "./providers/fakeProvider";
 import { geminiProvider } from "./providers/geminiProvider";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
+import { queryParagraphCache, setParagraphCache } from "./paragraphCache";
+import { clearTranslationPermitQueues, withTranslationPermit } from "./translationPermit";
 import { getWebRulesForUrl } from "./webRuleStore";
 import type { ProviderRequest, ProviderResponseItem, TranslationProvider } from "./providers/providerTypes";
 import type { BackgroundMessage, ContentMessage, MessageResponse } from "../shared/messages";
@@ -47,6 +49,18 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
   if (message.type === "IMT_TRANSLATE_BATCH") {
     return translateBatch(message.request);
   }
+  if (message.type === "IMT_QUERY_PARAGRAPH_CACHE") {
+    const hits = await queryParagraphCache(message.lookups);
+    return { ok: true, cacheHits: [...hits.entries()] };
+  }
+  if (message.type === "IMT_SET_PARAGRAPH_CACHE") {
+    await setParagraphCache(message.entries);
+    return { ok: true };
+  }
+  if (message.type === "IMT_CLEAR_TRANSLATE_QUEUE") {
+    clearTranslationPermitQueues(message.provider);
+    return { ok: true };
+  }
   if (message.type === "IMT_GET_CONFIG") {
     const config = await createConfigStore().load();
     return { ok: true, config };
@@ -75,7 +89,7 @@ async function translateBatch(request: ProviderRequest): Promise<MessageResponse
   if (!provider) return { ok: false, error: `Unsupported translation provider: ${request.provider}` };
 
   try {
-    const items = await provider.translate(request);
+    const items = await withTranslationPermit(request.provider, request.maxConcurrentRequests, () => provider.translate(request));
     return { ok: true, items: reconcileProviderItems(request.items, items) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };

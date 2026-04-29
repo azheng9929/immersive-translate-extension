@@ -128,6 +128,31 @@ describe("PageTranslationSession", () => {
     ]);
   });
 
+  it("retranslates existing translated roots when their text node changes", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p id="live">Initial article text.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
+
+    await session.translatePage();
+    const originalTextNode = document.querySelector("#live")!.firstChild as Text;
+    originalTextNode.textContent = "Updated article text.";
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Initial article text.", "Updated article text."]);
+    expect(Array.from(document.querySelectorAll("#live .imt-translation-block")).map((node) => node.textContent)).toEqual([
+      "[zh-Hans] Updated article text.",
+    ]);
+  });
+
   it("does not dynamically translate buttons or extension UI", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
@@ -290,6 +315,34 @@ describe("PageTranslationSession", () => {
 
     expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
     expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "observing", dynamicRuns: 1 });
+  });
+
+  it("retranslates the page after SPA pushState route changes", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Initial article text.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      observeUrlChange: true,
+      urlChangeDelay: 20,
+    });
+
+    await session.translatePage();
+    history.pushState({}, "", "/next-page");
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Initial article text.", "Initial article text."]);
+    expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "observing" });
   });
 
   it("suspends dynamic translation after a burst of page changes", async () => {

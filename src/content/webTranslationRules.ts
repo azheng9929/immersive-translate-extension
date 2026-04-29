@@ -1,8 +1,9 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
+import { compileFilterRule, type CompiledFilterRule } from "./compiledFilterRule";
 import type { DynamicMode } from "../shared/config";
 import { matchWebTranslationRule } from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
-import type { RuleArrayValue, RuleContentSelector, WebTranslationRule } from "../shared/webRuleTypes";
+import type { RuleArrayValue, RuleContentSelector, RuleRecordValue, WebTranslationRule } from "../shared/webRuleTypes";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
 
 export type { RuleArrayValue, RuleContentSelector, WebTranslationRule };
@@ -10,12 +11,30 @@ export { matchWebTranslationRule, selectWebTranslationRulesForContent } from "..
 
 type ResolvedWebTranslationRule = Omit<
   WebTranslationRule,
-  "selectors" | "excludeSelectors" | "mutationExcludeSelectors" | "injectedCss" | "contentSelectors" | "attributeNames" | "advanceMergeConfig"
+  | "selectors"
+  | "excludeSelectors"
+  | "mutationExcludeSelectors"
+  | "injectedCss"
+  | "extraBlockSelectors"
+  | "extraInlineSelectors"
+  | "atomicBlockSelectors"
+  | "stayOriginalSelectors"
+  | "stayOriginalTags"
+  | "globalStyles"
+  | "contentSelectors"
+  | "attributeNames"
+  | "advanceMergeConfig"
 > & {
   selectors: readonly string[];
   excludeSelectors: readonly string[];
   mutationExcludeSelectors: readonly string[];
   injectedCss: readonly string[];
+  extraBlockSelectors: readonly string[];
+  extraInlineSelectors: readonly string[];
+  atomicBlockSelectors: readonly string[];
+  stayOriginalSelectors: readonly string[];
+  stayOriginalTags: readonly string[];
+  globalStyles: Readonly<Record<string, string>>;
   contentSelectors: readonly RuleContentSelector[];
   attributeNames: readonly TranslatableAttributeName[];
 };
@@ -69,6 +88,9 @@ const DEFAULT_SITE_POLICY = {
   mutationWindowMs: 5000,
   excludedDynamicSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   injectedCss: [],
+  filterRule: compileFilterRule({}),
+  observeUrlChange: true,
+  urlChangeDelay: 250,
 } satisfies SitePolicy;
 
 const DYNAMIC_PRESETS = {
@@ -144,6 +166,12 @@ export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
   excludeSelectors: [],
   mutationExcludeSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   attributeNames: SAFE_TRANSLATABLE_ATTRIBUTES,
+  extraBlockSelectors: [],
+  extraInlineSelectors: [],
+  atomicBlockSelectors: [],
+  stayOriginalSelectors: [],
+  stayOriginalTags: ["CODE", "KBD", "SAMP"],
+  globalStyles: {},
   dynamicPreset: "normal",
   allowTooltip: true,
   paragraphMinTextCount: 2,
@@ -488,7 +516,10 @@ export function compileRulePolicy(
     contentSelectors: rule.contentSelectors,
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
     excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
-    injectedCss: rule.injectedCss,
+    injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
+    filterRule: compileFilterRule(rule),
+    observeUrlChange: rule.observeUrlChange ?? DEFAULT_SITE_POLICY.observeUrlChange,
+    urlChangeDelay: rule.urlChangeDelay ?? DEFAULT_SITE_POLICY.urlChangeDelay,
     ...(rule.debounceMs !== undefined ? { debounceMs: rule.debounceMs } : {}),
     ...(rule.lazyRootMargin !== undefined ? { lazyRootMargin: rule.lazyRootMargin } : {}),
     ...(rule.lazyThreshold !== undefined ? { lazyThreshold: rule.lazyThreshold } : {}),
@@ -548,6 +579,13 @@ function mergeOneRule(base: ResolvedWebTranslationRule, delta: WebTranslationRul
     excludeSelectors: mergeArray(base.excludeSelectors, delta.excludeSelectors),
     mutationExcludeSelectors: mergeArray(base.mutationExcludeSelectors, delta.mutationExcludeSelectors),
     injectedCss: mergeArray(base.injectedCss, delta.injectedCss),
+    extraBlockSelectors: mergeArray(base.extraBlockSelectors, delta.extraBlockSelectors),
+    extraInlineSelectors: mergeArray(base.extraInlineSelectors, delta.extraInlineSelectors),
+    atomicBlockSelectors: mergeArray(base.atomicBlockSelectors, delta.atomicBlockSelectors),
+    stayOriginalSelectors: mergeArray(base.stayOriginalSelectors, delta.stayOriginalSelectors),
+    stayOriginalTags: mergeArray(base.stayOriginalTags, delta.stayOriginalTags, (tag) => String(tag).toUpperCase())
+      .map((tag) => tag.toUpperCase()),
+    globalStyles: mergeRecord(base.globalStyles, delta.globalStyles),
     contentSelectors: mergeArray(base.contentSelectors, delta.contentSelectors, contentSelectorKey),
     attributeNames: mergeArray(base.attributeNames, delta.attributeNames),
   };
@@ -560,6 +598,12 @@ function toResolvedRule(rule: WebTranslationRule): ResolvedWebTranslationRule {
     excludeSelectors: arrayValue(rule.excludeSelectors),
     mutationExcludeSelectors: arrayValue(rule.mutationExcludeSelectors),
     injectedCss: arrayValue(rule.injectedCss),
+    extraBlockSelectors: arrayValue(rule.extraBlockSelectors),
+    extraInlineSelectors: arrayValue(rule.extraInlineSelectors),
+    atomicBlockSelectors: arrayValue(rule.atomicBlockSelectors),
+    stayOriginalSelectors: arrayValue(rule.stayOriginalSelectors),
+    stayOriginalTags: arrayValue(rule.stayOriginalTags).map((tag) => tag.toUpperCase()),
+    globalStyles: recordValue(rule.globalStyles),
     contentSelectors: arrayValue(rule.contentSelectors),
     attributeNames: arrayValue(rule.attributeNames),
   };
@@ -586,8 +630,30 @@ function arrayValue<T>(value: RuleArrayValue<T> | undefined): readonly T[] {
   return unique(value.replace ?? value.add ?? []);
 }
 
+function mergeRecord<T>(
+  base: Readonly<Record<string, T>>,
+  value: RuleRecordValue<T> | undefined,
+): Readonly<Record<string, T>> {
+  if (!value) return base;
+  if (isRuleRecord(value)) return { ...value };
+
+  const next = value.replace ? { ...value.replace } : { ...base };
+  for (const key of value.remove ?? []) delete next[key];
+  return { ...next, ...(value.add ?? {}) };
+}
+
+function recordValue<T>(value: RuleRecordValue<T> | undefined): Readonly<Record<string, T>> {
+  if (!value) return {};
+  if (isRuleRecord(value)) return { ...value };
+  return { ...(value.replace ?? value.add ?? {}) };
+}
+
 function isRuleArray<T>(value: RuleArrayValue<T>): value is readonly T[] {
   return Array.isArray(value);
+}
+
+function isRuleRecord<T>(value: RuleRecordValue<T>): value is Readonly<Record<string, T>> {
+  return !("replace" in value || "add" in value || "remove" in value);
 }
 
 function unique<T>(items: readonly T[], keyOf: (item: T) => string = (item) => String(item)): T[] {
@@ -604,6 +670,10 @@ function unique<T>(items: readonly T[], keyOf: (item: T) => string = (item) => S
 
 function contentSelectorKey(item: RuleContentSelector): string {
   return `${item.selector}:${item.category}`;
+}
+
+function globalStylesToCss(globalStyles: Readonly<Record<string, string>>): string[] {
+  return Object.entries(globalStyles).map(([selector, style]) => `${selector} { ${style} }`);
 }
 
 function applyDynamicMode(policy: SitePolicy, dynamicMode: DynamicMode): SitePolicy {

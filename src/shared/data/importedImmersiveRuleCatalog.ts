@@ -9,6 +9,140 @@ export type ImportedImmersiveRuleCatalogEntry = Pick<
 
 export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   {
+    "id": "isSubtitleBuilder",
+    "siteKey": "*.immersivetranslate.*",
+    "matches": [
+      "https://*.immersivetranslate.*/subtitle*",
+      "https://*.immersivetranslate.*/*/download-subtitle",
+      "http://localhost:38001/*/download-subtitle*",
+      "https://*.immersivetranslate.*/*/subtitle*"
+    ],
+    "selectorMatches": [
+      "meta[name='immersive-translate-subtitle-builder'][content='true']"
+    ]
+  },
+  {
+    "id": "pdf",
+    "siteKey": "app.immersivetranslate.*",
+    "matches": [
+      "https://app.immersivetranslate.*/pdf",
+      "https://test-app.immersivetranslate.*/pdf",
+      "https://app.immersivetranslate.*/pdf/*",
+      "https://test-app.immersivetranslate.*/pdf/*",
+      "https://app.infread.com/pdf/*",
+      "http://localhost:38001/pdf*"
+    ],
+    "selectorMatches": [
+      "meta[name='immersive-translate-pdf-viewer'][content='true']"
+    ]
+  },
+  {
+    "id": "isEbook",
+    "selectorMatches": [
+      "meta[name='immersive-translate-ebook-viewer'][content='true']"
+    ]
+  },
+  {
+    "id": "isEbookBuilder",
+    "siteKey": "*.immersivetranslate.*",
+    "matches": [
+      "https://*.immersivetranslate.*/ebook/make*",
+      "https://*.immersivetranslate.*/ebook/make/*",
+      "https://app.infread.com/ebook/make*",
+      "http://localhost:38001/ebook/make*",
+      "http://localhost:3000/*/ebook-make*",
+      "https://*.immersivetranslate.*/*/*/ebook-make*",
+      "https://immersivetranslate.*/*/*/ebook-make*"
+    ],
+    "selectorMatches": [
+      "meta[name='immersive-translate-ebook-builder'][content='true']"
+    ]
+  },
+  {
+    "id": "immersiveTranslateIosOnBoarding",
+    "selectorMatches": [
+      "meta[name=immersiveTranslateIosOnBoarding]"
+    ]
+  },
+  {
+    "id": "immersiveTranslateIosOnBoardingStep1",
+    "selectorMatches": [
+      "meta[name=immersiveTranslateIosOnBoardingStep1]"
+    ]
+  },
+  {
+    "id": "immersivePreview",
+    "siteKey": "immersivetranslate.*",
+    "matches": [
+      "https://immersivetranslate.*/preview*",
+      "https://immersivetranslate.*/drafts*"
+    ]
+  },
+  {
+    "id": "dash-immersive",
+    "siteKey": "dash.immersivetranslate.com",
+    "matches": [
+      "https://dash.immersivetranslate.com/*",
+      "http://localhost:8000/dist/userscript/options*"
+    ]
+  },
+  {
+    "id": "pro-pdf-immersive",
+    "siteKey": "*.immersivetranslate.*",
+    "matches": [
+      "https://*.immersivetranslate.*/pdf-pro*"
+    ]
+  },
+  {
+    "id": "babelR-render",
+    "selectorMatches": [
+      ".babelR-offline-render"
+    ]
+  },
+  {
+    "id": "onboarding",
+    "siteKey": "onboarding.immersivetranslate.*",
+    "matches": [
+      "https://onboarding.immersivetranslate.*",
+      "https://*onboarding.immersivetranslate.*"
+    ]
+  },
+  {
+    "id": "immersive-word",
+    "siteKey": "*.immersivetranslate.*",
+    "matches": [
+      "https://*.immersivetranslate.*/word*",
+      "https://*.immersivetranslate.*/*/word*"
+    ]
+  },
+  {
+    "id": "immersive",
+    "siteKey": "localhost",
+    "matches": [
+      "https://immersivetranslate.*",
+      "https://*.immersivetranslate.*",
+      "http://localhost:38001",
+      "https://app.infread.com",
+      "https://*.immersivetranslate.*/*"
+    ]
+  },
+  {
+    "id": "simpread",
+    "selectorMatches": [
+      "div.simpread-read-root.simpread-read-root-show > sr-read"
+    ]
+  },
+  {
+    "id": "hangejp",
+    "siteKey": "arad.hange.jp",
+    "matches": [
+      "arad.hange.jp",
+      "arad.nexon.co.jp",
+      "oapi.dingtalk.com",
+      "login.dingtalk.com"
+    ]
+  },
+  {
     "id": "shopee",
     "siteKey": "seller.shopee.*",
     "matches": [
@@ -17,15 +151,50 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "xiapi",
+    "siteKey": "*.xiapibuy.*",
+    "matches": [
+      "*.xiapibuy.*"
+    ]
+  },
+  {
     "id": "fanbox",
-    "siteKey": "fanbox.cc",
+    "siteKey": "*.fanbox.cc",
     "matches": [
       "*.fanbox.cc"
     ]
   },
   {
+    "id": "twmanga",
+    "siteKey": "www.twmanga.com",
+    "matches": [
+      "www.twmanga.com"
+    ]
+  },
+  {
+    "id": "mgeko",
+    "siteKey": "www.mgeko.cc",
+    "matches": [
+      "www.mgeko.cc"
+    ]
+  },
+  {
+    "id": "jmcomic",
+    "siteKey": "jmcomic-zzz.one",
+    "matches": [
+      "jmcomic-zzz.one"
+    ]
+  },
+  {
+    "id": "fenoxo",
+    "siteKey": "www.fenoxo.com",
+    "matches": [
+      "www.fenoxo.com"
+    ]
+  },
+  {
     "id": "wikipedia",
-    "siteKey": "wikipedia.org",
+    "siteKey": "*.wikipedia.org",
     "matches": [
       "*.wikipedia.org"
     ]
@@ -62,15 +231,22 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "common-vtt",
+    "siteKey": "gdc-search.github.io",
+    "matches": [
+      "gdc-search.github.io"
+    ]
+  },
+  {
     "id": "zoom-asu",
-    "siteKey": "zoom.us",
+    "siteKey": "*.zoom.us",
     "matches": [
       "*.zoom.us/rec/*"
     ]
   },
   {
     "id": "zoom",
-    "siteKey": "zoom.us",
+    "siteKey": "*.zoom.us",
     "matches": [
       "*.zoom.us"
     ]
@@ -109,6 +285,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "www.hoyolab.com",
     "matches": [
       "www.hoyolab.com"
+    ]
+  },
+  {
+    "id": "tv.apple",
+    "siteKey": "tv.apple.com",
+    "matches": [
+      "tv.apple.com"
     ]
   },
   {
@@ -261,10 +444,50 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "githubNotebook",
+    "siteKey": "notebooks.githubusercontent.com",
+    "matches": [
+      "notebooks.githubusercontent.com"
+    ]
+  },
+  {
     "id": "rmit",
     "siteKey": "www.rmit.edu.au",
     "matches": [
       "www.rmit.edu.au"
+    ]
+  },
+  {
+    "id": "mfacebook",
+    "siteKey": "m.facebook.com",
+    "matches": [
+      "m.facebook.com"
+    ]
+  },
+  {
+    "id": "facebook",
+    "siteKey": "*.facebook.com",
+    "matches": [
+      "*.facebook.com"
+    ],
+    "excludeMatches": [
+      "www.facebook.com/business/*",
+      "business.facebook.com/*",
+      "www.facebook.com/help*",
+      "www.facebook.com/settings*",
+      "www.facebook.com/ads/library/*",
+      "developers.facebook.com/*",
+      "www.facebook.com/v20.0/plugins/*",
+      "www.facebook.com/support*",
+      "www.facebook.com/terms*",
+      "www.facebook.com/privacy*"
+    ]
+  },
+  {
+    "id": "facebookV20VideoPlugin",
+    "siteKey": "www.facebook.com",
+    "matches": [
+      "www.facebook.com/v20.0/plugins/*"
     ]
   },
   {
@@ -282,6 +505,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "yotube-embed",
+    "siteKey": "www.youtube.com",
+    "matches": [
+      "https://www.youtube.com/embed*"
+    ]
+  },
+  {
     "id": "youtube",
     "siteKey": "www.youtube.com",
     "matches": [
@@ -293,6 +523,21 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "www.youtubekids.com",
     "matches": [
       "www.youtubekids.com"
+    ]
+  },
+  {
+    "id": "tvYoutube",
+    "siteKey": "tv.youtube.com",
+    "matches": [
+      "tv.youtube.com"
+    ]
+  },
+  {
+    "id": "youtube-subtitle",
+    "siteKey": "www.youtube-nocookie.com",
+    "matches": [
+      "www.youtube-nocookie.com",
+      "music.youtube.com"
     ]
   },
   {
@@ -336,7 +581,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "substack",
-    "siteKey": "substack.com",
+    "siteKey": "newsletter.rootsofprogress.org",
     "matches": [
       "*.substack.com",
       "newsletter.rootsofprogress.org"
@@ -385,7 +630,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "aha",
-    "siteKey": "ideas.aha.io",
+    "siteKey": "*.ideas.aha.io",
     "matches": [
       "*.ideas.aha.io"
     ]
@@ -431,6 +676,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "codeforces",
+    "siteKey": "codeforces.com",
+    "matches": [
+      "https://codeforces.com/*"
+    ]
+  },
+  {
     "id": "discord",
     "siteKey": "discord.com",
     "matches": [
@@ -467,7 +719,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "slack",
-    "siteKey": "slack.com",
+    "siteKey": "*.slack.com",
     "matches": [
       "*.slack.com"
     ]
@@ -647,6 +899,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "modelhub",
+    "siteKey": "www.modelhub.com",
+    "matches": [
+      "https://www.modelhub.com/*"
+    ]
+  },
+  {
     "id": "xvideos",
     "siteKey": "www.xvideos.com",
     "matches": [
@@ -682,10 +941,32 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "jable",
+    "siteKey": "jable.tv",
+    "matches": [
+      "https://jable.tv/*"
+    ]
+  },
+  {
+    "id": "netflav.player",
+    "siteKey": "netflavns1.com",
+    "matches": [
+      "https://netflavns1.com",
+      "https://embedrise.com"
+    ]
+  },
+  {
     "id": "netflav",
     "siteKey": "netflav*.com",
     "matches": [
       "https://netflav*.com/*"
+    ]
+  },
+  {
+    "id": "czechvideo",
+    "siteKey": "czechvideo.co",
+    "matches": [
+      "https://czechvideo.co/*"
     ]
   },
   {
@@ -715,6 +996,12 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ],
     "selectorMatches": [
       "meta[property='al:ios:url'][content^='medium://']"
+    ]
+  },
+  {
+    "id": "nitter",
+    "selectorMatches": [
+      "meta[property='og:site_name'][content='Nitter']"
     ]
   },
   {
@@ -750,6 +1037,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "www.tripadvisor.com",
     "matches": [
       "www.tripadvisor.com"
+    ]
+  },
+  {
+    "id": "kelbyone",
+    "siteKey": "members.kelbyone.com",
+    "matches": [
+      "members.kelbyone.com"
     ]
   },
   {
@@ -791,6 +1085,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ],
     "excludeMatches": [
       "https://www.bloomberg.com/live/*"
+    ]
+  },
+  {
+    "id": "baiduPanVideo",
+    "siteKey": "pan.baidu.com",
+    "matches": [
+      "pan.baidu.com"
+    ]
+  },
+  {
+    "id": "baiduXueshu",
+    "siteKey": "xueshu.baidu.com",
+    "matches": [
+      "xueshu.baidu.com"
     ]
   },
   {
@@ -847,10 +1155,31 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "tinytask",
+    "siteKey": "www.tinytask.net",
+    "matches": [
+      "https://www.tinytask.net"
+    ]
+  },
+  {
     "id": "foxnews",
     "siteKey": "www.foxnews.com",
     "matches": [
       "www.foxnews.com"
+    ]
+  },
+  {
+    "id": "afreecatv",
+    "siteKey": "www.afreecatv.com",
+    "matches": [
+      "www.afreecatv.com"
+    ]
+  },
+  {
+    "id": "opennet",
+    "siteKey": "opennet.ru",
+    "matches": [
+      "opennet.ru"
     ]
   },
   {
@@ -873,7 +1202,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "fandom",
-    "siteKey": "fandom.com",
+    "siteKey": "*.fandom.com",
     "matches": [
       "*.fandom.com"
     ]
@@ -883,6 +1212,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "huggingface.co",
     "matches": [
       "huggingface.co"
+    ]
+  },
+  {
+    "id": "statista",
+    "siteKey": "www.statista.com",
+    "matches": [
+      "www.statista.com"
     ]
   },
   {
@@ -915,10 +1251,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "deepseek",
+    "siteKey": "chat.deepseek.com",
+    "matches": [
+      "chat.deepseek.com"
+    ]
+  },
+  {
     "id": "poe",
     "siteKey": "poe.com",
     "matches": [
       "https://poe.com/*"
+    ]
+  },
+  {
+    "id": "kindroid",
+    "siteKey": "kindroid.ai",
+    "matches": [
+      "kindroid.ai"
     ]
   },
   {
@@ -933,6 +1283,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "glasp.co",
     "matches": [
       "glasp.co"
+    ]
+  },
+  {
+    "id": "nyassembly",
+    "siteKey": "nyassembly.gov",
+    "matches": [
+      "nyassembly.gov"
     ]
   },
   {
@@ -977,6 +1334,14 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "matches": [
       "https://www.tiktok.com/*/video/*",
       "https://www.tiktok.com/*"
+    ]
+  },
+  {
+    "id": "rfcEditor",
+    "siteKey": "www.rfc-editor.org",
+    "matches": [
+      "www.rfc-editor.org",
+      "docs.haproxy.org"
     ]
   },
   {
@@ -1040,7 +1405,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "jetbrains",
-    "siteKey": "jetbrains.com",
+    "siteKey": "*.jetbrains.com",
     "matches": [
       "https://*.jetbrains.com"
     ]
@@ -1102,6 +1467,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "gatesnotes",
+    "siteKey": "www.gatesnotes.com",
+    "matches": [
+      "www.gatesnotes.com"
+    ]
+  },
+  {
     "id": "coinmarketcap",
     "siteKey": "coinmarketcap.com",
     "matches": [
@@ -1124,7 +1496,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "zendesk",
-    "siteKey": "zendesk.com",
+    "siteKey": "*.zendesk.com",
     "matches": [
       "https://*.zendesk.com/agent/*"
     ]
@@ -1151,6 +1523,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "tass",
+    "siteKey": "tass.ru",
+    "matches": [
+      "tass.ru"
+    ]
+  },
+  {
     "id": "fiverr",
     "siteKey": "www.fiverr.com",
     "matches": [
@@ -1159,7 +1538,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "fiverr-main",
-    "siteKey": "fiverr.com",
+    "siteKey": "*.fiverr.com",
     "matches": [
       "*.fiverr.com"
     ]
@@ -1187,6 +1566,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "spiedigitallibrary",
+    "siteKey": "www.spiedigitallibrary.org",
+    "matches": [
+      "www.spiedigitallibrary.org"
+    ]
+  },
+  {
     "id": "promptingguide",
     "siteKey": "www.promptingguide.ai",
     "matches": [
@@ -1194,8 +1580,15 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "ground",
+    "siteKey": "ground.news",
+    "matches": [
+      "ground.news"
+    ]
+  },
+  {
     "id": "ietf",
-    "siteKey": "ietf.org",
+    "siteKey": "*.ietf.org",
     "matches": [
       "*.ietf.org/doc/html/*"
     ]
@@ -1265,7 +1658,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "urlChangeDelay",
-    "siteKey": "babelnovel.com",
+    "siteKey": "docs.oracle.com",
     "matches": [
       "https://babelnovel.com/books/*",
       "https://www.webnovel.com/book/*",
@@ -1298,10 +1691,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "lawhub",
+    "siteKey": "lawhub.lsac.org",
+    "matches": [
+      "https://lawhub.lsac.org/question/*"
+    ]
+  },
+  {
     "id": "yuque",
     "siteKey": "www.yuque.com",
     "matches": [
       "https://www.yuque.com/*"
+    ]
+  },
+  {
+    "id": "bearblog",
+    "siteKey": "bearblog.dev",
+    "matches": [
+      "https://bearblog.dev/discover/*"
     ]
   },
   {
@@ -1334,6 +1741,19 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "openai-blog",
+    "siteKey": "openai.com",
+    "matches": [
+      "https://openai.com/blog/*"
+    ]
+  },
+  {
+    "id": "urlComment",
+    "selectorMatches": [
+      "meta[name='generator'][content^='Discourse']"
+    ]
+  },
+  {
     "id": "feedly",
     "siteKey": "feedly.com",
     "matches": [
@@ -1349,9 +1769,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "bing",
-    "siteKey": "bing.com",
+    "siteKey": "*.bing.com",
     "matches": [
       "https://*.bing.com/search*"
+    ]
+  },
+  {
+    "id": "bingNews",
+    "siteKey": "*.bing.com",
+    "matches": [
+      "https://*.bing.com/news/search*"
     ]
   },
   {
@@ -1363,7 +1790,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "yahoo",
-    "siteKey": "yahoo.*",
+    "siteKey": "*.yahoo.*",
     "matches": [
       "*.yahoo.*"
     ]
@@ -1374,6 +1801,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "matches": [
       "www.wsj.com",
       "cn.wsj.com"
+    ]
+  },
+  {
+    "id": "loom",
+    "siteKey": "www.loom.com",
+    "matches": [
+      "www.loom.com"
     ]
   },
   {
@@ -1391,6 +1825,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "feeder",
+    "siteKey": "feeder.co",
+    "matches": [
+      "https://feeder.co/*"
+    ]
+  },
+  {
+    "id": "elektrotechnik",
+    "siteKey": "www.elektrotechnik.rwth-aachen.de",
+    "matches": [
+      "https://www.elektrotechnik.rwth-aachen.de/*"
+    ]
+  },
+  {
     "id": "nytimes",
     "siteKey": "www.nytimes.com",
     "matches": [
@@ -1405,10 +1853,52 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "eastmoney",
+    "siteKey": "guba.eastmoney.com",
+    "matches": [
+      "guba.eastmoney.com"
+    ]
+  },
+  {
+    "id": "xueqiu",
+    "siteKey": "xueqiu.com",
+    "matches": [
+      "xueqiu.com"
+    ]
+  },
+  {
+    "id": "laohu8",
+    "siteKey": "www.laohu8.com",
+    "matches": [
+      "www.laohu8.com"
+    ]
+  },
+  {
     "id": "plati",
     "siteKey": "plati.market",
     "matches": [
       "plati.market"
+    ]
+  },
+  {
+    "id": "futunn",
+    "siteKey": "www.futunn.com",
+    "matches": [
+      "www.futunn.com"
+    ]
+  },
+  {
+    "id": "bmvrMarseille",
+    "siteKey": "www.bmvr.marseille.fr",
+    "matches": [
+      "www.bmvr.marseille.fr"
+    ]
+  },
+  {
+    "id": "piAi",
+    "siteKey": "pi.ai",
+    "matches": [
+      "pi.ai/talk"
     ]
   },
   {
@@ -1420,11 +1910,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "feishu",
-    "siteKey": "feishu.cn",
+    "siteKey": "*.feishu.cn",
     "matches": [
       "*.feishu.cn",
       "*.larkoffice.com",
       "*.larksuite.com"
+    ]
+  },
+  {
+    "id": "gitbook",
+    "selectorMatches": [
+      ".gitbook-root"
+    ]
+  },
+  {
+    "id": "mitre",
+    "siteKey": "cwe.mitre.org",
+    "matches": [
+      "cwe.mitre.org"
     ]
   },
   {
@@ -1442,10 +1945,27 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "ieeexplore",
+    "siteKey": "ieeexplore.ieee.org",
+    "matches": [
+      "ieeexplore.ieee.org"
+    ],
+    "excludeMatches": [
+      "ieeexplore.ieee.org/*/getPDF.jsp*"
+    ]
+  },
+  {
     "id": "cnn",
-    "siteKey": "cnn.com",
+    "siteKey": "*.cnn.com",
     "matches": [
       "*.cnn.com"
+    ]
+  },
+  {
+    "id": "githubBlog",
+    "siteKey": "github.blog",
+    "matches": [
+      "github.blog"
     ]
   },
   {
@@ -1512,9 +2032,23 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "yna",
-    "siteKey": "yna*",
+    "siteKey": "*.yna*",
     "matches": [
       "*.yna*"
+    ]
+  },
+  {
+    "id": "cnet",
+    "siteKey": "www.cnet.com",
+    "matches": [
+      "www.cnet.com"
+    ]
+  },
+  {
+    "id": "dolmods",
+    "siteKey": "dolmods.net",
+    "matches": [
+      "dolmods.net"
     ]
   },
   {
@@ -1532,10 +2066,61 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "htdp",
+    "siteKey": "htdp.org",
+    "matches": [
+      "htdp.org"
+    ]
+  },
+  {
+    "id": "newsletterss",
+    "siteKey": "newsletterss.com",
+    "matches": [
+      "newsletterss.com"
+    ]
+  },
+  {
+    "id": "docusaurus",
+    "selectorMatches": [
+      "#__docusaurus"
+    ]
+  },
+  {
+    "id": "mercari",
+    "siteKey": "*.mercari.com",
+    "matches": [
+      "*.mercari.com"
+    ]
+  },
+  {
     "id": "qqMail",
-    "siteKey": "mail.qq.com",
+    "siteKey": "*.mail.qq.com",
     "matches": [
       "*.mail.qq.com"
+    ]
+  },
+  {
+    "id": "nikkei",
+    "siteKey": "www.nikkei.com",
+    "matches": [
+      "www.nikkei.com"
+    ]
+  },
+  {
+    "id": "pubs.rsc.org",
+    "siteKey": "pubs.rsc.org",
+    "matches": [
+      "pubs.rsc.org"
+    ],
+    "excludeMatches": [
+      "https://pubs.rsc.org/*/articlepdf/*"
+    ]
+  },
+  {
+    "id": "indeed",
+    "siteKey": "*.indeed.com",
+    "matches": [
+      "*.indeed.com"
     ]
   },
   {
@@ -1567,10 +2152,36 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "chatpdf",
+    "siteKey": "www.chatpdf.com",
+    "matches": [
+      "www.chatpdf.com"
+    ]
+  },
+  {
+    "id": "inciteful",
+    "siteKey": "inciteful.xyz",
+    "matches": [
+      "inciteful.xyz"
+    ]
+  },
+  {
     "id": "app.element.io",
     "siteKey": "app.element.io",
     "matches": [
       "app.element.io"
+    ]
+  },
+  {
+    "id": "mkdocs-material",
+    "selectorMatches": [
+      ".md-container[data-md-component]"
+    ]
+  },
+  {
+    "id": "termynal",
+    "selectorMatches": [
+      "link[href*='termynal.css']"
     ]
   },
   {
@@ -1581,8 +2192,22 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "hub.logseq",
+    "siteKey": "hub.logseq.com",
+    "matches": [
+      "hub.logseq.com"
+    ]
+  },
+  {
+    "id": "chat.zalo",
+    "siteKey": "chat.zalo.me",
+    "matches": [
+      "chat.zalo.me"
+    ]
+  },
+  {
     "id": "epam",
-    "siteKey": "epam.com",
+    "siteKey": "*.epam.com",
     "matches": [
       "*.epam.com"
     ]
@@ -1609,6 +2234,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "wattpad",
+    "siteKey": "www.wattpad.com",
+    "matches": [
+      "www.wattpad.com"
+    ]
+  },
+  {
     "id": "netflix",
     "siteKey": "www.netflix.com",
     "matches": [
@@ -1617,7 +2249,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "udemy",
-    "siteKey": "udemy.com",
+    "siteKey": "*.udemy.com",
     "matches": [
       "*.udemy.com"
     ]
@@ -1645,7 +2277,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "wiley",
-    "siteKey": "wiley.com",
+    "siteKey": "*.wiley.com",
     "matches": [
       "*.wiley.com"
     ],
@@ -1653,6 +2285,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
       "onlinelibrary.wiley.com/action/downloadSupplement*",
       "onlinelibrary.wiley.com/doi/pdf/*",
       "onlinelibrary.wiley.com/doi/am-pdf/*"
+    ]
+  },
+  {
+    "id": "investors",
+    "siteKey": "www.investors.com",
+    "matches": [
+      "www.investors.com"
+    ]
+  },
+  {
+    "id": "abc.net",
+    "siteKey": "www.abc.net.au",
+    "matches": [
+      "www.abc.net.au"
     ]
   },
   {
@@ -1664,10 +2310,17 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "thaipbs",
-    "siteKey": "www.thaipbs.*",
+    "siteKey": "players.brightcove.net",
     "matches": [
       "www.thaipbs.*",
       "players.brightcove.net"
+    ]
+  },
+  {
+    "id": "matlabacademy",
+    "siteKey": "matlabacademy.mathworks.com",
+    "matches": [
+      "matlabacademy.mathworks.com"
     ]
   },
   {
@@ -1699,10 +2352,80 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "khanacademy",
+    "siteKey": "www.khanacademy.org",
+    "matches": [
+      "www.khanacademy.org"
+    ]
+  },
+  {
     "id": "nebula",
     "siteKey": "nebula.tv",
     "matches": [
       "nebula.tv"
+    ]
+  },
+  {
+    "id": "ko-commic",
+    "siteKey": "m.xn--h10b90bbmq49b63sq4e.com",
+    "matches": [
+      "*.xn--h10b90bbmq49b63sq4e.com",
+      "m.뉴토끼대피소.com",
+      "뉴토끼대피소.com",
+      "funbe*.com",
+      "happytoon01.com",
+      "tkor*.com",
+      "m.블랙툰.co"
+    ]
+  },
+  {
+    "id": "comic-meteor",
+    "siteKey": "comic-meteor.jp",
+    "matches": [
+      "comic-meteor.jp",
+      "omegascans.org"
+    ]
+  },
+  {
+    "id": "greentoon.net",
+    "siteKey": "greentoon.net",
+    "matches": [
+      "greentoon.net"
+    ]
+  },
+  {
+    "id": "klmanga",
+    "siteKey": "klmanga.*",
+    "matches": [
+      "klmanga.*"
+    ]
+  },
+  {
+    "id": "dynasty-scans",
+    "siteKey": "dynasty-scans.com",
+    "matches": [
+      "dynasty-scans.com"
+    ]
+  },
+  {
+    "id": "fawesome",
+    "siteKey": "fawesome.tv",
+    "matches": [
+      "fawesome.tv"
+    ]
+  },
+  {
+    "id": "readallcomics",
+    "siteKey": "readallcomics.com",
+    "matches": [
+      "readallcomics.com"
+    ]
+  },
+  {
+    "id": "mangaplus-shueisha",
+    "siteKey": "mangaplus.shueisha.*",
+    "matches": [
+      "mangaplus.shueisha.*"
     ]
   },
   {
@@ -1720,10 +2443,476 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "globalcomix",
+    "siteKey": "globalcomix.com",
+    "matches": [
+      "globalcomix.com"
+    ]
+  },
+  {
+    "id": "comix",
+    "siteKey": "comix.to",
+    "matches": [
+      "comix.to"
+    ]
+  },
+  {
+    "id": "mangatoto",
+    "siteKey": "mangatoto.com",
+    "matches": [
+      "mangatoto.com",
+      "batotoo.com",
+      "mangatoto.net"
+    ]
+  },
+  {
+    "id": "ranfren.neocities.org",
+    "siteKey": "ranfren.neocities.org",
+    "matches": [
+      "ranfren.neocities.org"
+    ]
+  },
+  {
+    "id": "manga18",
+    "siteKey": "manga18.club",
+    "matches": [
+      "manga18.club"
+    ]
+  },
+  {
+    "id": "readmanga18",
+    "siteKey": "readmanga18.com",
+    "matches": [
+      "readmanga18.com"
+    ]
+  },
+  {
+    "id": "rawlazy",
+    "siteKey": "rawlazy.io",
+    "matches": [
+      "rawlazy.io"
+    ]
+  },
+  {
+    "id": "utoon",
+    "siteKey": "utoon.net",
+    "matches": [
+      "utoon.net"
+    ]
+  },
+  {
+    "id": "klz9",
+    "siteKey": "klz9.com",
+    "matches": [
+      "klz9.com"
+    ]
+  },
+  {
+    "id": "hentairox.com",
+    "siteKey": "hentairox.com",
+    "matches": [
+      "hentairox.com"
+    ]
+  },
+  {
+    "id": "comemh8",
+    "siteKey": "www.comemh8.com",
+    "matches": [
+      "www.comemh8.com"
+    ]
+  },
+  {
+    "id": "manhuapica",
+    "siteKey": "manhuapica.com",
+    "matches": [
+      "manhuapica.com"
+    ]
+  },
+  {
+    "id": "Tencent-Manga",
+    "siteKey": "m.ac.qq.com",
+    "matches": [
+      "m.ac.qq.com"
+    ]
+  },
+  {
+    "id": "fhentai",
+    "siteKey": "fhentai.net",
+    "matches": [
+      "fhentai.net"
+    ]
+  },
+  {
     "id": "scholar.cnki.net",
     "siteKey": "scholar.cnki.net",
     "matches": [
       "scholar.cnki.net"
+    ]
+  },
+  {
+    "id": "visortmo",
+    "siteKey": "visortmo_notranslate.com",
+    "matches": [
+      "visortmo_notranslate.com"
+    ]
+  },
+  {
+    "id": "hitomi",
+    "siteKey": "hitomi.la",
+    "matches": [
+      "hitomi.la",
+      "hitomi.si"
+    ]
+  },
+  {
+    "id": "acgmhh",
+    "siteKey": "acgmhh.com",
+    "matches": [
+      "acgmhh.com"
+    ]
+  },
+  {
+    "id": "www.comic-ryu.jp",
+    "siteKey": "www.comic-ryu.jp",
+    "matches": [
+      "www.comic-ryu.jp"
+    ]
+  },
+  {
+    "id": "177picyy",
+    "siteKey": "www.177picyy.com",
+    "matches": [
+      "www.177picyy.com"
+    ]
+  },
+  {
+    "id": "ideastatica",
+    "siteKey": "www.ideastatica.com",
+    "matches": [
+      "www.ideastatica.com"
+    ]
+  },
+  {
+    "id": "yymanhua",
+    "siteKey": "yymanhua.com",
+    "matches": [
+      "yymanhua.com"
+    ]
+  },
+  {
+    "id": "antbyw",
+    "siteKey": "www.antbyw.com",
+    "matches": [
+      "www.antbyw.com"
+    ]
+  },
+  {
+    "id": "jmanga",
+    "siteKey": "jmanga.*",
+    "matches": [
+      "jmanga.*",
+      "*.jmanga.*"
+    ]
+  },
+  {
+    "id": "news.talos-web",
+    "siteKey": "news.talos-web.com",
+    "matches": [
+      "news.talos-web.com"
+    ]
+  },
+  {
+    "id": "twicomi",
+    "siteKey": "twicomi.com",
+    "matches": [
+      "https://twicomi.com/manga*"
+    ]
+  },
+  {
+    "id": "wnacg",
+    "siteKey": "wnacg.com",
+    "matches": [
+      "wnacg.com",
+      "www.wnacg.com",
+      "www.wn02.cc",
+      "www.wnacg.ru",
+      "www.wnacg*.cc"
+    ]
+  },
+  {
+    "id": "readcomicsonline",
+    "siteKey": "readcomicsonline.ru",
+    "matches": [
+      "readcomicsonline.ru"
+    ]
+  },
+  {
+    "id": "nhentai",
+    "siteKey": "nhentai.net",
+    "matches": [
+      "nhentai.net",
+      "6hentai.net",
+      "nhentai.com",
+      "vortexscans.org"
+    ]
+  },
+  {
+    "id": "kemono",
+    "siteKey": "kemono.su",
+    "matches": [
+      "kemono.su",
+      "kemono.cr"
+    ]
+  },
+  {
+    "id": "weebcentral",
+    "siteKey": "weebcentral.com",
+    "matches": [
+      "weebcentral.com"
+    ]
+  },
+  {
+    "id": "iframe-manga",
+    "siteKey": "freeonlinehd.site",
+    "matches": [
+      "freeonlinehd.site",
+      "weebrook.com"
+    ]
+  },
+  {
+    "id": "mangadistrict-manhwaclan",
+    "siteKey": "mangadistrict2.com",
+    "matches": [
+      "mangadistrict2.com",
+      "manhwaclan.com",
+      "manhuaread.com",
+      "www.mangaread.org",
+      "mangaforfree.net",
+      "bakamh.com",
+      "yakshascans.com",
+      "topcomicporno.com",
+      "toonclash.com",
+      "rawdex.net",
+      "reset-scans.org",
+      "cultivationmanhua.com",
+      "freeonlinehd.site",
+      "weebrook.com"
+    ]
+  },
+  {
+    "id": "wn01",
+    "siteKey": "www.wn01.*",
+    "matches": [
+      "www.wn01.*"
+    ]
+  },
+  {
+    "id": "pixhentai.com",
+    "siteKey": "pixhentai.com",
+    "matches": [
+      "pixhentai.com"
+    ]
+  },
+  {
+    "id": "manhwaread",
+    "siteKey": "manhwaread.com",
+    "matches": [
+      "manhwaread.com",
+      "www.manhwaread.com"
+    ]
+  },
+  {
+    "id": "manhwabuddy",
+    "siteKey": "manhwabuddy.com",
+    "matches": [
+      "manhwabuddy.com"
+    ]
+  },
+  {
+    "id": "zerobywai",
+    "siteKey": "www.zerobywai.com",
+    "matches": [
+      "www.zerobywai.com"
+    ]
+  },
+  {
+    "id": "toongod",
+    "siteKey": "toongod.cc",
+    "matches": [
+      "toongod.cc"
+    ]
+  },
+  {
+    "id": "fantia",
+    "siteKey": "fantia_notranslate.*",
+    "matches": [
+      "fantia_notranslate.*"
+    ]
+  },
+  {
+    "id": "wto.to",
+    "siteKey": "wto.to",
+    "matches": [
+      "wto.to"
+    ]
+  },
+  {
+    "id": "pash-up",
+    "siteKey": "pash-up.jp",
+    "matches": [
+      "pash-up.jp"
+    ]
+  },
+  {
+    "id": "piccoma.com",
+    "siteKey": "piccoma.com",
+    "matches": [
+      "piccoma.com"
+    ]
+  },
+  {
+    "id": "sukima",
+    "siteKey": "www.sukima.me",
+    "matches": [
+      "www.sukima.me"
+    ]
+  },
+  {
+    "id": "colamanga",
+    "siteKey": "www.colamanga.com",
+    "matches": [
+      "www.colamanga.com"
+    ]
+  },
+  {
+    "id": "ganganonline",
+    "siteKey": "*.ganganonline.com",
+    "matches": [
+      "*.ganganonline.com"
+    ]
+  },
+  {
+    "id": "bato",
+    "siteKey": "bato.to",
+    "matches": [
+      "bato.to",
+      "battwo.com",
+      "bato.si",
+      "mto.to"
+    ]
+  },
+  {
+    "id": "asuracomic",
+    "siteKey": "asuracomic.net",
+    "matches": [
+      "asuracomic.net"
+    ]
+  },
+  {
+    "id": "asurascanz",
+    "siteKey": "asurascanz.com",
+    "matches": [
+      "asurascanz.com"
+    ]
+  },
+  {
+    "id": "asurascans",
+    "siteKey": "asurascans.com",
+    "matches": [
+      "asurascans.com"
+    ]
+  },
+  {
+    "id": "lezhinus",
+    "siteKey": "www.lezhinus.com",
+    "matches": [
+      "www.lezhinus.com"
+    ]
+  },
+  {
+    "id": "allmanga",
+    "siteKey": "allmanga.to",
+    "matches": [
+      "allmanga.to"
+    ]
+  },
+  {
+    "id": "allporncomic",
+    "siteKey": "allporncomic.com",
+    "matches": [
+      "allporncomic.com"
+    ]
+  },
+  {
+    "id": "mangaz",
+    "siteKey": "*.mangaz.com",
+    "matches": [
+      "*.mangaz.com"
+    ]
+  },
+  {
+    "id": "girls-h-comics",
+    "siteKey": "girls-h-comics.com",
+    "matches": [
+      "girls-h-comics.com"
+    ]
+  },
+  {
+    "id": "futabanet",
+    "siteKey": "gaugau.futabanet_block_too_much.jp",
+    "matches": [
+      "gaugau.futabanet_block_too_much.jp"
+    ]
+  },
+  {
+    "id": "mrblue",
+    "siteKey": "*.mrblue.com",
+    "matches": [
+      "*.mrblue.com"
+    ]
+  },
+  {
+    "id": "web-ace",
+    "siteKey": "web-ace.*",
+    "matches": [
+      "web-ace.*"
+    ]
+  },
+  {
+    "id": "toonily",
+    "siteKey": "toonily_notranslate.me",
+    "matches": [
+      "toonily_notranslate.me"
+    ]
+  },
+  {
+    "id": "omegascans",
+    "siteKey": "omegascans_notranslate.org",
+    "matches": [
+      "omegascans_notranslate.org",
+      "reaperscans.com",
+      "www.omegascans.org"
+    ]
+  },
+  {
+    "id": "zerobywzz",
+    "siteKey": "www.zerobywzz.com",
+    "matches": [
+      "www.zerobywzz.com"
+    ]
+  },
+  {
+    "id": "dokusho-ojikan.jp",
+    "siteKey": "dokusho-ojikan.jp",
+    "matches": [
+      "dokusho-ojikan.jp"
+    ]
+  },
+  {
+    "id": "newtoki468",
+    "siteKey": "newtoki*.com",
+    "matches": [
+      "newtoki*.com"
     ]
   },
   {
@@ -1737,6 +2926,28 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "idmzj",
+    "siteKey": "m.idmzj.com",
+    "matches": [
+      "m.idmzj.com"
+    ]
+  },
+  {
+    "id": "bomtoon",
+    "siteKey": "www.bomtoon_notranslate.com",
+    "matches": [
+      "www.bomtoon_notranslate.com",
+      "www.bomtoon.com"
+    ]
+  },
+  {
+    "id": "yamibo",
+    "siteKey": "www.yamibo.com",
+    "matches": [
+      "www.yamibo.com"
+    ]
+  },
+  {
     "id": "datalab.naver",
     "siteKey": "datalab.naver.com",
     "matches": [
@@ -1744,10 +2955,38 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "copymanga",
+    "siteKey": "www.copymanga.site",
+    "matches": [
+      "www.copymanga.site"
+    ]
+  },
+  {
+    "id": "readcomiconline",
+    "siteKey": "readcomiconline.li",
+    "matches": [
+      "readcomiconline.li"
+    ]
+  },
+  {
     "id": "championcross.jp",
     "siteKey": "championcross.jp",
     "matches": [
       "https://championcross.jp"
+    ]
+  },
+  {
+    "id": "comic-zenon",
+    "siteKey": "comic-zenon.com",
+    "matches": [
+      "comic-zenon.com"
+    ]
+  },
+  {
+    "id": "mechacomic.jp",
+    "siteKey": "mechacomic.jp",
+    "matches": [
+      "mechacomic.jp"
     ]
   },
   {
@@ -1770,6 +3009,102 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "comic-top",
+    "siteKey": "comic-top.com",
+    "matches": [
+      "comic-top.com"
+    ]
+  },
+  {
+    "id": "mangafire",
+    "siteKey": "mangafire.to",
+    "matches": [
+      "mangafire.to"
+    ]
+  },
+  {
+    "id": "jumptoon-next",
+    "siteKey": "jumptoon-next.com",
+    "matches": [
+      "jumptoon-next.com"
+    ]
+  },
+  {
+    "id": "jumptoon",
+    "siteKey": "jumptoon_tiaoman.com",
+    "matches": [
+      "jumptoon_tiaoman.com",
+      "jumptoon.com"
+    ]
+  },
+  {
+    "id": "comic-trail",
+    "siteKey": "comic-trail.com",
+    "matches": [
+      "comic-trail.com"
+    ]
+  },
+  {
+    "id": "comic-walker",
+    "siteKey": "comic-walker.com",
+    "matches": [
+      "comic-walker.com"
+    ]
+  },
+  {
+    "id": "comick",
+    "siteKey": "comick.io",
+    "matches": [
+      "comick.io",
+      "comick.art"
+    ]
+  },
+  {
+    "id": "manga18fx",
+    "siteKey": "manga18fx.com",
+    "matches": [
+      "manga18fx.com",
+      "bakamh.ru"
+    ]
+  },
+  {
+    "id": "mangasincensura",
+    "siteKey": "www.mangasincensura.com",
+    "matches": [
+      "www.mangasincensura.com"
+    ]
+  },
+  {
+    "id": "manhwa-raw",
+    "siteKey": "manhwa-raw.com",
+    "matches": [
+      "manhwa-raw.com",
+      "ero18x.com"
+    ]
+  },
+  {
+    "id": "lrr.tvc-16.science",
+    "siteKey": "lrr.tvc-16.science",
+    "matches": [
+      "lrr.tvc-16.science"
+    ]
+  },
+  {
+    "id": "mangarawad",
+    "siteKey": "mangarawad.org",
+    "matches": [
+      "mangarawad.org",
+      "mangarawad.blog"
+    ]
+  },
+  {
+    "id": "managall",
+    "siteKey": "s1.managall.com",
+    "matches": [
+      "s1.managall.com"
+    ]
+  },
+  {
     "id": "runoob",
     "siteKey": "www.runoob.com",
     "matches": [
@@ -1777,10 +3112,52 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "manhwato",
+    "siteKey": "manhwato.com",
+    "matches": [
+      "manhwato.com"
+    ]
+  },
+  {
+    "id": "manhwatop",
+    "siteKey": "manhwatop.com",
+    "matches": [
+      "manhwatop.com"
+    ]
+  },
+  {
+    "id": "manga-park",
+    "siteKey": "manga-park.com",
+    "matches": [
+      "manga-park.com"
+    ]
+  },
+  {
+    "id": "ko-comic",
+    "siteKey": "*comic.naver.com",
+    "matches": [
+      "*comic.naver.com"
+    ]
+  },
+  {
+    "id": "fxfx302",
+    "siteKey": "fxfx302.com",
+    "matches": [
+      "fxfx302.com"
+    ]
+  },
+  {
     "id": "pixiv",
     "siteKey": "www.pixiv.net",
     "matches": [
       "www.pixiv.net"
+    ]
+  },
+  {
+    "id": "newtoki341.com",
+    "siteKey": "newtoki_notranslate*.com",
+    "matches": [
+      "newtoki_notranslate*.com"
     ]
   },
   {
@@ -1798,6 +3175,328 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "writing.com",
+    "siteKey": "writing.com",
+    "matches": [
+      "writing.com"
+    ]
+  },
+  {
+    "id": "comic-fuz",
+    "siteKey": "comic-fuz.com",
+    "matches": [
+      "comic-fuz.com"
+    ]
+  },
+  {
+    "id": "mangadex",
+    "siteKey": "mangadex.org",
+    "matches": [
+      "mangadex.org"
+    ]
+  },
+  {
+    "id": "kuaikanmanhua",
+    "siteKey": "*.kuaikanmanhua_notranslate.com",
+    "matches": [
+      "*.kuaikanmanhua_notranslate.com"
+    ]
+  },
+  {
+    "id": "sexkomix2",
+    "siteKey": "sexkomix2.com",
+    "matches": [
+      "sexkomix2.com"
+    ]
+  },
+  {
+    "id": "mangapark",
+    "siteKey": "mangapark.net",
+    "matches": [
+      "mangapark.net",
+      "mangapark.to",
+      "mangapark.org"
+    ]
+  },
+  {
+    "id": "mangaflame",
+    "siteKey": "mangaflame.org",
+    "matches": [
+      "mangaflame.org",
+      "manhwa404.com"
+    ]
+  },
+  {
+    "id": "templetoons",
+    "siteKey": "templetoons.com",
+    "matches": [
+      "templetoons.com"
+    ]
+  },
+  {
+    "id": "poipiku",
+    "siteKey": "poipiku.com",
+    "matches": [
+      "poipiku.com"
+    ]
+  },
+  {
+    "id": "batocomic",
+    "siteKey": "batocomic.net",
+    "matches": [
+      "batocomic.net",
+      "zbato.org"
+    ]
+  },
+  {
+    "id": "mangasuika",
+    "siteKey": "www.mangasuika.com",
+    "matches": [
+      "www.mangasuika.com"
+    ]
+  },
+  {
+    "id": "firemanga",
+    "siteKey": "www.firemanga.com",
+    "matches": [
+      "www.firemanga.com"
+    ]
+  },
+  {
+    "id": "lmanga",
+    "siteKey": "www.lmanga.com",
+    "matches": [
+      "www.lmanga.com"
+    ]
+  },
+  {
+    "id": "ganma",
+    "siteKey": "share.ganma.jp",
+    "matches": [
+      "share.ganma.jp",
+      "ganma.jp"
+    ]
+  },
+  {
+    "id": "manhwahub",
+    "siteKey": "manhwahub.net",
+    "matches": [
+      "manhwahub.net",
+      "manhuatop.org",
+      "aedexnox.vxviral.xyz"
+    ]
+  },
+  {
+    "id": "hentaizap",
+    "siteKey": "hentaizap.com",
+    "matches": [
+      "hentaizap.com"
+    ]
+  },
+  {
+    "id": "younganimal",
+    "siteKey": "younganimal.com",
+    "matches": [
+      "younganimal.com"
+    ]
+  },
+  {
+    "id": "bilibili-manga",
+    "siteKey": "manga.bilibili.com",
+    "matches": [
+      "manga.bilibili.com"
+    ]
+  },
+  {
+    "id": "comic-growl",
+    "siteKey": "comic-growl.com",
+    "matches": [
+      "comic-growl.com"
+    ]
+  },
+  {
+    "id": "manhuabika",
+    "siteKey": "manhuabika.com",
+    "matches": [
+      "manhuabika.com"
+    ]
+  },
+  {
+    "id": "manhwahentai",
+    "siteKey": "manhwahentai.io",
+    "matches": [
+      "manhwahentai.io",
+      "beehentai.com"
+    ]
+  },
+  {
+    "id": "xmanga",
+    "siteKey": "xmanga.org",
+    "matches": [
+      "xmanga.org"
+    ]
+  },
+  {
+    "id": "comic-action",
+    "siteKey": "comic-action.com",
+    "matches": [
+      "comic-action.com"
+    ]
+  },
+  {
+    "id": "animatebookstore",
+    "siteKey": "www.animatebookstore.com",
+    "matches": [
+      "www.animatebookstore.com"
+    ]
+  },
+  {
+    "id": "rokuhentai",
+    "siteKey": "rokuhentai.com",
+    "matches": [
+      "rokuhentai.com"
+    ]
+  },
+  {
+    "id": "hanime1",
+    "siteKey": "hanime1.me",
+    "matches": [
+      "hanime1.me"
+    ]
+  },
+  {
+    "id": "rawotaku",
+    "siteKey": "rawotaku.com",
+    "matches": [
+      "rawotaku.com"
+    ]
+  },
+  {
+    "id": "rawkuma.net",
+    "siteKey": "rawkuma.net",
+    "matches": [
+      "rawkuma.net",
+      "florascans.net"
+    ]
+  },
+  {
+    "id": "pixiv.app",
+    "siteKey": "pixiv.app",
+    "matches": [
+      "pixiv.app"
+    ]
+  },
+  {
+    "id": "speed-manga",
+    "siteKey": "speed-manga.com",
+    "matches": [
+      "speed-manga.com"
+    ]
+  },
+  {
+    "id": "cmoa",
+    "siteKey": "www.cmoa.jp",
+    "matches": [
+      "www.cmoa.jp",
+      "booklive.jp",
+      "www.yomonga.com"
+    ]
+  },
+  {
+    "id": "global.manga",
+    "siteKey": "global.manga-up.com",
+    "matches": [
+      "global.manga-up.com"
+    ]
+  },
+  {
+    "id": "mangaball",
+    "siteKey": "mangaball.net",
+    "matches": [
+      "mangaball.net"
+    ]
+  },
+  {
+    "id": "yanmaga.jp",
+    "siteKey": "yanmaga.jp",
+    "matches": [
+      "yanmaga.jp",
+      "viewer.bookhodai.jp"
+    ]
+  },
+  {
+    "id": "tkr-manga",
+    "siteKey": "tkr*.com",
+    "matches": [
+      "tkr*.com"
+    ]
+  },
+  {
+    "id": "manhwa18.com",
+    "siteKey": "manhwa18.com",
+    "matches": [
+      "manhwa18.com"
+    ]
+  },
+  {
+    "id": "comic.mf-fleur.jp",
+    "siteKey": "comic.mf-fleur.jp",
+    "matches": [
+      "comic.mf-fleur.jp"
+    ]
+  },
+  {
+    "id": "wfwf",
+    "siteKey": "wfwf395.com",
+    "matches": [
+      "wfwf395.com",
+      "wfwf399.com"
+    ]
+  },
+  {
+    "id": "play.comipo.app",
+    "siteKey": "play.comipo.app",
+    "matches": [
+      "play.comipo.app"
+    ]
+  },
+  {
+    "id": "mangafreak",
+    "siteKey": "ww2.mangafreak.me",
+    "matches": [
+      "ww2.mangafreak.me"
+    ]
+  },
+  {
+    "id": "komiic",
+    "siteKey": "komiic.com",
+    "matches": [
+      "komiic.com"
+    ]
+  },
+  {
+    "id": "page.kakao",
+    "siteKey": "page.kakao.com",
+    "matches": [
+      "page.kakao.com"
+    ]
+  },
+  {
+    "id": "manhwaus.org",
+    "siteKey": "manhwaus.org",
+    "matches": [
+      "manhwaus.org",
+      "manga18.me"
+    ]
+  },
+  {
+    "id": "tichct",
+    "siteKey": "www.tichct.org",
+    "matches": [
+      "www.tichct.org"
+    ]
+  },
+  {
     "id": "frontendmasters",
     "siteKey": "frontendmasters.com",
     "matches": [
@@ -1806,9 +3505,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "udacity",
-    "siteKey": "udacity.com",
+    "siteKey": "*.udacity.com",
     "matches": [
       "*.udacity.com"
+    ]
+  },
+  {
+    "id": "skillshare",
+    "siteKey": "www.skillshare.com",
+    "matches": [
+      "www.skillshare.com"
     ]
   },
   {
@@ -1833,6 +3539,27 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "svtplay",
+    "siteKey": "www.svtplay.se",
+    "matches": [
+      "www.svtplay.se"
+    ]
+  },
+  {
+    "id": "unity-learn",
+    "siteKey": "learn.unity.com",
+    "matches": [
+      "learn.unity.com"
+    ]
+  },
+  {
+    "id": "hbogo",
+    "siteKey": "www.hbogoasia.*",
+    "matches": [
+      "www.hbogoasia.*"
+    ]
+  },
+  {
     "id": "barrons",
     "siteKey": "www.barrons.com",
     "matches": [
@@ -1844,6 +3571,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "scrimba.com",
     "matches": [
       "scrimba.com"
+    ]
+  },
+  {
+    "id": "video-barrons",
+    "siteKey": "video-api.wsj.com",
+    "matches": [
+      "video-api.wsj.com"
+    ]
+  },
+  {
+    "id": "aetv",
+    "siteKey": "play.aetv.com",
+    "matches": [
+      "play.aetv.com"
     ]
   },
   {
@@ -1892,14 +3633,14 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "linkin",
-    "siteKey": "linkedin.com",
+    "siteKey": "*.linkedin.com",
     "matches": [
       "*.linkedin.com"
     ]
   },
   {
     "id": "kanopy",
-    "siteKey": "kanopy.com",
+    "siteKey": "*.kanopy.com",
     "matches": [
       "*.kanopy.com"
     ]
@@ -1935,6 +3676,54 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "itv",
+    "siteKey": "*.itv.com",
+    "matches": [
+      "*.itv.com"
+    ]
+  },
+  {
+    "id": "vk.com",
+    "siteKey": "vkvideo.ru",
+    "matches": [
+      "vk.com/video*",
+      "vkvideo.ru"
+    ]
+  },
+  {
+    "id": "egghead",
+    "siteKey": "egghead.io",
+    "matches": [
+      "egghead.io"
+    ]
+  },
+  {
+    "id": "coursera1",
+    "selectorMatches": [
+      ".rc-MetatagsWrapper .rc-VLPContainerWrapperCds"
+    ]
+  },
+  {
+    "id": "coursera2",
+    "selectorMatches": [
+      ".rc-MetatagsWrapper .rc-Course"
+    ]
+  },
+  {
+    "id": "whop",
+    "siteKey": "courses.apps.whop.com",
+    "matches": [
+      "courses.apps.whop.com"
+    ]
+  },
+  {
+    "id": "servicenow",
+    "siteKey": "www.servicenow.com",
+    "matches": [
+      "www.servicenow.com"
+    ]
+  },
+  {
     "id": "quark",
     "siteKey": "pan.quark.*",
     "matches": [
@@ -1942,10 +3731,32 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "kika",
+    "siteKey": "www.kika.de",
+    "matches": [
+      "www.kika.de"
+    ]
+  },
+  {
+    "id": "ocrtraining",
+    "siteKey": "ocrtraining.cit.nih.gov",
+    "matches": [
+      "ocrtraining.cit.nih.gov",
+      "videocast.nih.gov"
+    ]
+  },
+  {
     "id": "espn",
-    "siteKey": "espn.com",
+    "siteKey": "*.espn.com",
     "matches": [
       "*.espn.com"
+    ]
+  },
+  {
+    "id": "anthropic-course",
+    "siteKey": "anthropic.skilljar.com",
+    "matches": [
+      "anthropic.skilljar.com"
     ]
   },
   {
@@ -1982,28 +3793,28 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "dailymotion",
-    "siteKey": "dailymotion.com",
+    "siteKey": "*.dailymotion.com",
     "matches": [
       "*.dailymotion.com"
     ]
   },
   {
     "id": "crunchyroll",
-    "siteKey": "crunchyroll.com",
+    "siteKey": "*.crunchyroll.com",
     "matches": [
       "*.crunchyroll.com"
     ]
   },
   {
     "id": "osmosis",
-    "siteKey": "osmosis.org",
+    "siteKey": "*.osmosis.org",
     "matches": [
       "*.osmosis.org"
     ]
   },
   {
     "id": "pbs",
-    "siteKey": "pbs.org",
+    "siteKey": "*.pbs.org",
     "matches": [
       "*.pbs.org"
     ]
@@ -2023,6 +3834,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "smartpoly.teachable.com",
+    "siteKey": "smartpoly.teachable.com",
+    "matches": [
+      "smartpoly.teachable.com"
+    ]
+  },
+  {
     "id": "themotionmagic",
     "siteKey": "player.hotmart.com",
     "matches": [
@@ -2034,7 +3852,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "movie-web",
-    "siteKey": "movie-web.app",
+    "siteKey": "vidsrc.xyz",
     "matches": [
       "movie-web.app/media*",
       "movie-web-me.vercel.app/media*",
@@ -2064,8 +3882,15 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "backrooms-wiki",
+    "siteKey": "backrooms-wiki.wikidot.com",
+    "matches": [
+      "backrooms-wiki.wikidot.com"
+    ]
+  },
+  {
     "id": "hubspotvideo",
-    "siteKey": "hubspotvideo.com",
+    "siteKey": "*.hubspotvideo.com",
     "matches": [
       "*.hubspotvideo.com"
     ]
@@ -2079,9 +3904,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "paramountplus",
-    "siteKey": "paramountplus.com",
+    "siteKey": "*.paramountplus.com",
     "matches": [
       "*.paramountplus.com"
+    ]
+  },
+  {
+    "id": "plex.tv",
+    "siteKey": "watch.plex.tv",
+    "matches": [
+      "watch.plex.tv"
     ]
   },
   {
@@ -2158,7 +3990,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "player.vimeo",
-    "siteKey": "player.vimeo.com",
+    "siteKey": "www.physeo.com",
     "matches": [
       "https://player.vimeo.com/video/*",
       "www.physeo.com"
@@ -2168,8 +4000,15 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "laracasts.com",
+    "siteKey": "laracasts.com",
+    "matches": [
+      "laracasts.com"
+    ]
+  },
+  {
     "id": "tv.adobe",
-    "siteKey": "tv.adobe.com",
+    "siteKey": "*.tv.adobe.com",
     "matches": [
       "https://*.tv.adobe.com"
     ]
@@ -2183,9 +4022,23 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "comsol",
-    "siteKey": "comsol.com",
+    "siteKey": "*.comsol.com",
     "matches": [
       "*.comsol.com"
+    ]
+  },
+  {
+    "id": "jove",
+    "siteKey": "*.jove.com",
+    "matches": [
+      "*.jove.com"
+    ]
+  },
+  {
+    "id": "rumble",
+    "siteKey": "rumble.com",
+    "matches": [
+      "rumble.com"
     ]
   },
   {
@@ -2208,7 +4061,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "edx",
-    "siteKey": "edx.org",
+    "siteKey": "courses.mitxonline.mit.edu",
     "matches": [
       "*.edx.org",
       "courses.mitxonline.mit.edu"
@@ -2237,7 +4090,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "bbc",
-    "siteKey": "bbc.*",
+    "siteKey": "*.bbc.*",
     "matches": [
       "*.bbc.*"
     ]
@@ -2250,6 +4103,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "piped.video",
+    "siteKey": "piped.video",
+    "matches": [
+      "piped.video"
+    ]
+  },
+  {
     "id": "disneyplus",
     "siteKey": "www.disneyplus.com",
     "matches": [
@@ -2257,8 +4117,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "mubi",
+    "siteKey": "mubi.com",
+    "matches": [
+      "https://mubi.com",
+      "https://mubi.de"
+    ]
+  },
+  {
     "id": "hulu",
-    "siteKey": "hulu.com",
+    "siteKey": "*.hulu.com",
     "matches": [
       "https://*.hulu.com",
       "https://*.hulu.*"
@@ -2279,10 +4147,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "jointherealworld",
+    "siteKey": "app.jointherealworld.com",
+    "matches": [
+      "app.jointherealworld.com"
+    ]
+  },
+  {
     "id": "rtve",
     "siteKey": "www.rtve.*",
     "matches": [
       "www.rtve.*"
+    ]
+  },
+  {
+    "id": "dmm",
+    "siteKey": "tv.dmm.com",
+    "matches": [
+      "tv.dmm.com"
     ]
   },
   {
@@ -2356,6 +4238,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "codewithandrea",
+    "siteKey": "customer-*.cloudflarestream.com",
+    "matches": [
+      "customer-*.cloudflarestream.com"
+    ]
+  },
+  {
     "id": "ucdavis",
     "siteKey": "aggievideo.canvas.ucdavis.edu",
     "matches": [
@@ -2399,7 +4288,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "dr",
-    "siteKey": "dr.dk",
+    "siteKey": "*.dr.dk",
     "matches": [
       "*.dr.dk"
     ]
@@ -2478,6 +4367,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "fibery",
+    "siteKey": "the.fibery.io",
+    "matches": [
+      "the.fibery.io"
+    ]
+  },
+  {
     "id": "bardGoogle",
     "siteKey": "bard.google.com",
     "matches": [
@@ -2500,12 +4396,19 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "otherGoogle",
-    "siteKey": "google.com",
+    "siteKey": "dart.dev",
     "matches": [
       "*.google.com",
       "dart.dev",
       "*.google",
       "*.googleapis.com"
+    ]
+  },
+  {
+    "id": "etymonline",
+    "siteKey": "www.etymonline.com",
+    "matches": [
+      "www.etymonline.com"
     ]
   },
   {
@@ -2535,9 +4438,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "tandfonline",
-    "siteKey": "tandfonline.com",
+    "siteKey": "*.tandfonline.com",
     "matches": [
       "*.tandfonline.com"
+    ]
+  },
+  {
+    "id": "boringreport",
+    "siteKey": "www.boringreport.org",
+    "matches": [
+      "www.boringreport.org"
     ]
   },
   {
@@ -2549,9 +4459,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "peacocktv",
-    "siteKey": "peacocktv.com",
+    "siteKey": "*.peacocktv.com",
     "matches": [
       "*.peacocktv.com"
+    ]
+  },
+  {
+    "id": "jmir",
+    "siteKey": "*.jmir.org",
+    "matches": [
+      "*.jmir.org"
     ]
   },
   {
@@ -2569,6 +4486,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "learnopengl",
+    "siteKey": "learnopengl.com",
+    "matches": [
+      "learnopengl.com"
+    ]
+  },
+  {
     "id": "notateslaapp",
     "siteKey": "www.notateslaapp.com",
     "matches": [
@@ -2577,9 +4501,16 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "eightfold",
-    "siteKey": "eightfold.ai",
+    "siteKey": "*.eightfold.ai",
     "matches": [
       "*.eightfold.ai"
+    ]
+  },
+  {
+    "id": "chub.ai",
+    "siteKey": "chub.ai",
+    "matches": [
+      "chub.ai"
     ]
   },
   {
@@ -2597,6 +4528,12 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "gradio-app",
+    "selectorMatches": [
+      "gradio-app"
+    ]
+  },
+  {
     "id": "hadoop.apache.org",
     "siteKey": "hadoop.apache.org",
     "matches": [
@@ -2611,6 +4548,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "docs.unity.cn",
+    "siteKey": "docs.unity.cn",
+    "matches": [
+      "docs.unity.cn"
+    ]
+  },
+  {
     "id": "pubs.acs.org",
     "siteKey": "pubs.acs.org",
     "matches": [
@@ -2618,6 +4562,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ],
     "excludeMatches": [
       "pubs.acs.org/doi/pdf*"
+    ]
+  },
+  {
+    "id": "typeset.io",
+    "siteKey": "typeset.io",
+    "matches": [
+      "typeset.io"
+    ]
+  },
+  {
+    "id": "transformer-circuits.pub",
+    "siteKey": "transformer-circuits.pub",
+    "matches": [
+      "transformer-circuits.pub"
     ]
   },
   {
@@ -2691,10 +4649,35 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "trankynam",
+    "siteKey": "www.trankynam.com",
+    "matches": [
+      "www.trankynam.com"
+    ]
+  },
+  {
     "id": "chromium",
-    "siteKey": "chromium.org",
+    "siteKey": "*.chromium.org",
     "matches": [
       "*.chromium.org"
+    ]
+  },
+  {
+    "id": "noRichTranslate",
+    "siteKey": "www.omim.org",
+    "matches": [
+      "www.omim.org",
+      "*.nisanyanadlar.com",
+      "www.360doc.cn"
+    ]
+  },
+  {
+    "id": "longPage",
+    "siteKey": "neuralnetworksanddeeplearning.com",
+    "matches": [
+      "neuralnetworksanddeeplearning.com",
+      "www.alphapolis.co.jp",
+      "sive.rs"
     ]
   },
   {
@@ -2712,6 +4695,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "duolingo",
+    "siteKey": "www.duolingo.com",
+    "matches": [
+      "www.duolingo.com"
+    ]
+  },
+  {
     "id": "sp-codeSites",
     "siteKey": "docs.wxwidgets.org",
     "matches": [
@@ -2726,6 +4716,184 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "sphinx-rtd-theme",
+    "selectorMatches": [
+      ".wy-nav-side"
+    ]
+  },
+  {
+    "id": "arenascan",
+    "siteKey": "arenascan.com",
+    "matches": [
+      "arenascan.com",
+      "luvyaa.my.id"
+    ]
+  },
+  {
+    "id": "manhuaplus",
+    "siteKey": "manhuaplus.org",
+    "matches": [
+      "manhuaplus.org"
+    ]
+  },
+  {
+    "id": "hentai.name",
+    "siteKey": "www.hentai.name",
+    "matches": [
+      "www.hentai.name"
+    ]
+  },
+  {
+    "id": "www.manhuazhan.com",
+    "siteKey": "www.manhuazhan.com",
+    "matches": [
+      "www.manhuazhan.com"
+    ]
+  },
+  {
+    "id": "momon-ga.com",
+    "siteKey": "momon-ga.com",
+    "matches": [
+      "momon-ga.com"
+    ]
+  },
+  {
+    "id": "blossommanga.com",
+    "siteKey": "blossommanga.com",
+    "matches": [
+      "blossommanga.com"
+    ]
+  },
+  {
+    "id": "w226.npdn.top",
+    "siteKey": "w226.npdn.top",
+    "matches": [
+      "w226.npdn.top",
+      "www.hmttmh.com"
+    ]
+  },
+  {
+    "id": "dlsite",
+    "siteKey": "*.dlsite.com",
+    "matches": [
+      "*.dlsite.com"
+    ]
+  },
+  {
+    "id": "rawkuma",
+    "siteKey": "rawkuma.com",
+    "matches": [
+      "rawkuma.com"
+    ]
+  },
+  {
+    "id": "manhuaus.com",
+    "siteKey": "manhuaus.com",
+    "matches": [
+      "manhuaus.com"
+    ]
+  },
+  {
+    "id": "toondex",
+    "siteKey": "toondex.co",
+    "matches": [
+      "toondex.co"
+    ]
+  },
+  {
+    "id": "jestful",
+    "siteKey": "jestful.net",
+    "matches": [
+      "jestful.net"
+    ]
+  },
+  {
+    "id": "manwadd",
+    "siteKey": "manwadd.cc",
+    "matches": [
+      "manwadd.cc",
+      "manwadb.cc",
+      "manwadb.xyz",
+      "manwath.cc",
+      "manwa.me",
+      "manwa*.*"
+    ]
+  },
+  {
+    "id": "saucemanhwa",
+    "siteKey": "saucemanhwa.com",
+    "matches": [
+      "saucemanhwa.com",
+      "saucemanhwa.org"
+    ]
+  },
+  {
+    "id": "kaijimanga",
+    "siteKey": "w9.kaijimanga.com",
+    "matches": [
+      "w9.kaijimanga.com",
+      "rawfree.*"
+    ]
+  },
+  {
+    "id": "mangakoinu",
+    "siteKey": "www.mangakoinu.com",
+    "matches": [
+      "www.mangakoinu.com"
+    ]
+  },
+  {
+    "id": "comicmanga",
+    "siteKey": "comicmanga.cc",
+    "matches": [
+      "comicmanga.cc"
+    ]
+  },
+  {
+    "id": "mangajikan",
+    "siteKey": "www.mangajikan.com",
+    "matches": [
+      "www.mangajikan.com"
+    ]
+  },
+  {
+    "id": "manhwaden",
+    "siteKey": "www.manhwaden.com",
+    "matches": [
+      "www.manhwaden.com"
+    ]
+  },
+  {
+    "id": "jcomic",
+    "siteKey": "jcomic.net",
+    "matches": [
+      "jcomic.net"
+    ]
+  },
+  {
+    "id": "komiku",
+    "siteKey": "komiku.com",
+    "matches": [
+      "komiku.com",
+      "komiku.one",
+      "manga18fx.cc"
+    ]
+  },
+  {
+    "id": "sololevelingmangafree",
+    "siteKey": "www.sololevelingmangafree.com",
+    "matches": [
+      "www.sololevelingmangafree.com"
+    ]
+  },
+  {
+    "id": "dvamh-vzwp7",
+    "siteKey": "dvamh-vzwp7.top",
+    "matches": [
+      "dvamh-vzwp7.top"
+    ]
+  },
+  {
     "id": "followis",
     "siteKey": "app.follow.is",
     "matches": [
@@ -2734,7 +4902,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "svelte",
-    "siteKey": "svelte.dev",
+    "siteKey": "learn.svelte.dev",
     "matches": [
       "svelte.dev/docs/*",
       "learn.svelte.dev"
@@ -2749,7 +4917,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "service-now",
-    "siteKey": "service-now.com",
+    "siteKey": "*.service-now.com",
     "matches": [
       "*.service-now.com"
     ]
@@ -2776,6 +4944,213 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "palcy",
+    "siteKey": "palcy.jp",
+    "matches": [
+      "palcy.jp"
+    ]
+  },
+  {
+    "id": "xbato",
+    "siteKey": "xbato.com",
+    "matches": [
+      "xbato.com"
+    ]
+  },
+  {
+    "id": "syosetu",
+    "siteKey": "syosetu.si",
+    "matches": [
+      "syosetu.si"
+    ]
+  },
+  {
+    "id": "iqiyi-manga",
+    "siteKey": "www.iqiyi.com",
+    "matches": [
+      "www.iqiyi.com/manhua/*"
+    ]
+  },
+  {
+    "id": "mangarawjp",
+    "siteKey": "mangarawjp.me",
+    "matches": [
+      "mangarawjp.me"
+    ]
+  },
+  {
+    "id": "cartoonporn",
+    "siteKey": "cartoonporn.to",
+    "matches": [
+      "cartoonporn.to"
+    ]
+  },
+  {
+    "id": "e621",
+    "siteKey": "e621.net",
+    "matches": [
+      "e621.net"
+    ]
+  },
+  {
+    "id": "comic.pixiv.net",
+    "siteKey": "comic.pixiv.net",
+    "matches": [
+      "comic.pixiv.net"
+    ]
+  },
+  {
+    "id": "www.comico.jp",
+    "siteKey": "www.comico.jp",
+    "matches": [
+      "www.comico.jp"
+    ]
+  },
+  {
+    "id": "rule34",
+    "siteKey": "rule34.xxx",
+    "matches": [
+      "rule34.xxx"
+    ]
+  },
+  {
+    "id": "hentaipaw",
+    "siteKey": "hentaipaw.com",
+    "matches": [
+      "hentaipaw.com",
+      "ja.hentaipaw.com"
+    ]
+  },
+  {
+    "id": "mn4u",
+    "siteKey": "mn4u.net",
+    "matches": [
+      "mn4u.net"
+    ]
+  },
+  {
+    "id": "imhentai",
+    "siteKey": "imhentai.xxx",
+    "matches": [
+      "imhentai.xxx"
+    ]
+  },
+  {
+    "id": "book18",
+    "siteKey": "book18.fans",
+    "matches": [
+      "book18.fans"
+    ]
+  },
+  {
+    "id": "18comic",
+    "siteKey": "18comic.vip",
+    "matches": [
+      "18comic.vip"
+    ]
+  },
+  {
+    "id": "uzakichanmanga",
+    "siteKey": "*.uzakichanmanga.com",
+    "matches": [
+      "*.uzakichanmanga.com"
+    ]
+  },
+  {
+    "id": "manhwas",
+    "siteKey": "www.manhwas.men",
+    "matches": [
+      "www.manhwas.men"
+    ]
+  },
+  {
+    "id": "yinmh",
+    "siteKey": "www.yinmh.com",
+    "matches": [
+      "www.yinmh.com"
+    ]
+  },
+  {
+    "id": "webtoonraw",
+    "siteKey": "webtoonraw.com",
+    "matches": [
+      "webtoonraw.com"
+    ]
+  },
+  {
+    "id": "webtoons",
+    "siteKey": "www.webtoons.com",
+    "matches": [
+      "www.webtoons.com",
+      "m.webtoons.com"
+    ]
+  },
+  {
+    "id": "lezhin",
+    "siteKey": "lezhin.com",
+    "matches": [
+      "lezhin.com",
+      "www.lezhin.com"
+    ]
+  },
+  {
+    "id": "ridibooks.com",
+    "siteKey": "ridibooks.com",
+    "matches": [
+      "ridibooks.com"
+    ]
+  },
+  {
+    "id": "sololevelingfree.vip",
+    "siteKey": "sololevelingfree.vip",
+    "matches": [
+      "sololevelingfree.vip"
+    ]
+  },
+  {
+    "id": "topreadmanga.com",
+    "siteKey": "topreadmanga.com",
+    "matches": [
+      "topreadmanga.com",
+      "kissmanga.in"
+    ]
+  },
+  {
+    "id": "revengeoftheiron-bloodedswordhound.one",
+    "siteKey": "revengeoftheiron-bloodedswordhound.one",
+    "matches": [
+      "revengeoftheiron-bloodedswordhound.one"
+    ]
+  },
+  {
+    "id": "www.wn03.ru",
+    "siteKey": "www.wn03.ru",
+    "matches": [
+      "www.wn03.ru"
+    ]
+  },
+  {
+    "id": "www.sunday-webry.com",
+    "siteKey": "www.sunday-webry.com",
+    "matches": [
+      "www.sunday-webry.com"
+    ]
+  },
+  {
+    "id": "ynjn",
+    "siteKey": "ynjn.jp",
+    "matches": [
+      "ynjn.jp"
+    ]
+  },
+  {
+    "id": "mangalove",
+    "siteKey": "mangalove.me",
+    "matches": [
+      "mangalove.me"
+    ]
+  },
+  {
     "id": "www.acrobiosystems.com",
     "siteKey": "www.acrobiosystems.com",
     "matches": [
@@ -2794,6 +5169,34 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "motrix.app",
     "matches": [
       "motrix.app"
+    ]
+  },
+  {
+    "id": "t1.xtoon2.com",
+    "siteKey": "t1.xtoon2.com",
+    "matches": [
+      "t1.xtoon2.com"
+    ]
+  },
+  {
+    "id": "t1.xtoon365.com",
+    "siteKey": "t1.xtoon365.com",
+    "matches": [
+      "t1.xtoon365.com"
+    ]
+  },
+  {
+    "id": "02.ikiru.wtf",
+    "siteKey": "02.ikiru.wtf",
+    "matches": [
+      "02.ikiru.wtf"
+    ]
+  },
+  {
+    "id": "mangahub",
+    "siteKey": "mangahub.ru",
+    "matches": [
+      "mangahub.ru"
     ]
   },
   {
@@ -2832,11 +5235,46 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "z-lib",
+    "siteKey": "*.z-lib.*",
+    "matches": [
+      "*.z-lib.*"
+    ]
+  },
+  {
+    "id": "otter.ai",
+    "siteKey": "otter.ai",
+    "matches": [
+      "otter.ai"
+    ]
+  },
+  {
     "id": "translation-font-size-unset",
     "siteKey": "m.yxlady.com",
     "matches": [
       "m.yxlady.com",
       "web3.fireverseai.com"
+    ]
+  },
+  {
+    "id": "curseforge",
+    "siteKey": "www.curseforge.com",
+    "matches": [
+      "www.curseforge.com"
+    ]
+  },
+  {
+    "id": "duckduckgo",
+    "siteKey": "duckduckgo.com",
+    "matches": [
+      "duckduckgo.com"
+    ]
+  },
+  {
+    "id": "justia",
+    "siteKey": "supreme.justia.com",
+    "matches": [
+      "supreme.justia.com"
     ]
   },
   {
@@ -2854,6 +5292,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "rebang",
+    "siteKey": "rebang.today",
+    "matches": [
+      "rebang.today"
+    ]
+  },
+  {
     "id": "monmouthcoffee",
     "siteKey": "www.monmouthcoffee.*",
     "matches": [
@@ -2868,10 +5313,25 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "mocharymethod.com",
+    "siteKey": "beta.mocharymethod.com",
+    "matches": [
+      "beta.mocharymethod.com"
+    ]
+  },
+  {
     "id": "appsumo",
     "siteKey": "appsumo.com",
     "matches": [
       "appsumo.com"
+    ]
+  },
+  {
+    "id": "bb-rich",
+    "selectorMatches": [
+      "bb-rich-text-editor",
+      ".bb-editor-root",
+      ".ql-editor"
     ]
   },
   {
@@ -2947,15 +5407,36 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "readthedocs",
+    "siteKey": "*.readthedocs.*",
+    "matches": [
+      "*.readthedocs.*"
+    ]
+  },
+  {
+    "id": "surveymyopinion.researchnow",
+    "siteKey": "surveymyopinion.researchnow.com",
+    "matches": [
+      "surveymyopinion.researchnow.com"
+    ]
+  },
+  {
     "id": "xfiction.org",
-    "siteKey": "xfiction.org",
+    "siteKey": "*.xfiction.org",
     "matches": [
       "*.xfiction.org"
     ]
   },
   {
+    "id": "new.rayyan.ai",
+    "siteKey": "new.rayyan.ai",
+    "matches": [
+      "new.rayyan.ai"
+    ]
+  },
+  {
     "id": "aliexpress",
-    "siteKey": "aliexpress.*",
+    "siteKey": "*.aliexpress.*",
     "matches": [
       "*.aliexpress.*"
     ]
@@ -2968,10 +5449,23 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "journals.aps",
+    "siteKey": "journals.aps.*",
+    "matches": [
+      "journals.aps.*"
+    ]
+  },
+  {
     "id": "mobalytics",
     "siteKey": "mobalytics.gg",
     "matches": [
       "mobalytics.gg"
+    ]
+  },
+  {
+    "id": "JeffyReader",
+    "selectorMatches": [
+      "br-span"
     ]
   },
   {
@@ -2998,7 +5492,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "taobao",
-    "siteKey": "taobao.com",
+    "siteKey": "*.taobao.com",
     "matches": [
       "*.taobao.com"
     ]
@@ -3008,6 +5502,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "www.graphcore.ai",
     "matches": [
       "www.graphcore.ai"
+    ]
+  },
+  {
+    "id": "next_westlaw",
+    "siteKey": "*.next.westlaw.com",
+    "matches": [
+      "*.next.westlaw.com"
     ]
   },
   {
@@ -3056,10 +5557,23 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "sp.nexusmods",
+    "selectorMatches": [
+      ".next-container section [data-lexical-editor]"
+    ]
+  },
+  {
     "id": "ollama",
     "siteKey": "ollama.com",
     "matches": [
       "ollama.com"
+    ]
+  },
+  {
+    "id": "ya.ru",
+    "siteKey": "ya.ru",
+    "matches": [
+      "ya.ru"
     ]
   },
   {
@@ -3070,10 +5584,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "rubyonrails",
+    "siteKey": "api.rubyonrails.org",
+    "matches": [
+      "api.rubyonrails.org"
+    ]
+  },
+  {
     "id": "teacherspayteachers",
     "siteKey": "www.teacherspayteachers.com",
     "matches": [
       "www.teacherspayteachers.com/browse/*"
+    ]
+  },
+  {
+    "id": "gothamist",
+    "siteKey": "gothamist.com",
+    "matches": [
+      "gothamist.com"
     ]
   },
   {
@@ -3085,7 +5613,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "1password",
-    "siteKey": "1password.com",
+    "siteKey": "*.1password.com",
     "matches": [
       "*.1password.com"
     ]
@@ -3133,6 +5661,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "turboscribe",
+    "siteKey": "turboscribe.ai",
+    "matches": [
+      "turboscribe.ai"
+    ]
+  },
+  {
     "id": "doc2x",
     "siteKey": "doc2x.com",
     "matches": [
@@ -3141,10 +5676,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "mathsisfun",
+    "siteKey": "www.mathsisfun.com",
+    "matches": [
+      "www.mathsisfun.com"
+    ]
+  },
+  {
     "id": "trade",
     "siteKey": "axiom.trade",
     "matches": [
       "axiom.trade"
+    ]
+  },
+  {
+    "id": "trade-padre",
+    "siteKey": "trade.padre.gg",
+    "matches": [
+      "trade.padre.gg"
     ]
   },
   {
@@ -3209,8 +5758,15 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "disableAutoHeight",
+    "siteKey": "app.intercom.com",
+    "matches": [
+      "app.intercom.com"
+    ]
+  },
+  {
     "id": "autoHeight",
-    "siteKey": "sooplive.*",
+    "siteKey": "zen-browser.app",
     "matches": [
       "*.sooplive.*",
       "zen-browser.app",
@@ -3296,6 +5852,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "www.ti.com.cn",
+    "siteKey": "www.ti.com.cn",
+    "matches": [
+      "www.ti.com.cn"
+    ]
+  },
+  {
     "id": "edclub.com",
     "siteKey": "www.edclub.com",
     "matches": [
@@ -3317,6 +5880,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "investopedia",
+    "siteKey": "www.investopedia.com",
+    "matches": [
+      "www.investopedia.com"
+    ]
+  },
+  {
     "id": "skool",
     "siteKey": "www.skool.com",
     "matches": [
@@ -3324,10 +5894,38 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "futuretools",
+    "siteKey": "www.futuretools.io",
+    "matches": [
+      "www.futuretools.io"
+    ]
+  },
+  {
+    "id": "ficbook.net",
+    "siteKey": "ficbook.net",
+    "matches": [
+      "ficbook.net"
+    ]
+  },
+  {
     "id": "xiaosaas",
-    "siteKey": "xiaosaas.com",
+    "siteKey": "*.xiaosaas.com",
     "matches": [
       "*.xiaosaas.com"
+    ]
+  },
+  {
+    "id": "migflash",
+    "siteKey": "migflash.com",
+    "matches": [
+      "migflash.com"
+    ]
+  },
+  {
+    "id": "jfrog",
+    "siteKey": "jfrog.com",
+    "matches": [
+      "jfrog.com"
     ]
   },
   {
@@ -3335,6 +5933,20 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     "siteKey": "www.freecodecamp.org",
     "matches": [
       "www.freecodecamp.org"
+    ]
+  },
+  {
+    "id": "solidity-by-example",
+    "siteKey": "solidity-by-example.org",
+    "matches": [
+      "solidity-by-example.org"
+    ]
+  },
+  {
+    "id": "kemono.cr",
+    "siteKey": "kemono.cr",
+    "matches": [
+      "kemono.cr"
     ]
   },
   {
@@ -3352,6 +5964,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "spicychat.ai",
+    "siteKey": "spicychat.ai",
+    "matches": [
+      "spicychat.ai"
+    ]
+  },
+  {
     "id": "sdk-cooperate",
     "siteKey": "pandaily.com",
     "matches": [
@@ -3366,10 +5985,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "mckinsey",
+    "siteKey": "www.mckinsey.com",
+    "matches": [
+      "www.mckinsey.com"
+    ]
+  },
+  {
     "id": "dcinside",
-    "siteKey": "dcinside.com",
+    "siteKey": "*.dcinside.com",
     "matches": [
       "*.dcinside.com"
+    ]
+  },
+  {
+    "id": "radix-ui",
+    "siteKey": "www.radix-ui.com",
+    "matches": [
+      "www.radix-ui.com"
     ]
   },
   {
@@ -3430,10 +6063,24 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "remove_em",
+    "siteKey": "git-scm.com",
+    "matches": [
+      "git-scm.com",
+      "models.com"
+    ]
+  },
+  {
     "id": "vercel",
     "siteKey": "vercel.com",
     "matches": [
       "vercel.com"
+    ]
+  },
+  {
+    "id": "live_attach_basic",
+    "selectorMatches": [
+      "meta[name='immersive-translate-live-attach-basic'][content='true']"
     ]
   },
   {
@@ -3458,8 +6105,18 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "common-text-track",
+    "siteKey": "www.typing.com",
+    "matches": [
+      "www.typing.com",
+      "*.video-stream-hosting.de",
+      "*.thieme.de",
+      "videos.sproutvideo.com"
+    ]
+  },
+  {
     "id": "common-vtt-jw",
-    "siteKey": "rottentomatoes.com",
+    "siteKey": "megaplay.buzz",
     "matches": [
       "*.rottentomatoes.com",
       "megaplay.buzz",
@@ -3467,8 +6124,22 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "common-ebutt",
+    "siteKey": "www.tagesschau.de",
+    "matches": [
+      "www.tagesschau.de"
+    ]
+  },
+  {
+    "id": "formatPreSites",
+    "siteKey": "macro.com",
+    "matches": [
+      "macro.com"
+    ]
+  },
+  {
     "id": "txt",
-    "siteKey": "*",
+    "siteKey": "*:",
     "matches": [
       "*://*/*.txt",
       "file://*/*.txt"
@@ -3490,6 +6161,13 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
       "ieltscat.xdf.*",
       "moddota.com",
       "www.nogizaka46.com"
+    ]
+  },
+  {
+    "id": "cms",
+    "siteKey": "silverbullet.md",
+    "matches": [
+      "silverbullet.md"
     ]
   },
   {
@@ -3538,6 +6216,107 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
     ]
   },
   {
+    "id": "preCodeSites",
+    "siteKey": "taylor.town",
+    "matches": [
+      "taylor.town",
+      "www.flatpanelshd.com",
+      "www.rarlab.com",
+      "bugs.mysql.com",
+      "crushon.ai"
+    ]
+  },
+  {
+    "id": "otherMathSites",
+    "selectorMatches": [
+      "math",
+      "mjx-container",
+      "[class*='MathJax']",
+      "[class*='math-']"
+    ]
+  },
+  {
+    "id": "htmlLangFirst",
+    "selectorMatches": [
+      "[lang=he-IL]",
+      "[lang=nl-NL]",
+      "[lang=ar-SA]",
+      "[lang=fa-IR]",
+      "[lang=fi]",
+      "[lang=fi-FI]"
+    ]
+  },
+  {
+    "id": "deepFrameTranslate",
+    "siteKey": "anarchothaumaturgist.itch.io",
+    "matches": [
+      "anarchothaumaturgist.itch.io",
+      "darkpetal16.itch.io",
+      "registry.khronos.org",
+      "achieve.macmillanlearning.com",
+      "mail.shanghai.*",
+      "help.autodesk.com",
+      "*.vitalsource.com",
+      "*.sumtotal.host",
+      "academy.notion.com",
+      "www.unigui.com"
+    ]
+  },
+  {
+    "id": "common.pdfWebPage",
+    "selectorMatches": [
+      "embed[type='application/pdf']"
+    ]
+  },
+  {
+    "id": "finalCommon.pdfWebPage",
+    "siteKey": "obgyn.onlinelibrary.wiley.com",
+    "matches": [
+      "https://obgyn.onlinelibrary.wiley.com/doi/pdf/*",
+      "https://onlinelibrary.wiley.com/doi/pdf/*",
+      "https://docs.amd.com/v/u/*/*",
+      "https://arxiv.org/pdf/*"
+    ],
+    "selectorMatches": [
+      "embed[type='application/pdf']",
+      "iframe[type='application/pdf']",
+      "[id=myPdfIframe][src*=pdf]",
+      "#article [type='application/pdf'][src*=pdf]",
+      ".textFrame [type='application/pdf'][src*=pdf]",
+      ".ggPdf",
+      "[id=pdfCanvasContainer] > iframe[src*=pdf]",
+      ".viewercontent-container  iframe[src*=documents]",
+      "object[type='application/pdf']"
+    ]
+  },
+  {
+    "id": "common4.pdfWebPage",
+    "selectorMatches": [
+      "#statements-pdf"
+    ]
+  },
+  {
+    "id": "common-query.pdfWebPage",
+    "selectorMatches": [
+      "[id=pdfCanvasContainer] > iframe[src*=pdf]"
+    ]
+  },
+  {
+    "id": "fix-nav2header",
+    "siteKey": "www.acea.auto",
+    "matches": [
+      "www.acea.auto",
+      "news.cgtn.com"
+    ]
+  },
+  {
+    "id": "strict-fix-nav2header",
+    "siteKey": "www.talkclassical.com",
+    "matches": [
+      "www.talkclassical.com"
+    ]
+  },
+  {
     "id": "fix-header",
     "siteKey": "societyforpsychotherapy.org",
     "matches": [
@@ -3556,7 +6335,7 @@ export const IMPORTED_IMMERSIVE_RULE_CATALOG = [
   },
   {
     "id": "NoTranslate",
-    "siteKey": "tiktok.com",
+    "siteKey": "altis.world",
     "matches": [
       "*.tiktok.com",
       "altis.world",

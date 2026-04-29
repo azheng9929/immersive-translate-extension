@@ -3,6 +3,11 @@ import { normalizeForCache, normalizeVisibleText } from "../shared/normalize";
 import { shouldSkipForTargetLanguage } from "../shared/languageHeuristics";
 import { isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
+import {
+  findTranslationRoot,
+  isStayOriginalElement,
+  type CompiledFilterRule,
+} from "./compiledFilterRule";
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
 import {
@@ -22,6 +27,7 @@ type BuildInput = {
   allowTooltip?: boolean;
   contentSelectors?: GranularityOptions["contentSelectors"];
   excludeSelectors?: GranularityOptions["excludeSelectors"];
+  filterRule?: CompiledFilterRule;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -34,7 +40,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   const rootToCategories = new Map<HTMLElement, UnitCategory[]>();
 
   for (const scanned of input.scannedTexts) {
-    const root = scanned.root ?? findSemanticRoot(scanned.parent);
+    const root = scanned.root ?? findSemanticRoot(scanned.parent, input.filterRule);
     const texts = rootToTexts.get(root) ?? [];
     texts.push(scanned.node);
     rootToTexts.set(root, texts);
@@ -55,7 +61,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
       ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
       targetLang: input.targetLang,
-    });
+    }, input.filterRule);
     if (!collected.text) {
       recordUnitDropped(input.diagnostics, collected.skipReason);
       continue;
@@ -105,14 +111,16 @@ function collectUnitText(
   root: HTMLElement,
   fallbackTextNodes: Text[],
   options: GranularityOptions & { allowTooltip?: boolean },
+  filterRule?: CompiledFilterRule,
 ): { text: string; skipReason?: string } {
   let rawText = "";
-  let text = "";
+  const textParts: string[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
       if (isSkippableElement(parent, options)) return NodeFilter.FILTER_REJECT;
+      if (filterRule && isStayOriginalElement(parent, filterRule)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
@@ -123,17 +131,27 @@ function collectUnitText(
     const nodeText = node.textContent ?? "";
     rawText += nodeText;
     const parent = node.parentElement;
-    if (parent && !resolveTextGranularity(parent, normalizeVisibleText(nodeText), options).skip) {
-      text += nodeText;
+    if (
+      parent &&
+      !(filterRule && isStayOriginalElement(parent, filterRule)) &&
+      !resolveTextGranularity(parent, normalizeVisibleText(nodeText), options).skip
+    ) {
+      const visibleText = normalizeVisibleText(nodeText);
+      if (visibleText) textParts.push(visibleText);
     }
     node = walker.nextNode();
   }
 
   const normalizedRawText = normalizeVisibleText(rawText);
   if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return { text: "", skipReason: "target-language" };
-  if (text) return { text: normalizeVisibleText(text) };
+  const text = normalizeCollectedText(textParts);
+  if (text) return { text };
   const fallbackText = normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
   return fallbackText ? { text: fallbackText } : { text: "", skipReason: "empty" };
+}
+
+function normalizeCollectedText(parts: readonly string[]): string {
+  return normalizeVisibleText(parts.join(" ")).replace(/\s+([.,!?;:%])/g, "$1");
 }
 
 function categoryFromScanned(categories: UnitCategory[] | undefined): UnitCategory | undefined {
@@ -141,7 +159,9 @@ function categoryFromScanned(categories: UnitCategory[] | undefined): UnitCatego
   return [...new Set(categories)].sort((a, b) => priorityForCategory(b) - priorityForCategory(a))[0];
 }
 
-function findSemanticRoot(element: HTMLElement): HTMLElement {
+function findSemanticRoot(element: HTMLElement, filterRule: CompiledFilterRule | undefined): HTMLElement {
+  if (filterRule) return findTranslationRoot(element, filterRule);
+
   const direct = element.closest<HTMLElement>(
     "button,[role='button'],td,th,li,p,blockquote,figcaption,h1,h2,h3,h4,h5,h6,label,legend,summary,a",
   );

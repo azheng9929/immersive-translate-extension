@@ -90,6 +90,37 @@ describe("webTranslationRules", () => {
     ]);
   });
 
+  it("preserves immersive rule fields used by the DOM filter compiler", () => {
+    const merged = mergeWebTranslationRules(generalRule, {
+      id: "github",
+      extraInlineSelectors: { add: ["g-emoji", "a.anchor"] },
+      atomicBlockSelectors: { add: ["[itemprop=description]"] },
+      stayOriginalTags: { add: ["CODE", "TT", "G-EMOJI"] },
+      stayOriginalSelectors: { add: [".math", "[role=math]"] },
+      globalStyles: {
+        ".TimelineItem-body .Link--primary": "-webkit-line-clamp: unset;",
+      },
+      mainFrameSelector: "main",
+      observeUrlChange: true,
+      urlChangeDelay: 120,
+      detectParagraphLanguage: true,
+    });
+
+    expect(merged.extraInlineSelectors).toEqual(["g-emoji", "a.anchor"]);
+    expect(merged.atomicBlockSelectors).toEqual(["[itemprop=description]"]);
+    expect(merged.stayOriginalTags).toEqual(["CODE", "TT", "G-EMOJI"]);
+    expect(merged.stayOriginalSelectors).toEqual([".math", "[role=math]"]);
+    expect(merged.globalStyles).toEqual({
+      ".TimelineItem-body .Link--primary": "-webkit-line-clamp: unset;",
+    });
+    expect(merged).toMatchObject({
+      mainFrameSelector: "main",
+      observeUrlChange: true,
+      urlChangeDelay: 120,
+      detectParagraphLanguage: true,
+    });
+  });
+
   it("applies conditional advanceMergeConfig patches", () => {
     const merged = mergeWebTranslationRules(generalRule, {
       id: "chat",
@@ -135,6 +166,32 @@ describe("webTranslationRules", () => {
     expect(policy.excludeSelectors).toContain("#masthead-container");
     expect(policy.excludedDynamicSelectors).toContain("ytd-popup-container");
     expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
+  });
+
+  it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "github",
+        selectors: { add: [".markdown-body"] },
+        extraInlineSelectors: { add: ["g-emoji"] },
+        atomicBlockSelectors: { add: ["[itemprop=description]"] },
+        stayOriginalTags: { add: ["CODE"] },
+        globalStyles: {
+          ".TimelineItem-body .Link--primary": "-webkit-line-clamp: unset;",
+        },
+        observeUrlChange: true,
+        urlChangeDelay: 100,
+      }),
+      "github.com",
+      "normal",
+    );
+
+    expect(policy.injectedCss.join("\n")).toContain(".TimelineItem-body .Link--primary");
+    expect(policy.filterRule.extraInlineSelectors).toContain("g-emoji");
+    expect(policy.filterRule.atomicBlockSelectors).toContain("[itemprop=description]");
+    expect(policy.filterRule.stayOriginalTags).toContain("CODE");
+    expect(policy.observeUrlChange).toBe(true);
+    expect(policy.urlChangeDelay).toBe(100);
   });
 
   it("selects only DOM-detection rules plus the current URL rule for content-side matching", () => {

@@ -44,6 +44,8 @@ type PageTranslationSessionOptions = {
   maxObservedRoots?: number;
   maxMutationNodesPerWindow?: number;
   mutationWindowMs?: number;
+  observeUrlChange?: boolean;
+  urlChangeDelay?: number;
   tooltipDebounceMs?: number;
   site?: PageTranslationSiteStatus;
 };
@@ -58,6 +60,9 @@ const EMPTY_SUMMARY: TranslationPageSummary = {
 };
 
 const SUSPENDED_MESSAGE = "Dynamic translation paused because this page is changing too quickly.";
+const URL_CHANGE_EVENT = "imt:urlchange";
+
+let historyUrlChangeEventsPatched = false;
 
 export class PageTranslationSession {
   private status: PageTranslationStatus = {
@@ -86,7 +91,11 @@ export class PageTranslationSession {
   private mutationWindowStartedAt = 0;
   private mutationNodesInWindow = 0;
   private listeningForVisibility = false;
+  private listeningForUrlChange = false;
+  private lastObservedUrl = globalThis.location?.href ?? "";
+  private urlChangeTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly handleVisibilityChangeBound = () => this.handleVisibilityChange();
+  private readonly handleUrlChangeBound = () => this.handleUrlChange();
 
   constructor(
     private readonly controller: PageController,
@@ -113,6 +122,7 @@ export class PageTranslationSession {
     this.pendingVisibleLazyDynamicRun = false;
     this.dynamicSuspended = false;
     this.resetMutationWindow();
+    this.lastObservedUrl = globalThis.location?.href ?? this.lastObservedUrl;
     this.setStatus({
       ...EMPTY_SUMMARY,
       phase: "translating",
@@ -204,12 +214,14 @@ export class PageTranslationSession {
 
   private activateDynamicObserver(phase: PageTranslationPhase = this.status.phase): DynamicObservationState {
     this.disconnectMutationObserver();
+    this.removeUrlChangeListener();
     if (this.dynamicSuspended) return "suspended";
     if (!canSupplement(phase) || this.dynamicMode() === "off") {
       this.removeVisibilityListener();
       return "inactive";
     }
     this.addVisibilityListener();
+    this.addUrlChangeListener();
     if (!this.isPageVisible()) return "paused";
     if (!this.connectMutationObserver()) return "inactive";
     return this.pendingRoots.size > 0 ? "queued" : "observing";
@@ -220,7 +232,13 @@ export class PageTranslationSession {
     if (!root || typeof MutationObserver === "undefined") return false;
 
     this.observer = new MutationObserver((mutations) => this.handleMutations(mutations));
-    this.observer.observe(root, { childList: true, subtree: true });
+    this.observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["placeholder", "alt", "title", "aria-label"],
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
     return true;
   }
 
@@ -233,6 +251,7 @@ export class PageTranslationSession {
   private stopObserver(): void {
     this.disconnectMutationObserver();
     this.removeVisibilityListener();
+    this.removeUrlChangeListener();
     this.lazyObserver?.disconnect();
     this.lazyObserver = undefined;
     this.lazyObservedRoots.clear();
@@ -247,28 +266,41 @@ export class PageTranslationSession {
       clearTimeout(this.lazyDiscoveryTimer);
       this.lazyDiscoveryTimer = undefined;
     }
+    if (this.urlChangeTimer) {
+      clearTimeout(this.urlChangeTimer);
+      this.urlChangeTimer = undefined;
+    }
   }
 
   private handleMutations(mutations: MutationRecord[]): void {
     if (!this.canHandleDynamicMutations()) return;
 
-    const roots: HTMLElement[] = [];
+    const roots: { root: HTMLElement; allowTranslatedRoot: boolean }[] = [];
     let hasHoverOverlayRoot = false;
     for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        const root = rootFromAddedNode(node);
-        if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
-        if (!hasPotentialTranslatableContent(root)) continue;
-        if (isLikelyHoverOverlayRoot(root)) hasHoverOverlayRoot = true;
-        roots.push(root);
+      if (mutation.type === "childList") {
+        for (const node of mutation.addedNodes) {
+          const root = rootFromAddedNode(node);
+          if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
+          if (!hasPotentialTranslatableContent(root)) continue;
+          if (isLikelyHoverOverlayRoot(root)) hasHoverOverlayRoot = true;
+          roots.push({ root, allowTranslatedRoot: false });
+        }
+        continue;
       }
+
+      const changedRoot = rootFromChangedMutation(mutation);
+      if (!changedRoot || !changedRoot.isConnected || this.shouldIgnoreRoot(changedRoot, true)) continue;
+      if (!hasPotentialTranslatableContent(changedRoot)) continue;
+      if (isLikelyHoverOverlayRoot(changedRoot)) hasHoverOverlayRoot = true;
+      roots.push({ root: changedRoot, allowTranslatedRoot: true });
     }
 
     if (roots.length === 0) return;
     if (!this.recordMutationVolume(roots.length)) return;
 
-    for (const root of roots) {
-      if (!this.addPendingRoot(root, false)) return;
+    for (const { root, allowTranslatedRoot } of roots) {
+      if (!this.addPendingRoot(root, false, { allowTranslatedRoot })) return;
     }
 
     if (this.pendingRoots.size === 0) return;
@@ -296,8 +328,32 @@ export class PageTranslationSession {
     else this.setStatus({ ...this.status, observation });
   }
 
-  private addPendingRoot(root: HTMLElement, notify = true): boolean {
-    if (this.dynamicSuspended || this.shouldIgnoreRoot(root)) return true;
+  private handleUrlChange(): void {
+    if (!this.options.observeUrlChange || !this.canHandleDynamicMutations()) return;
+    const currentUrl = globalThis.location?.href ?? "";
+    if (!currentUrl || currentUrl === this.lastObservedUrl) return;
+    this.lastObservedUrl = currentUrl;
+
+    if (this.urlChangeTimer) clearTimeout(this.urlChangeTimer);
+    this.urlChangeTimer = setTimeout(() => {
+      this.urlChangeTimer = undefined;
+      if (!this.canHandleDynamicMutations()) return;
+      const root = this.options.observeRoot ?? document.body;
+      if (root instanceof HTMLElement && root.isConnected) {
+        this.controller.restorePage();
+        this.pendingRoots.clear();
+        this.addPendingRoot(root, false, { allowTranslatedRoot: true });
+        this.scheduleFlush(0);
+      }
+    }, Math.max(0, this.options.urlChangeDelay ?? 250));
+  }
+
+  private addPendingRoot(
+    root: HTMLElement,
+    notify = true,
+    options: { allowTranslatedRoot?: boolean } = {},
+  ): boolean {
+    if (this.dynamicSuspended || this.shouldIgnoreRoot(root, options.allowTranslatedRoot)) return true;
 
     for (const pending of [...this.pendingRoots]) {
       if (pending instanceof Node && pending.contains(root)) return true;
@@ -343,7 +399,10 @@ export class PageTranslationSession {
     }
 
     const allRoots = [...this.pendingRoots].filter(
-      (root): root is HTMLElement => root instanceof HTMLElement && root.isConnected && !this.shouldIgnoreRoot(root),
+      (root): root is HTMLElement =>
+        root instanceof HTMLElement &&
+        root.isConnected &&
+        !this.shouldIgnoreRoot(root, root.getAttribute("data-imt-state") === "translated"),
     );
     this.pendingRoots.clear();
 
@@ -559,6 +618,7 @@ export class PageTranslationSession {
     }
     this.disconnectMutationObserver();
     this.removeVisibilityListener();
+    this.removeUrlChangeListener();
     this.setStatus({ ...this.status, observation: "suspended", lastError: SUSPENDED_MESSAGE });
   }
 
@@ -567,8 +627,10 @@ export class PageTranslationSession {
     this.mutationNodesInWindow = 0;
   }
 
-  private shouldIgnoreRoot(root: HTMLElement): boolean {
-    return shouldIgnoreDynamicRoot(root, this.options.excludedDynamicSelectors ?? DEFAULT_EXCLUDED_DYNAMIC_SELECTORS);
+  private shouldIgnoreRoot(root: HTMLElement, allowTranslatedRoot = false): boolean {
+    return shouldIgnoreDynamicRoot(root, this.options.excludedDynamicSelectors ?? DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, {
+      allowTranslatedRoot,
+    });
   }
 
   private dynamicMode(): DynamicTranslationMode {
@@ -613,6 +675,23 @@ export class PageTranslationSession {
     if (!this.listeningForVisibility) return;
     document.removeEventListener("visibilitychange", this.handleVisibilityChangeBound, false);
     this.listeningForVisibility = false;
+  }
+
+  private addUrlChangeListener(): void {
+    if (!this.options.observeUrlChange || this.listeningForUrlChange) return;
+    ensureHistoryUrlChangeEvents();
+    window.addEventListener("popstate", this.handleUrlChangeBound, false);
+    window.addEventListener("hashchange", this.handleUrlChangeBound, false);
+    window.addEventListener(URL_CHANGE_EVENT, this.handleUrlChangeBound, false);
+    this.listeningForUrlChange = true;
+  }
+
+  private removeUrlChangeListener(): void {
+    if (!this.listeningForUrlChange) return;
+    window.removeEventListener("popstate", this.handleUrlChangeBound, false);
+    window.removeEventListener("hashchange", this.handleUrlChangeBound, false);
+    window.removeEventListener(URL_CHANGE_EVENT, this.handleUrlChangeBound, false);
+    this.listeningForUrlChange = false;
   }
 
   private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics" | "site"> & {
@@ -669,15 +748,62 @@ function rootFromAddedNode(node: Node): HTMLElement | null {
   return parent instanceof HTMLElement ? parent : null;
 }
 
-function shouldIgnoreDynamicRoot(root: HTMLElement, selectors: readonly string[]): boolean {
+function ensureHistoryUrlChangeEvents(): void {
+  if (historyUrlChangeEventsPatched || !globalThis.history) return;
+  patchHistoryMethod("pushState");
+  patchHistoryMethod("replaceState");
+  historyUrlChangeEventsPatched = true;
+}
+
+function patchHistoryMethod(method: "pushState" | "replaceState"): void {
+  const original = history[method];
+  history[method] = function patchedHistoryMethod(this: History, ...args: Parameters<History[typeof method]>) {
+    const result = original.apply(this, args);
+    window.dispatchEvent(new Event(URL_CHANGE_EVENT));
+    return result;
+  } as History[typeof method];
+}
+
+function rootFromChangedMutation(mutation: MutationRecord): HTMLElement | null {
+  if (mutation.type === "characterData") {
+    const parent = mutation.target.parentElement;
+    if (!parent || parent.closest('[data-imt-managed="true"]')) return null;
+    return parent.closest<HTMLElement>('[data-imt-state="translated"]') ?? findNearestTextRoot(parent);
+  }
+
+  if (mutation.type === "attributes" && mutation.target instanceof HTMLElement) {
+    const target = mutation.target;
+    if (target.closest('[data-imt-managed="true"]')) return null;
+    return target.closest<HTMLElement>('[data-imt-state="translated"]') ?? target;
+  }
+
+  return null;
+}
+
+function findNearestTextRoot(element: HTMLElement): HTMLElement {
+  return element.closest<HTMLElement>(
+    "button,[role='button'],td,th,li,p,blockquote,figcaption,h1,h2,h3,h4,h5,h6,label,legend,summary,a",
+  ) ?? element;
+}
+
+function shouldIgnoreDynamicRoot(
+  root: HTMLElement,
+  selectors: readonly string[],
+  options: { allowTranslatedRoot?: boolean } = {},
+): boolean {
   for (const selector of selectors) {
     try {
+      if (options.allowTranslatedRoot && isTranslatedStateSelector(selector) && root.matches(selector)) continue;
       if (root.closest(selector)) return true;
     } catch {
       continue;
     }
   }
   return false;
+}
+
+function isTranslatedStateSelector(selector: string): boolean {
+  return selector.includes("data-imt-state") && selector.includes("translated");
 }
 
 function hasPotentialTranslatableContent(root: HTMLElement): boolean {

@@ -1,6 +1,7 @@
 import type { DynamicMode } from "../shared/config";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
+import type { CompiledFilterRule } from "./compiledFilterRule";
 import {
   DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   resolveWebTranslationPolicy,
@@ -39,6 +40,9 @@ export type SitePolicy = {
   mutationWindowMs: number;
   excludedDynamicSelectors: readonly string[];
   injectedCss: readonly string[];
+  filterRule: CompiledFilterRule;
+  observeUrlChange: boolean;
+  urlChangeDelay: number;
 };
 
 export type SitePolicyOptions = {

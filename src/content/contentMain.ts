@@ -1,4 +1,5 @@
 import { FloatingTranslationControl } from "./floatingControl";
+import { BackgroundTranslationCache } from "./backgroundTranslationCache";
 import { scheduleAutoTranslate } from "./autoTranslate";
 import { InputTranslator } from "./inputTranslator";
 import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
@@ -22,7 +23,6 @@ import {
   type ExtensionProvider,
 } from "../shared/config";
 import { buildGlossarySystemPrompt } from "../shared/glossary";
-import { IndexedDbTranslationCache } from "../shared/translationCache";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
 
 export async function runContentMain(): Promise<void> {
@@ -151,6 +151,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
     excludeSelectors: sitePolicy.excludeSelectors,
     contentSelectors: sitePolicy.contentSelectors,
+    filterRule: sitePolicy.filterRule,
     allowTooltip: sitePolicy.allowTooltip,
     getPageTitle: readPageTitleContext,
     ...progressivePageBatchOptions(config),
@@ -162,7 +163,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     ),
   };
 
-  return new PageController(config.useCache ? { ...options, cache: new IndexedDbTranslationCache() } : options);
+  return new PageController(config.useCache ? { ...options, cache: new BackgroundTranslationCache() } : options);
 }
 
 function createPageSession(config: ExtensionConfig, pageRules: readonly WebTranslationRule[]): PageTranslationSession {
@@ -185,6 +186,8 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
     maxObservedRoots: sitePolicy.maxObservedRoots,
     maxMutationNodesPerWindow: sitePolicy.maxMutationNodesPerWindow,
     mutationWindowMs: sitePolicy.mutationWindowMs,
+    observeUrlChange: sitePolicy.observeUrlChange,
+    urlChangeDelay: sitePolicy.urlChangeDelay,
     tooltipDebounceMs: 120,
     site: {
       hostname: sitePolicy.hostname,

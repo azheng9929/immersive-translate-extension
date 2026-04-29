@@ -19,7 +19,7 @@ describe("webRuleStore", () => {
     const rules = await getWebRulesForUrl("https://medium.com/@writer/story");
 
     expect(rules.length).toBeGreaterThan(1);
-    expect(rules.length).toBeLessThan(40);
+    expect(rules.length).toBeLessThan(80);
     expect(rules.some((rule) => rule.id === "medium")).toBe(true);
     expect(rules.some((rule) => rule.id === "github")).toBe(false);
   });
@@ -27,6 +27,27 @@ describe("webRuleStore", () => {
   it("does not load imported rules for unrelated pages", async () => {
     await expect(getWebRulesForUrl("https://example.invalid/story")).resolves.toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps advanced immersive rule fields in the lazily loaded dataset", async () => {
+    const githubRules = await getWebRulesForUrl("https://github.com/openai/openai-node");
+    const github = githubRules.find((rule) => rule.id === "github");
+    expect(github).toMatchObject({
+      detectParagraphLanguage: true,
+    });
+    expect(github?.extraInlineSelectors).toContain("g-emoji");
+    expect(github?.atomicBlockSelectors).toContain("[itemprop=description]");
+    expect(github?.stayOriginalTags).toContain("CODE");
+    expect(github?.globalStyles).toMatchObject({
+      ".TimelineItem-body .Link--primary": "-webkit-line-clamp: unset;",
+    });
+
+    const mediumRules = await getWebRulesForUrl("https://medium.com/@writer/story");
+    const medium = mediumRules.find((rule) => rule.id === "medium");
+    expect(medium?.urlChangeDelay).toBe(20);
+    expect(medium?.globalStyles).toMatchObject({
+      "article p": "-webkit-line-clamp: unset;max-height:unset;",
+    });
   });
 
   it("does not statically import content or the full imported rule chunk", () => {

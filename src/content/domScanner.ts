@@ -1,6 +1,12 @@
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslatableAttributeName, UnitCategory } from "../shared/types";
+import {
+  classifyElementForTranslation,
+  findTranslationRoot,
+  isStayOriginalElement,
+  type CompiledFilterRule,
+} from "./compiledFilterRule";
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import {
   recordScanAccepted,
@@ -37,6 +43,7 @@ function getScannerCategory(element: HTMLElement): UnitCategory {
 
 export type TextScanOptions = GranularityOptions & {
   allowTooltip?: boolean;
+  filterRule?: CompiledFilterRule;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -52,6 +59,7 @@ export function scanDocumentText(root: ParentNode, options: TextScanOptions = {}
         const parent = node.parentElement;
         if (!parent) return rejectText(options.diagnostics, "no-parent");
         if (isSkippableElement(parent, options)) return rejectText(options.diagnostics, "global-selector");
+        if (isFilteredByCompiledRule(parent, options.filterRule)) return rejectText(options.diagnostics, "compiled-filter");
         if (!isVisibleElement(parent)) return rejectText(options.diagnostics, "hidden");
         const decision = resolveTextGranularity(parent, text, options);
         if (decision.skip) return rejectText(options.diagnostics, decision.reason);
@@ -75,7 +83,8 @@ export function scanDocumentText(root: ParentNode, options: TextScanOptions = {}
           parent,
           text,
         };
-        if (decision.root) scanned.root = decision.root;
+        const root = decision.root ?? compiledTranslationRoot(parent, options.filterRule);
+        if (root) scanned.root = root;
         if (decision.category) scanned.category = decision.category;
         results.push(scanned);
       }
@@ -103,6 +112,10 @@ export function scanTranslatableAttributes(
         recordScanSeen(options.diagnostics, "attributes");
         if (isSkippableElement(element, options)) {
           recordScanSkipped(options.diagnostics, "attributes", "global-selector");
+          continue;
+        }
+        if (isFilteredByCompiledRule(element, options.filterRule)) {
+          recordScanSkipped(options.diagnostics, "attributes", "compiled-filter");
           continue;
         }
         if (!isVisibleElement(element)) {
@@ -140,6 +153,7 @@ function collectScannableRoots(root: ParentNode, options: TextScanOptions): Pare
       const shadowRoot = element.shadowRoot;
       if (!shadowRoot) continue;
       if (isSkippableElement(element, options) || !isVisibleElement(element)) continue;
+      if (isFilteredByCompiledRule(element, options.filterRule)) continue;
       visit(shadowRoot);
     }
   };
@@ -156,4 +170,15 @@ function elementsInRoot(root: ParentNode): HTMLElement[] {
 function rejectText(diagnostics: TranslationDiagnostics | undefined, reason = "unknown"): number {
   recordScanSkipped(diagnostics, "text", reason);
   return NodeFilter.FILTER_REJECT;
+}
+
+function isFilteredByCompiledRule(element: HTMLElement, filterRule: CompiledFilterRule | undefined): boolean {
+  if (!filterRule) return false;
+  const classification = classifyElementForTranslation(element, filterRule);
+  return classification.kind === "excluded" || classification.kind === "stay-original" || isStayOriginalElement(element, filterRule);
+}
+
+function compiledTranslationRoot(element: HTMLElement, filterRule: CompiledFilterRule | undefined): HTMLElement | undefined {
+  if (!filterRule) return undefined;
+  return findTranslationRoot(element, filterRule);
 }
