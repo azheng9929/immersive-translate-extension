@@ -12,6 +12,7 @@ import {
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
 import type { DiagnosticReasonCounts, TranslationDiagnostics } from "../../src/content/translationDiagnostics";
+import { setSiteRule } from "../../src/shared/siteRules";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
@@ -84,6 +85,16 @@ const setCurrentSiteDynamicMode = async (dynamicMode: SiteDynamicModeChoice) => 
   await loadPageStatus();
 };
 
+const setCurrentSiteAutoTranslate = async (enabled: boolean) => {
+  const site = currentSite.value;
+  if (!site) return;
+  const currentRule = config.siteRules[site.siteKey] ?? {};
+  await updateConfig({
+    siteRules: setSiteRule(config.siteRules, site.siteKey, { ...currentRule, autoTranslate: enabled }),
+  });
+  await loadPageStatus();
+};
+
 const openOptions = () => {
   void chrome.runtime.openOptionsPage();
 };
@@ -114,6 +125,12 @@ const currentSiteDynamicMode = computed<SiteDynamicModeChoice>(() => {
   const site = currentSite.value;
   if (!site) return "auto";
   return config.siteDynamicModes[site.siteKey] ?? "auto";
+});
+
+const currentSiteAutoTranslate = computed(() => {
+  const site = currentSite.value;
+  if (!site) return false;
+  return config.siteRules[site.siteKey]?.autoTranslate === true;
 });
 
 const currentSiteSummary = computed(() => {
@@ -263,6 +280,15 @@ function endpointSummary(value: string): string {
         <button data-testid="site-mode-conservative" type="button" :class="{ active: currentSiteDynamicMode === 'conservative' }" @click="setCurrentSiteDynamicMode('conservative')">Safe</button>
         <button data-testid="site-mode-normal" type="button" :class="{ active: currentSiteDynamicMode === 'normal' }" @click="setCurrentSiteDynamicMode('normal')">Normal</button>
       </div>
+      <label class="toggle-row">
+        <span>Auto translate this site</span>
+        <input
+          data-testid="site-auto-translate-toggle"
+          type="checkbox"
+          :checked="currentSiteAutoTranslate"
+          @change="setCurrentSiteAutoTranslate(($event.target as HTMLInputElement).checked)"
+        />
+      </label>
     </section>
 
     <section class="settings" aria-label="Basic settings" :aria-busy="isLoading">

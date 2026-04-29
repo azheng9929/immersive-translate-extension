@@ -8,7 +8,9 @@ import type {
 } from "./config";
 
 export type SiteDynamicModeChoice = DynamicMode | "auto";
+export type SiteAutoTranslateChoice = "global" | "always" | "never";
 export type SiteRule = {
+  autoTranslate?: boolean;
   dynamicMode?: DynamicMode;
   displayMode?: DisplayMode;
   provider?: ExtensionProvider;
@@ -93,6 +95,9 @@ function normalizeSiteRule(value: unknown): SiteRule | undefined {
   if (!isRecord(value)) return undefined;
 
   const rule: SiteRule = {};
+  if (typeof value.autoTranslate === "boolean") {
+    rule.autoTranslate = value.autoTranslate;
+  }
   if (typeof value.dynamicMode === "string" && SUPPORTED_DYNAMIC_MODES.has(value.dynamicMode as DynamicMode)) {
     rule.dynamicMode = value.dynamicMode as DynamicMode;
   }

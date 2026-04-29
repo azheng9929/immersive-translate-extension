@@ -32,6 +32,7 @@ export const DEFAULT_GEMINI_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
 
 export type ExtensionConfig = {
   targetLang: string;
+  autoTranslate: boolean;
   provider: ExtensionProvider;
   fallbackProvider: FallbackProvider;
   displayMode: DisplayMode;
@@ -65,6 +66,7 @@ export type ExtensionConfigPatch = Partial<ExtensionConfig>;
 
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   targetLang: "zh-Hans",
+  autoTranslate: false,
   provider: "microsoft",
   fallbackProvider: "none",
   displayMode: "smart",
@@ -142,6 +144,7 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
 
   return {
     targetLang: normalizeTargetLang(input.targetLang),
+    autoTranslate: normalizeBoolean(input.autoTranslate, DEFAULT_EXTENSION_CONFIG.autoTranslate),
     provider: normalizeProvider(input.provider),
     fallbackProvider: normalizeFallbackProvider(input.fallbackProvider),
     displayMode: normalizeDisplayMode(input.displayMode),
@@ -177,6 +180,7 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
 
   const patch: ExtensionConfigPatch = {};
   if ("targetLang" in value) patch.targetLang = normalizeTargetLang(value.targetLang);
+  if ("autoTranslate" in value) patch.autoTranslate = normalizeBoolean(value.autoTranslate, DEFAULT_EXTENSION_CONFIG.autoTranslate);
   if ("provider" in value) patch.provider = normalizeProvider(value.provider);
   if ("fallbackProvider" in value) patch.fallbackProvider = normalizeFallbackProvider(value.fallbackProvider);
   if ("displayMode" in value) patch.displayMode = normalizeDisplayMode(value.displayMode);
@@ -246,6 +250,7 @@ export function resolveSiteConfig(config: ExtensionConfig, hostname: string): Ex
   return normalizeExtensionConfig({
     ...config,
     ...requestPatch,
+    ...(typeof rule.autoTranslate === "boolean" ? { autoTranslate: rule.autoTranslate } : {}),
     ...(rule.provider ? { provider: rule.provider } : {}),
     ...(rule.fallbackProvider ? { fallbackProvider: rule.fallbackProvider } : {}),
     ...(rule.displayMode ? { displayMode: rule.displayMode } : {}),

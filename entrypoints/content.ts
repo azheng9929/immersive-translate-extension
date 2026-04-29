@@ -1,4 +1,5 @@
 import { FloatingTranslationControl } from "../src/content/floatingControl";
+import { scheduleAutoTranslate } from "../src/content/autoTranslate";
 import { InputTranslator } from "../src/content/inputTranslator";
 import { shouldMountOriginalTextTooltip } from "../src/content/interactionPolicy";
 import { OriginalTextTooltip } from "../src/content/originalTextTooltip";
@@ -30,6 +31,7 @@ export default defineContentScript({
     let pageSession = createPageSession(config);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
+    let cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
     const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => pageSession.translatePage(),
@@ -55,10 +57,12 @@ export default defineContentScript({
         sendResponse({ ok: true, status: pageSession.getStatus() });
       }
       if (message?.type === "IMT_CONFIG_UPDATED") {
+        cancelAutoTranslate?.();
         pageSession.restorePage();
         pageSession.dispose();
         config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
         pageSession = createPageSession(config);
+        cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
         selectionTranslator.unmount();
         selectionTranslator = createSelectionTranslator(config);
         selectionTranslator.mount();

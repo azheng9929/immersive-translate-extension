@@ -376,6 +376,7 @@ describe("options App", () => {
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-provider']").setValue("gemini");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-fallback-provider']").setValue("microsoft");
     await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-request-profile']").setValue("high-dynamic");
+    await wrapper.find<HTMLSelectElement>("[data-testid='site-rule-auto-translate']").setValue("always");
     await wrapper.find("[data-testid='site-rule-save']").trigger("click");
     await flushPromises();
 
@@ -384,6 +385,7 @@ describe("options App", () => {
       patch: {
         siteRules: {
           "reddit.com": {
+            autoTranslate: true,
             dynamicMode: "conservative",
             displayMode: "bilingual",
             provider: "gemini",

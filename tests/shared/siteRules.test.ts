@@ -22,6 +22,7 @@ describe("site rule helpers", () => {
     expect(
       normalizeSiteRules({
         "https://www.youtube.com/watch?v=abc": {
+          autoTranslate: true,
           dynamicMode: "conservative",
           displayMode: "translation-only",
           provider: "gemini",
@@ -38,6 +39,7 @@ describe("site rule helpers", () => {
       }),
     ).toEqual({
       "youtube.com": {
+        autoTranslate: true,
         dynamicMode: "conservative",
         displayMode: "translation-only",
         provider: "gemini",
@@ -49,11 +51,13 @@ describe("site rule helpers", () => {
 
   it("sets enhanced site rules without keeping empty global-only rules", () => {
     const rules = setSiteRule({}, "https://www.youtube.com/watch?v=abc", {
+      autoTranslate: false,
       displayMode: "bilingual",
       provider: "openai-compatible",
     });
     expect(rules).toEqual({
       "youtube.com": {
+        autoTranslate: false,
         displayMode: "bilingual",
         provider: "openai-compatible",
       },
@@ -71,6 +75,7 @@ describe("site rule helpers", () => {
       requestProfile: "balanced",
       siteRules: {
         "https://www.youtube.com/watch?v=abc": {
+          autoTranslate: true,
           dynamicMode: "off",
           displayMode: "translation-only",
           provider: "gemini",
@@ -82,6 +87,7 @@ describe("site rule helpers", () => {
 
     expect(resolveSiteConfig(config, "www.youtube.com")).toMatchObject({
       provider: "gemini",
+      autoTranslate: true,
       fallbackProvider: "microsoft",
       displayMode: "translation-only",
       dynamicMode: "off",

@@ -22,6 +22,7 @@ import {
   normalizeSiteRuleKey,
   setSiteDynamicModeRule,
   setSiteRule,
+  type SiteAutoTranslateChoice,
   type SiteRule,
 } from "../../src/shared/siteRules";
 
@@ -34,6 +35,7 @@ const glossaryExportText = ref("");
 const glossaryImportError = ref("");
 const siteRuleHost = ref("");
 const siteRuleMode = ref<DynamicMode | "global">("conservative");
+const siteRuleAutoTranslate = ref<SiteAutoTranslateChoice>("global");
 const siteRuleDisplayMode = ref<DisplayMode | "global">("global");
 const siteRuleProvider = ref<ExtensionProvider | "global">("global");
 const siteRuleFallbackProvider = ref<FallbackProvider | "global">("global");
@@ -44,6 +46,7 @@ const siteRules = computed(() =>
   Array.from(new Set([...Object.keys(config.siteRules), ...Object.keys(config.siteDynamicModes)]))
     .map((siteKey) => ({
       siteKey,
+      autoTranslate: config.siteRules[siteKey]?.autoTranslate,
       dynamicMode: config.siteRules[siteKey]?.dynamicMode ?? config.siteDynamicModes[siteKey],
       displayMode: config.siteRules[siteKey]?.displayMode,
       provider: config.siteRules[siteKey]?.provider,
@@ -206,6 +209,8 @@ function numberInputValue(event: Event): number {
 
 function buildSiteRulePatch(): SiteRule {
   const rule: SiteRule = {};
+  if (siteRuleAutoTranslate.value === "always") rule.autoTranslate = true;
+  if (siteRuleAutoTranslate.value === "never") rule.autoTranslate = false;
   if (siteRuleMode.value !== "global") rule.dynamicMode = siteRuleMode.value;
   if (siteRuleDisplayMode.value !== "global") rule.displayMode = siteRuleDisplayMode.value;
   if (siteRuleProvider.value !== "global") rule.provider = siteRuleProvider.value;
@@ -572,6 +577,14 @@ function buildSiteRulePatch(): SiteRule {
           />
         </label>
         <label class="field">
+          <span>Auto translate</span>
+          <select data-testid="site-rule-auto-translate" :value="siteRuleAutoTranslate" @change="siteRuleAutoTranslate = ($event.target as HTMLSelectElement).value as SiteAutoTranslateChoice">
+            <option value="global">Global</option>
+            <option value="always">Always</option>
+            <option value="never">Never</option>
+          </select>
+        </label>
+        <label class="field">
           <span>Dynamic mode</span>
           <select data-testid="site-rule-mode" :value="siteRuleMode" @change="siteRuleMode = ($event.target as HTMLSelectElement).value as DynamicMode">
             <option value="global">Global</option>
@@ -630,6 +643,7 @@ function buildSiteRulePatch(): SiteRule {
             <strong>{{ rule.siteKey }}</strong>
             <span>
               {{ rule.dynamicMode ?? "global" }}
+              <template v-if="typeof rule.autoTranslate === 'boolean'"> · auto {{ rule.autoTranslate ? "always" : "never" }}</template>
               <template v-if="rule.displayMode"> · {{ rule.displayMode }}</template>
               <template v-if="rule.provider"> · {{ rule.provider }}</template>
               <template v-if="rule.fallbackProvider"> · fallback {{ rule.fallbackProvider }}</template>
@@ -809,12 +823,13 @@ p {
 
 .site-rule-editor {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 12px;
 }
 
 .site-rule-save {
+  align-self: end;
   min-width: 112px;
 }
 

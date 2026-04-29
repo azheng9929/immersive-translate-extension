@@ -10,6 +10,7 @@ describe("normalizeExtensionConfig", () => {
     expect(
       normalizeExtensionConfig({
         targetLang: "ja",
+        autoTranslate: true,
         provider: "fake",
         displayMode: "translation-only",
         dynamicMode: "conservative",
@@ -37,6 +38,7 @@ describe("normalizeExtensionConfig", () => {
         ],
         siteRules: {
           "https://www.youtube.com/watch?v=abc": {
+            autoTranslate: true,
             dynamicMode: "off",
             displayMode: "bilingual",
             provider: "gemini",
@@ -54,6 +56,7 @@ describe("normalizeExtensionConfig", () => {
       }),
     ).toEqual({
       targetLang: "ja",
+      autoTranslate: true,
       provider: "fake",
       displayMode: "translation-only",
       dynamicMode: "conservative",
@@ -81,6 +84,7 @@ describe("normalizeExtensionConfig", () => {
       ],
       siteRules: {
         "youtube.com": {
+          autoTranslate: true,
           dynamicMode: "off",
           displayMode: "bilingual",
           provider: "gemini",
@@ -101,6 +105,7 @@ describe("normalizeExtensionConfig", () => {
     expect(
       normalizeExtensionConfig({
         targetLang: "",
+        autoTranslate: "yes",
         provider: "unknown",
         displayMode: "raw",
         dynamicMode: "aggressive",
