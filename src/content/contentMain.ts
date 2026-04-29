@@ -148,6 +148,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     providerId: providerChainId(config),
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
+    ...(sitePolicy.mainFrameSelector ? { mainFrameSelector: sitePolicy.mainFrameSelector } : {}),
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
     excludeSelectors: sitePolicy.excludeSelectors,
     contentSelectors: sitePolicy.contentSelectors,

@@ -213,7 +213,8 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       ...runtimeErrors.filter((error) => !isExtensionError(error, extensionId)),
       ...consoleErrors.filter((error) => !isExtensionError(error, extensionId) && !isIgnorableConsoleError(error.text)),
     ];
-    const skipped = isXLoginWall(site, metrics);
+    const skipReason = siteAccessGateReason(site, metrics);
+    const skipped = Boolean(skipReason);
     const pageStatus = pageStatusResponse?.ok ? pageStatusResponse.status : undefined;
     const excessiveFailures = pageStatus ? pageStatus.failed > Math.max(5, Math.ceil(pageStatus.total * 0.5)) : false;
     const ok = Boolean(translateResponse?.ok) &&
@@ -233,7 +234,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       ok,
       skipped,
       summary: skipped
-        ? `skipped: login wall (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
+        ? `skipped: ${skipReason} (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
         : [
             `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots`,
             `failed=${pageStatus?.failed ?? "n/a"}`,
@@ -693,6 +694,16 @@ function isXLoginWall(site, metrics) {
     metrics.url.includes("x.com/i/flow/login") ||
     metrics.bodyTextLength < 100
   );
+}
+
+function isRedditHumanityCheck(site, metrics) {
+  return site.host === "reddit.com" && /prove your humanity/i.test(metrics.title);
+}
+
+function siteAccessGateReason(site, metrics) {
+  if (isXLoginWall(site, metrics)) return "login wall";
+  if (isRedditHumanityCheck(site, metrics)) return "humanity check";
+  return undefined;
 }
 
 function isIgnorableConsoleError(message) {

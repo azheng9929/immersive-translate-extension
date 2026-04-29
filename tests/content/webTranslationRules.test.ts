@@ -146,6 +146,7 @@ describe("webTranslationRules", () => {
         siteKey: "youtube.com",
         isHighDynamic: true,
         dynamicPreset: "conservative",
+        mainFrameSelector: "main#content",
         selectors: { add: ["#video-title"] },
         excludeSelectors: { add: ["#masthead-container"] },
         mutationExcludeSelectors: { add: ["ytd-popup-container"] },
@@ -161,6 +162,7 @@ describe("webTranslationRules", () => {
       dynamicMode: "conservative",
       dynamicModeSource: "site-default",
       isHighDynamic: true,
+      mainFrameSelector: "main#content",
     });
     expect(policy.preferredScanRootSelectors).toContain("#video-title");
     expect(policy.excludeSelectors).toContain("#masthead-container");

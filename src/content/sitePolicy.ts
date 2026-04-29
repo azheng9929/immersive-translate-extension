@@ -24,6 +24,7 @@ export type SitePolicy = {
   isHighDynamic: boolean;
   dynamicMode: DynamicTranslationMode;
   attributeNames: readonly TranslatableAttributeName[];
+  mainFrameSelector?: string;
   preferredScanRootSelectors: readonly string[];
   excludeSelectors: readonly string[];
   contentSelectors: readonly SiteContentSelector[];

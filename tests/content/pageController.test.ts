@@ -384,6 +384,44 @@ describe("PageController", () => {
     expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
 
+  it("switches translated content between bilingual, translation-only, and original without another provider request", async () => {
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    let batchCalls = 0;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      displayMode: "bilingual",
+      translateBatch: async (items) => {
+        batchCalls += 1;
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector("p")?.textContent).toContain("Hello world.");
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+
+    controller.setRenderState("translation");
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector("p")?.textContent).toBe("[zh-Hans] Hello world.");
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
+
+    controller.setRenderState("bilingual");
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector("p")?.textContent).toContain("Hello world.");
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+
+    controller.setRenderState("original");
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector("p")?.textContent).toBe("Hello world.");
+    expect(document.querySelector(".imt-translation-block")).toBeNull();
+
+    controller.setRenderState("bilingual");
+    expect(batchCalls).toBe(1);
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
+  });
+
   it("keeps fragile UI as replacement in bilingual display mode", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
     const controller = new PageController({
@@ -620,6 +658,28 @@ describe("PageController", () => {
     expect(document.body.textContent).toContain("1.2M views");
     expect(document.body.textContent).toContain("Share");
     expect(document.querySelector("h1")?.textContent).toContain("[zh-Hans] How large language models actually work");
+  });
+
+  it("uses mainFrameSelector to keep page scans inside the configured content frame", async () => {
+    document.body.innerHTML = `
+      <aside><p>Navigation teaser outside the article frame.</p></aside>
+      <main class="reader"><p>Readable article paragraph.</p></main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      mainFrameSelector: "main.reader",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Readable article paragraph."]);
+    expect(document.querySelector("aside .imt-translation-block")).toBeNull();
+    expect(document.querySelector("main .imt-translation-block")?.textContent).toBe("[zh-Hans] Readable article paragraph.");
   });
 
   it("uses preferred scan roots to avoid translating Twitter chrome", async () => {

@@ -511,6 +511,7 @@ export function compileRulePolicy(
     siteKey: rule.siteKey || normalizedHostname,
     isHighDynamic: Boolean(rule.isHighDynamic),
     attributeNames: rule.attributeNames,
+    ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
     preferredScanRootSelectors: rule.selectors,
     excludeSelectors: rule.excludeSelectors,
     contentSelectors: rule.contentSelectors,

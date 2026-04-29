@@ -2,6 +2,7 @@ import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { removeTranslationLoading, renderTranslation, renderTranslationLoading } from "./renderEngine";
 import { restoreAll, restoreRecords } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
+import { decideRenderMode } from "./renderDecider";
 import type { DisplayMode } from "../shared/config";
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
@@ -30,6 +31,7 @@ type ViewportRootOptions = {
   rootMargin?: string;
   maxRoots?: number;
 };
+export type PageRenderState = "smart" | "bilingual" | "translation" | "original";
 
 type ControllerOptions = {
   targetLang: string;
@@ -39,6 +41,7 @@ type ControllerOptions = {
   cache?: TranslationCache;
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
+  mainFrameSelector?: string;
   preferredScanRootSelectors?: readonly string[];
   excludeSelectors?: readonly string[];
   contentSelectors?: readonly SiteContentSelector[];
@@ -64,8 +67,11 @@ export class PageController {
   private records: RestoreRecord[] = [];
   private units: TranslationUnit[] = [];
   private diagnostics: TranslationDiagnostics = createTranslationDiagnostics();
+  private renderState: PageRenderState;
 
-  constructor(private readonly options: ControllerOptions) {}
+  constructor(private readonly options: ControllerOptions) {
+    this.renderState = renderStateFromDisplayMode(options.displayMode);
+  }
 
   async translatePage(
     root: ParentNode = document.body,
@@ -107,7 +113,10 @@ export class PageController {
     root: ParentNode = document.body,
     options: ViewportRootOptions = {},
   ): HTMLElement[] {
-    const candidates = collectCandidateViewportRoots(root, this.options.preferredScanRootSelectors);
+    const scanRoots = collectMainFrameRoots(root, this.options.mainFrameSelector);
+    const candidates = dedupeElements(
+      scanRoots.flatMap((scanRoot) => collectCandidateViewportRoots(scanRoot, this.options.preferredScanRootSelectors)),
+    );
     const roots: HTMLElement[] = [];
     const margin = options.rootMargin ?? "900px";
     const maxRoots = normalizeInteger(options.maxRoots, 80, 1, 500);
@@ -128,6 +137,21 @@ export class PageController {
 
   getDiagnostics(): TranslationDiagnostics {
     return cloneTranslationDiagnostics(this.diagnostics);
+  }
+
+  setRenderState(renderState: PageRenderState): void {
+    this.renderState = renderState;
+
+    restoreRecords(this.records);
+    this.records = [];
+
+    if (renderState === "original") return;
+
+    for (const unit of this.units) {
+      if (unit.state !== "translated" || unit.translatedText === undefined || !unit.root.isConnected) continue;
+      unit.renderMode = resolveRenderModeForState(unit, renderState);
+      this.records.push(...renderTranslation(unit, unit.translatedText));
+    }
   }
 
   private async translateRoots(
@@ -214,7 +238,9 @@ export class PageController {
       diagnostics,
     };
     const scanRoots = dedupeParentNodes(
-      roots.flatMap((root) => collectScanRoots(root, this.options.preferredScanRootSelectors)),
+      roots.flatMap((root) =>
+        collectScanRoots(root, this.options.mainFrameSelector, this.options.preferredScanRootSelectors),
+      ),
     );
     const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
     const attributes = scanRoots.flatMap((scanRoot) =>
@@ -341,17 +367,16 @@ export class PageController {
   }
 
   private applyTranslation(unit: TranslationUnit, translatedText: string): void {
-    this.records.push(...renderTranslation(unit, translatedText));
     unit.translatedText = translatedText;
     unit.state = "translated";
+    if (this.renderState === "original") return;
+    unit.renderMode = resolveRenderModeForState(unit, this.renderState);
+    this.records.push(...renderTranslation(unit, translatedText));
   }
 
   private applyDisplayMode(units: TranslationUnit[]): void {
-    const displayMode = this.options.displayMode ?? "smart";
-    if (displayMode === "smart") return;
-
     for (const unit of units) {
-      unit.renderMode = displayMode === "translation-only" ? translationOnlyMode(unit) : bilingualMode(unit);
+      unit.renderMode = resolveRenderModeForState(unit, this.renderState);
     }
   }
 
@@ -395,7 +420,7 @@ export class PageController {
   ): Promise<void> {
     const batch = missingUnits.map((entry) => entry.item);
     for (const { unit } of missingUnits) {
-      this.records.push(...renderTranslationLoading(unit));
+      if (this.renderState !== "original") this.records.push(...renderTranslationLoading(unit));
       unit.state = "loading";
     }
 
@@ -449,6 +474,18 @@ export class PageController {
 
 function translationOnlyMode(unit: TranslationUnit): RenderMode {
   return unit.category === "attribute" ? "replace-attribute" : "replace-text";
+}
+
+function resolveRenderModeForState(unit: TranslationUnit, renderState: PageRenderState): RenderMode {
+  if (renderState === "translation") return translationOnlyMode(unit);
+  if (renderState === "bilingual") return bilingualMode(unit);
+  return decideRenderMode(unit.category, unit.root, unit.originalText);
+}
+
+function renderStateFromDisplayMode(displayMode: DisplayMode | undefined): PageRenderState {
+  if (displayMode === "translation-only") return "translation";
+  if (displayMode === "bilingual") return "bilingual";
+  return "smart";
 }
 
 function bilingualMode(unit: TranslationUnit): RenderMode {
@@ -505,7 +542,44 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
   return Math.min(Math.max(Math.round(numberValue), min), max);
 }
 
-function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[] | undefined): ParentNode[] {
+function collectScanRoots(
+  root: ParentNode,
+  mainFrameSelector: string | undefined,
+  preferredSelectors: readonly string[] | undefined,
+): ParentNode[] {
+  return collectMainFrameRoots(root, mainFrameSelector).flatMap((mainFrameRoot) =>
+    collectPreferredScanRoots(mainFrameRoot, preferredSelectors),
+  );
+}
+
+function collectMainFrameRoots(root: ParentNode, mainFrameSelector: string | undefined): ParentNode[] {
+  const selector = mainFrameSelector?.trim();
+  if (!selector) return [root];
+
+  const roots: HTMLElement[] = [];
+  const addMainRoot = (candidate: HTMLElement): void => addRoot(roots, candidate);
+
+  try {
+    if (root instanceof HTMLElement) {
+      if (root.matches(selector) || root.closest(selector)) return [root];
+    }
+
+    root.querySelectorAll?.(selector).forEach((element) => {
+      if (element instanceof HTMLElement) addMainRoot(element);
+    });
+  } catch {
+    return [root];
+  }
+
+  if (roots.length > 0) return roots;
+  return isDocumentScanRoot(root) ? [root] : [];
+}
+
+function isDocumentScanRoot(root: ParentNode): boolean {
+  return root === document || root === document.body || root === document.documentElement;
+}
+
+function collectPreferredScanRoots(root: ParentNode, preferredSelectors: readonly string[] | undefined): ParentNode[] {
   if (!preferredSelectors || preferredSelectors.length === 0) return [root];
 
   const roots: HTMLElement[] = [];
@@ -604,6 +678,12 @@ function matchesClosestSelector(element: HTMLElement, selectors: readonly string
     }
   }
   return false;
+}
+
+function dedupeElements(elements: HTMLElement[]): HTMLElement[] {
+  const accepted: HTMLElement[] = [];
+  for (const element of elements) addRoot(accepted, element);
+  return accepted;
 }
 
 function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {
