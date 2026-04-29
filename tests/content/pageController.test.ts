@@ -72,6 +72,26 @@ describe("PageController", () => {
     expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("Search docs");
   });
 
+  it("translates and restores readable text inside open shadow roots", async () => {
+    document.body.innerHTML = `<main><article-card></article-card></main>`;
+    const host = document.querySelector<HTMLElement>("article-card")!;
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    shadowRoot.innerHTML = `<article><p>Shadow article text.</p></article>`;
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    await controller.translatePage();
+
+    expect(shadowRoot.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Shadow article text.");
+
+    controller.restorePage();
+    expect(shadowRoot.querySelector(".imt-translation-block")).toBeNull();
+    expect(shadowRoot.querySelector("p")?.textContent).toBe("Shadow article text.");
+  });
+
   it("does not write stale translation results after restore", async () => {
     document.body.innerHTML = `<p>Hello world.</p>`;
     let resolveBatch: ((value: Array<{ id: string; text: string; status: "ok" }>) => void) | undefined;

@@ -78,6 +78,24 @@ describe("scanDocumentText", () => {
     expect(texts).not.toContain("const value = 1");
   });
 
+  it("scans text inside open shadow roots without scanning skipped hosts", () => {
+    mountFixture(`
+      <main>
+        <article-card id="readable"></article-card>
+        <article-card id="skipped" translate="no"></article-card>
+      </main>
+    `);
+    const readable = document.querySelector<HTMLElement>("#readable")!;
+    readable.attachShadow({ mode: "open" }).innerHTML = `<article><p>Shadow article text.</p></article>`;
+    const skipped = document.querySelector<HTMLElement>("#skipped")!;
+    skipped.attachShadow({ mode: "open" }).innerHTML = `<p>Skipped shadow text.</p>`;
+
+    const texts = scanDocumentText(document.body).map((item) => item.text);
+
+    expect(texts).toContain("Shadow article text.");
+    expect(texts).not.toContain("Skipped shadow text.");
+  });
+
   it("keeps short button and navigation text", () => {
     mountFixture(`
       <button>OK</button>
@@ -263,6 +281,18 @@ describe("scanTranslatableAttributes", () => {
 
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
       "placeholder:Search docs",
+    ]);
+  });
+
+  it("finds safe attributes inside open shadow roots", () => {
+    mountFixture(`<article-card></article-card>`);
+    const host = document.querySelector<HTMLElement>("article-card")!;
+    host.attachShadow({ mode: "open" }).innerHTML = `<input placeholder="Search shadow docs" />`;
+
+    const attrs = scanTranslatableAttributes(document.body);
+
+    expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
+      "placeholder:Search shadow docs",
     ]);
   });
 });
