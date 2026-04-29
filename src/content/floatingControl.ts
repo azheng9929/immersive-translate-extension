@@ -32,6 +32,7 @@ const STYLE_TEXT = `
   color: #0f2a5f;
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
+  pointer-events: none;
 }
 .imt-floating-root,
 .imt-floating-root * {
@@ -66,17 +67,19 @@ const STYLE_TEXT = `
   position: relative;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 58px;
+  width: 44px;
+  height: 64px;
   margin-right: 0;
-  border: 1px solid rgba(16, 36, 63, 0.12);
+  border: 1px solid rgba(16, 36, 63, 0.14);
   border-right: 0;
-  border-radius: 18px 0 0 18px;
+  border-radius: 17px 0 0 17px;
   color: var(--imt-ink);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,248,252,0.94) 100%);
-  box-shadow: 0 18px 42px rgba(16, 36, 63, 0.18), 0 2px 8px rgba(16, 36, 63, 0.12);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,248,252,0.9) 100%);
+  box-shadow: 0 16px 34px rgba(16, 36, 63, 0.14), 0 2px 8px rgba(16, 36, 63, 0.1);
+  backdrop-filter: blur(16px) saturate(1.18);
   cursor: pointer;
   overflow: hidden;
+  pointer-events: auto;
   transition: transform 180ms ease, width 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
 }
 .imt-floating-ball::before {
@@ -100,6 +103,32 @@ const STYLE_TEXT = `
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 7px 16px rgba(31, 122, 224, 0.26);
   transition: transform 180ms ease, opacity 180ms ease;
 }
+.imt-floating-grip {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 3px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(16, 36, 63, 0.16);
+  transform: translateY(-50%);
+}
+.imt-floating-grip::before,
+.imt-floating-grip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(16, 36, 63, 0.22);
+}
+.imt-floating-grip::before {
+  top: -7px;
+}
+.imt-floating-grip::after {
+  bottom: -7px;
+}
 .imt-floating-logo svg {
   width: 18px;
   height: 18px;
@@ -110,10 +139,10 @@ const STYLE_TEXT = `
   box-shadow: 0 22px 48px rgba(16, 36, 63, 0.22), 0 4px 10px rgba(16, 36, 63, 0.13);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-ball {
-  width: 22px;
-  height: 56px;
+  width: 20px;
+  height: 60px;
   margin-right: 0;
-  opacity: 0.78;
+  opacity: 0.7;
   box-shadow: 0 10px 24px rgba(16, 36, 63, 0.14);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-logo {
@@ -150,12 +179,13 @@ const STYLE_TEXT = `
   box-shadow: 0 24px 62px rgba(16, 36, 63, 0.2), 0 6px 18px rgba(16, 36, 63, 0.12);
   backdrop-filter: blur(18px) saturate(1.15);
   animation: imt-panel-in 160ms ease-out;
+  pointer-events: auto;
 }
 .imt-floating-header {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 14px 14px 10px;
 }
 .imt-floating-brand {
@@ -206,6 +236,33 @@ const STYLE_TEXT = `
   color: var(--imt-state);
   font-size: 12px;
   font-weight: 700;
+}
+.imt-floating-panel-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.imt-floating-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(16, 36, 63, 0.1);
+  border-radius: 8px;
+  color: #52627a;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font: inherit;
+}
+.imt-floating-icon-button:hover {
+  color: var(--imt-ink);
+  background: #f5f9ff;
+  border-color: rgba(31, 122, 224, 0.22);
+}
+.imt-floating-icon-button svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
 .imt-floating-summary {
   margin: 0;
@@ -422,6 +479,7 @@ export class FloatingTranslationControl {
     this.root.textContent = "";
     this.root.dataset.state = this.state;
     this.root.dataset.imtDock = "right-center";
+    this.root.dataset.imtSurface = "edge-tray";
     this.root.dataset.collapsed = String(this.collapsed);
 
     const style = document.createElement("style");
@@ -433,6 +491,12 @@ export class FloatingTranslationControl {
     ball.dataset.imtControl = "ball";
     ball.setAttribute("aria-label", this.collapsed ? "Show translation controls" : this.expanded ? "Close translation controls" : "Open translation controls");
     ball.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
+    const grip = document.createElement("span");
+    grip.className = "imt-floating-grip";
+    grip.dataset.imtControl = "handle-grip";
+    grip.setAttribute("aria-hidden", "true");
+    ball.append(grip);
+
     const logo = document.createElement("span");
     logo.className = "imt-floating-logo";
     logo.dataset.imtControl = "logo";
@@ -485,12 +549,20 @@ export class FloatingTranslationControl {
     status.dataset.imtControl = "status";
     status.textContent = statusLabel(this.state);
 
-    header.append(brand, status);
+    const panelControls = document.createElement("div");
+    panelControls.className = "imt-floating-panel-controls";
+    panelControls.dataset.imtControl = "panel-controls";
+    panelControls.append(
+      this.createIconButton("Minimize controls", "collapse", "minus", () => this.collapseToEdge()),
+      this.createIconButton("Hide on this page", "hide", "x", () => this.hide()),
+    );
+
+    header.append(brand, status, panelControls);
 
     const summary = document.createElement("p");
     summary.className = "imt-floating-summary";
     summary.dataset.imtControl = "summary";
-    summary.textContent = this.error ?? summaryLabel(this.summary);
+    summary.textContent = this.error ? userFacingError(this.error) : summaryLabel(this.summary);
 
     const progressValue = progressPercent(this.summary);
     const progress = document.createElement("div");
@@ -524,10 +596,8 @@ export class FloatingTranslationControl {
     translateButton.disabled = this.state === "translating" || this.state === "updating";
 
     const restoreButton = this.createButton("Restore", "restore", "imt-floating-button", () => this.restore());
-    const collapseButton = this.createButton("Minimize", "collapse", "imt-floating-button imt-floating-button-subtle", () => this.collapseToEdge());
-    const hideButton = this.createButton("Hide on this page", "hide", "imt-floating-button imt-floating-button-subtle", () => this.hide());
 
-    actions.append(translateButton, restoreButton, collapseButton, hideButton);
+    actions.append(translateButton, restoreButton);
     panel.append(header, summary, progress, metrics);
     const diagnostics = diagnosticsLabel(this.summary);
     if (diagnostics) {
@@ -568,6 +638,18 @@ export class FloatingTranslationControl {
     button.className = className;
     button.dataset.imtAction = action;
     button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  private createIconButton(label: string, action: string, icon: "minus" | "x", onClick: () => void): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "imt-floating-icon-button";
+    button.dataset.imtAction = action;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.append(createPanelActionIcon(icon));
     button.addEventListener("click", onClick);
     return button;
   }
@@ -618,6 +700,22 @@ function createTranslateIcon(): SVGSVGElement {
   return svg;
 }
 
+function createPanelActionIcon(icon: "minus" | "x"): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", icon === "minus" ? "M6 12h12" : "M7 7l10 10M17 7L7 17");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "2");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.append(path);
+  return svg;
+}
+
 function createMetric(kind: "translated" | "failed" | "pending", value: number, label: string): HTMLElement {
   const metric = document.createElement("span");
   metric.className = "imt-floating-metric";
@@ -646,7 +744,7 @@ function progressPercent(summary: FloatingStatus | undefined): number {
 
 function statusSubtitle(summary: FloatingStatus | undefined): string {
   if (!summary) return "Quiet controls for this page";
-  if ("observation" in summary) return `Dynamic updates ${summary.observation}`;
+  if ("observation" in summary) return `New content ${summary.observation}`;
   return "Page translation report";
 }
 
@@ -690,15 +788,22 @@ function summaryLabel(summary: FloatingStatus | undefined): string {
   if (summary.failed > 0) parts.push(`${summary.failed} failed`);
   if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
   if ("dynamicRuns" in summary && summary.dynamicRuns > 0) {
-    parts.push(`${summary.dynamicRuns} dynamic ${summary.dynamicRuns === 1 ? "update" : "updates"}`);
+    parts.push(`${summary.dynamicRuns} new content ${summary.dynamicRuns === 1 ? "update" : "updates"}`);
   }
   if ("observation" in summary && summary.observation === "paused") {
-    parts.push("dynamic updates paused");
+    parts.push("new content paused");
   }
   if ("observation" in summary && summary.observation === "suspended") {
-    parts.push("dynamic updates suspended");
+    parts.push("new content suspended");
   }
   return parts.join(", ");
+}
+
+function userFacingError(error: string): string {
+  if (error.startsWith("Dynamic translation paused because")) {
+    return error.replace("Dynamic translation", "New content");
+  }
+  return error;
 }
 
 function diagnosticsLabel(summary: FloatingStatus | undefined): string {
@@ -727,7 +832,7 @@ function detailedDiagnosticsLabels(summary: FloatingStatus | undefined): string[
   ];
 
   if ("observation" in summary) {
-    rows.unshift(`Dynamic ${summary.observation}, ${summary.pendingRoots} pending, ${summary.observedRoots} lazy`);
+    rows.unshift(`New content ${summary.observation}, ${summary.pendingRoots} pending, ${summary.observedRoots} lazy`);
   }
 
   const skipped = diagnosticsLabel(summary);
