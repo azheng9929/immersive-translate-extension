@@ -24,6 +24,12 @@ const sites = [
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
   { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
   { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
+  {
+    name: "Tactics Tools Hover",
+    host: "tactics.tools",
+    url: "https://tactics.tools/team-compositions",
+    hoverTooltip: true,
+  },
 ];
 const siteFilter = parseCsv(process.env.IMT_REGRESSION_SITE_FILTER ?? "").map((item) => item.toLowerCase());
 const selectedSites = siteFilter.length === 0
@@ -163,6 +169,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     const translateResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_TRANSLATE_PAGE" });
     const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, 8000);
     await delay(500);
+    const hoverResult = site.hoverTooltip ? await runHoverTooltipRegression(pageSession) : undefined;
     await scrollPage(pageSession);
     await delay(3500);
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
@@ -214,6 +221,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       (skipped || metrics.bodyTextLength > 0) &&
       (skipped || metrics.translatedBlocks > 0 || metrics.translatedRoots > 0) &&
       metrics.forbiddenTranslations === 0 &&
+      (!site.hoverTooltip || hoverResult?.ok) &&
       !excessiveFailures &&
       pageStatus?.phase !== "failed" &&
       extensionErrors.length === 0;
@@ -226,10 +234,17 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       skipped,
       summary: skipped
         ? `skipped: login wall (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
-        : `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots, failed=${pageStatus?.failed ?? "n/a"}, forbidden=${metrics.forbiddenTranslations}, first=${firstProgress.elapsedMs ?? "n/a"}ms`,
+        : [
+            `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots`,
+            `failed=${pageStatus?.failed ?? "n/a"}`,
+            `forbidden=${metrics.forbiddenTranslations}`,
+            `first=${firstProgress.elapsedMs ?? "n/a"}ms`,
+            hoverResult ? `hover=${hoverResult.ok ? "ok" : "failed"}` : undefined,
+          ].filter(Boolean).join(", "),
       translateResponse,
       pageStatusResponse,
       metrics,
+      hoverResult,
       firstProgress,
       screenshotPath,
       errors: extensionErrors,
@@ -404,6 +419,133 @@ async function scrollPage(pageSession) {
     await evaluate(pageSession, "window.scrollBy(0, Math.max(window.innerHeight, 700))");
     await delay(1000);
   }
+}
+
+async function runHoverTooltipRegression(pageSession) {
+  await evaluate(pageSession, "window.scrollTo(0, Math.min(600, Math.max(0, document.body.scrollHeight - window.innerHeight)))");
+  await delay(1000);
+
+  const candidates = await readHoverCandidates(pageSession);
+  const attempted = [];
+
+  for (const candidate of candidates) {
+    attempted.push(candidate);
+    await pageSession.send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: candidate.x,
+      y: candidate.y,
+    });
+
+    const tooltip = await waitForTranslatedTooltip(pageSession, 5000);
+    if (tooltip?.translatedBlocks > 0) {
+      return {
+        ok: true,
+        target: candidate,
+        tooltip,
+        attempted: attempted.length,
+      };
+    }
+
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 4 });
+    await delay(150);
+  }
+
+  const lastTooltip = await readVisibleTooltips(pageSession);
+  return {
+    ok: false,
+    attempted: attempted.length,
+    candidates: candidates.slice(0, 12),
+    lastTooltip,
+    error: candidates.length === 0 ? "No hover candidates found" : "No translated hover tooltip found",
+  };
+}
+
+async function readHoverCandidates(pageSession) {
+  return evaluate(pageSession, `(() => {
+    const selectors = [
+      'img',
+      '[style*="background-image"]',
+      'canvas',
+      'svg',
+      '[class*="item"]',
+      '[class*="unit"]'
+    ].join(',');
+    return Array.from(document.querySelectorAll(selectors))
+      .filter((element) => !element.closest('[data-imt-managed="true"], [data-imt-control="root"]'))
+      .map((element, index) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          index,
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          width: rect.width,
+          height: rect.height,
+          tag: element.tagName,
+          className: String(element.className || '').slice(0, 120),
+          alt: element.getAttribute('alt') || undefined,
+        };
+      })
+      .filter((item) =>
+        item.x > 0 &&
+        item.y > 0 &&
+        item.x < window.innerWidth &&
+        item.y < window.innerHeight &&
+        item.width >= 10 &&
+        item.width <= 120 &&
+        item.height >= 10 &&
+        item.height <= 120
+      )
+      .slice(0, 160);
+  })()`);
+}
+
+async function waitForTranslatedTooltip(pageSession, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastTooltip = [];
+
+  while (Date.now() < deadline) {
+    lastTooltip = await readVisibleTooltips(pageSession);
+    const translated = lastTooltip.find((tooltip) => tooltip.translatedBlocks > 0);
+    if (translated) return translated;
+    await delay(200);
+  }
+
+  return lastTooltip.find((tooltip) => tooltip.visible) ?? undefined;
+}
+
+async function readVisibleTooltips(pageSession) {
+  return evaluate(pageSession, `(() => {
+    const selector = [
+      '[role="tooltip"]',
+      '[popover]',
+      '[data-tippy-root]',
+      '.tippy-box',
+      '.tooltip',
+      '.popover',
+      '[class*="tooltip"]',
+      '[class*="popover"]'
+    ].join(',');
+    return Array.from(document.body.querySelectorAll(selector))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        const translations = Array.from(
+          element.querySelectorAll('.imt-translation-block, .imt-translation-compact')
+        ).map((node) => node.textContent?.trim()).filter(Boolean);
+        return {
+          tag: element.tagName,
+          role: element.getAttribute('role') || undefined,
+          className: String(element.className || '').slice(0, 160),
+          position: style.position,
+          zIndex: style.zIndex,
+          visible: rect.width > 0 && rect.height > 0,
+          text: (element.innerText || element.textContent || '').trim().slice(0, 500),
+          translatedBlocks: translations.length,
+          translatedText: translations.slice(0, 8),
+        };
+      })
+      .filter((item) => item.visible && item.text.length > 10);
+  })()`);
 }
 
 async function waitForTranslationProgress(pageSession, startedAt, timeoutMs) {
