@@ -16,6 +16,8 @@ export type SitePolicy = {
   debounceMs: number;
   lazyRootMargin: string;
   lazyThreshold: number;
+  eagerLazyRootMargin: string;
+  maxEagerLazyRoots: number;
   maxQueueSize: number;
   maxRootsPerFlush: number;
   maxObservedRoots: number;
@@ -121,6 +123,8 @@ const DEFAULT_SITE_POLICY: SitePolicy = {
   debounceMs: 1500,
   lazyRootMargin: "200px",
   lazyThreshold: 0.1,
+  eagerLazyRootMargin: "900px",
+  maxEagerLazyRoots: 120,
   maxQueueSize: 300,
   maxRootsPerFlush: 20,
   maxObservedRoots: 300,
@@ -133,6 +137,8 @@ const CONSERVATIVE_DYNAMIC_LIMITS = {
   dynamicMode: "conservative",
   debounceMs: 3000,
   lazyRootMargin: "120px",
+  eagerLazyRootMargin: "400px",
+  maxEagerLazyRoots: 40,
   maxQueueSize: 80,
   maxRootsPerFlush: 6,
   maxObservedRoots: 80,
@@ -143,6 +149,8 @@ const TWITTER_FAST_DYNAMIC_LIMITS = {
   dynamicMode: "conservative",
   debounceMs: 1200,
   lazyRootMargin: "700px",
+  eagerLazyRootMargin: "900px",
+  maxEagerLazyRoots: 80,
   maxQueueSize: 120,
   maxRootsPerFlush: 12,
   maxObservedRoots: 160,
@@ -157,6 +165,18 @@ const NORMAL_DYNAMIC_LIMITS = {
   maxRootsPerFlush: DEFAULT_SITE_POLICY.maxRootsPerFlush,
   maxObservedRoots: DEFAULT_SITE_POLICY.maxObservedRoots,
   maxMutationNodesPerWindow: DEFAULT_SITE_POLICY.maxMutationNodesPerWindow,
+} satisfies Partial<SitePolicy>;
+
+const METATFT_FAST_DYNAMIC_LIMITS = {
+  dynamicMode: "normal",
+  debounceMs: 500,
+  lazyRootMargin: "1400px",
+  eagerLazyRootMargin: "1800px",
+  maxEagerLazyRoots: 260,
+  maxQueueSize: 900,
+  maxRootsPerFlush: 90,
+  maxObservedRoots: 900,
+  maxMutationNodesPerWindow: 2200,
 } satisfies Partial<SitePolicy>;
 
 const TWITTER_SITE_POLICY: SitePolicy = {
@@ -177,6 +197,11 @@ const REDDIT_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
   ...CONSERVATIVE_DYNAMIC_LIMITS,
   excludedDynamicSelectors: REDDIT_EXCLUDED_DYNAMIC_SELECTORS,
+};
+
+const METATFT_SITE_POLICY: SitePolicy = {
+  ...DEFAULT_SITE_POLICY,
+  ...METATFT_FAST_DYNAMIC_LIMITS,
 };
 
 export function resolveSitePolicy(
@@ -230,6 +255,9 @@ function resolveBasePolicy(hostname: string): { policy: SitePolicy; siteKey: str
   }
   if (matchesDomain(hostname, "reddit.com")) {
     return { policy: REDDIT_SITE_POLICY, siteKey: "reddit.com", isHighDynamic: true };
+  }
+  if (matchesDomain(hostname, "metatft.com")) {
+    return { policy: METATFT_SITE_POLICY, siteKey: "metatft.com", isHighDynamic: true };
   }
   return { policy: DEFAULT_SITE_POLICY, siteKey: hostname, isHighDynamic: false };
 }

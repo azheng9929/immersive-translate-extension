@@ -30,6 +30,9 @@ type PageTranslationSessionOptions = {
   lazy?: boolean;
   lazyRootMargin?: string;
   lazyThreshold?: number;
+  eagerLazy?: boolean;
+  eagerLazyRootMargin?: string;
+  maxEagerLazyRoots?: number;
   dynamicMode?: DynamicTranslationMode;
   excludedDynamicSelectors?: readonly string[];
   maxQueueSize?: number;
@@ -114,15 +117,18 @@ export class PageTranslationSession {
     try {
       if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
         this.controller.restorePage();
-        this.observeLazyRoots(this.controller.collectTranslatableRoots(root), false);
+        const initialRoots = this.controller.collectTranslatableRoots(root);
+        const { eagerRoots, deferredRoots } = this.partitionInitialLazyRoots(initialRoots);
+        this.observeLazyRoots(deferredRoots, false);
         const observation = this.activateDynamicObserver("translated");
         this.setStatus({
           ...EMPTY_SUMMARY,
-          phase: "translated",
+          phase: eagerRoots.length > 0 ? "updating" : "translated",
           observation,
           dynamicRuns: 0,
           lastError: undefined,
         });
+        if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
         return this.getStatus();
       }
 
@@ -340,6 +346,25 @@ export class PageTranslationSession {
     }
   }
 
+  private partitionInitialLazyRoots(roots: HTMLElement[]): { eagerRoots: HTMLElement[]; deferredRoots: HTMLElement[] } {
+    if (!this.options.eagerLazy) return { eagerRoots: [], deferredRoots: roots };
+
+    const eagerRoots: HTMLElement[] = [];
+    const deferredRoots: HTMLElement[] = [];
+    const maxEagerRoots = this.options.maxEagerLazyRoots ?? 120;
+    const rootMargin = this.options.eagerLazyRootMargin ?? this.options.lazyRootMargin ?? "900px";
+
+    for (const root of roots) {
+      if (eagerRoots.length < maxEagerRoots && isNearViewport(root, rootMargin)) {
+        eagerRoots.push(root);
+      } else {
+        deferredRoots.push(root);
+      }
+    }
+
+    return { eagerRoots, deferredRoots };
+  }
+
   private handleLazyIntersections(entries: IntersectionObserverEntry[]): void {
     const visibleRoots: HTMLElement[] = [];
     let countDynamicRun = false;
@@ -548,6 +573,24 @@ function shouldIgnoreDynamicRoot(root: HTMLElement, selectors: readonly string[]
     }
   }
   return false;
+}
+
+function isNearViewport(element: HTMLElement, rootMargin: string): boolean {
+  const rect = element.getBoundingClientRect();
+  const margin = parseRootMarginPx(rootMargin);
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  return rect.bottom >= -margin &&
+    rect.top <= viewportHeight + margin &&
+    rect.right >= -margin &&
+    rect.left <= viewportWidth + margin;
+}
+
+function parseRootMarginPx(rootMargin: string): number {
+  const match = rootMargin.trim().match(/^(-?\d+(?:\.\d+)?)px\b/i);
+  if (!match) return 0;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function errorMessage(error: unknown): string {

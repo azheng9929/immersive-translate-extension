@@ -158,8 +158,10 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await navigate(pageSession, site.url);
     await delay(3000);
 
+    const translateStartedAt = Date.now();
     const translateResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_TRANSLATE_PAGE" });
-    await delay(2500);
+    const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, 8000);
+    await delay(500);
     await scrollPage(pageSession);
     await delay(3500);
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
@@ -224,10 +226,11 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       skipped,
       summary: skipped
         ? `skipped: login wall (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
-        : `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots, failed=${pageStatus?.failed ?? "n/a"}, forbidden=${metrics.forbiddenTranslations}`,
+        : `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots, failed=${pageStatus?.failed ?? "n/a"}, forbidden=${metrics.forbiddenTranslations}, first=${firstProgress.elapsedMs ?? "n/a"}ms`,
       translateResponse,
       pageStatusResponse,
       metrics,
+      firstProgress,
       screenshotPath,
       errors: extensionErrors,
       siteErrors: siteErrors.slice(0, 10),
@@ -401,6 +404,36 @@ async function scrollPage(pageSession) {
     await evaluate(pageSession, "window.scrollBy(0, Math.max(window.innerHeight, 700))");
     await delay(1000);
   }
+}
+
+async function waitForTranslationProgress(pageSession, startedAt, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastProgress = { translatedBlocks: 0, translatedRoots: 0 };
+
+  while (Date.now() < deadline) {
+    lastProgress = await readTranslationProgress(pageSession);
+    if (lastProgress.translatedBlocks > 0 || lastProgress.translatedRoots > 0) {
+      return {
+        ...lastProgress,
+        elapsedMs: Date.now() - startedAt,
+        timedOut: false,
+      };
+    }
+    await delay(100);
+  }
+
+  return {
+    ...lastProgress,
+    elapsedMs: undefined,
+    timedOut: true,
+  };
+}
+
+async function readTranslationProgress(pageSession) {
+  return evaluate(pageSession, `(() => ({
+    translatedBlocks: document.querySelectorAll('.imt-translation-block, .imt-translation-compact').length,
+    translatedRoots: document.querySelectorAll('[data-imt-state="translated"]').length,
+  }))()`);
 }
 
 async function captureScreenshot(pageSession, siteName) {

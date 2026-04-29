@@ -13,10 +13,14 @@ type MicrosoftOptions = {
   requestTimeoutMs: number;
 };
 
-const MICROSOFT_MAX_CONCURRENT_REQUESTS = 2;
-const MICROSOFT_MAX_BATCH_ITEMS = 50;
-const MICROSOFT_MAX_BATCH_CHARS = 12000;
+const MICROSOFT_MAX_CONCURRENT_REQUESTS = 4;
+const MICROSOFT_MAX_BATCH_ITEMS = 80;
+const MICROSOFT_MAX_BATCH_CHARS = 20000;
 const MICROSOFT_REQUEST_TIMEOUT_MS = 45000;
+const MICROSOFT_TOKEN_TTL_MS = 8 * 60 * 1000;
+
+let cachedToken: { value: string; expiresAt: number } | undefined;
+let pendingTokenPromise: Promise<string> | undefined;
 
 export const microsoftProvider: TranslationProvider = {
   async translate(request: ProviderRequest): Promise<ProviderResponseItem[]> {
@@ -31,6 +35,21 @@ export const microsoftProvider: TranslationProvider = {
 };
 
 async function fetchMicrosoftToken(timeoutMs: number): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && cachedToken.expiresAt > now) return cachedToken.value;
+  if (pendingTokenPromise) return pendingTokenPromise;
+
+  pendingTokenPromise = fetchFreshMicrosoftToken(timeoutMs);
+  try {
+    const token = await pendingTokenPromise;
+    cachedToken = { value: token, expiresAt: Date.now() + MICROSOFT_TOKEN_TTL_MS };
+    return token;
+  } finally {
+    pendingTokenPromise = undefined;
+  }
+}
+
+async function fetchFreshMicrosoftToken(timeoutMs: number): Promise<string> {
   const tokenResponse = await fetchWithTimeout("https://edge.microsoft.com/translate/auth", {}, timeoutMs);
   if (!tokenResponse.ok) throw new Error(`Microsoft auth failed: ${tokenResponse.status}`);
   return tokenResponse.text();
@@ -82,9 +101,14 @@ async function translateChunk(
   });
 }
 
+export function clearMicrosoftProviderRuntimeCacheForTests(): void {
+  cachedToken = undefined;
+  pendingTokenPromise = undefined;
+}
+
 function normalizeMicrosoftOptions(request: ProviderRequest): MicrosoftOptions {
   return {
-    maxConcurrentRequests: normalizeInteger(request.maxConcurrentRequests, MICROSOFT_MAX_CONCURRENT_REQUESTS, 1, 4),
+    maxConcurrentRequests: normalizeInteger(request.maxConcurrentRequests, MICROSOFT_MAX_CONCURRENT_REQUESTS, 1, 6),
     maxBatchItems: normalizeInteger(request.maxBatchItems, MICROSOFT_MAX_BATCH_ITEMS, 1, 100),
     maxBatchChars: normalizeInteger(request.maxBatchChars, MICROSOFT_MAX_BATCH_CHARS, 500, 50000),
     requestTimeoutMs: normalizeInteger(request.requestTimeoutMs, MICROSOFT_REQUEST_TIMEOUT_MS, 5000, 180000),

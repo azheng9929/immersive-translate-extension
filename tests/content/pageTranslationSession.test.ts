@@ -415,6 +415,47 @@ describe("PageTranslationSession", () => {
     expect(requestedTexts).toEqual(["First lazy paragraph.", "Second lazy paragraph."]);
     expect(session.getStatus()).toMatchObject({ phase: "translated", total: 2, translated: 2 });
   });
+
+  it("eagerly translates near-viewport lazy roots before intersection callbacks", async () => {
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible lazy paragraph.</p>
+        <p id="later">Far lazy paragraph.</p>
+      </main>
+    `;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(document.querySelector("#later")!, { top: 2000, bottom: 2040, left: 0, right: 200 });
+
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      eagerLazyRootMargin: "100px",
+      maxEagerLazyRoots: 10,
+    });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().translated === 1);
+
+    expect(requestedTexts).toEqual(["Visible lazy paragraph."]);
+    expect(document.querySelector("#visible .imt-translation-block")?.textContent).toBe("[zh-Hans] Visible lazy paragraph.");
+    expect(FakeIntersectionObserver.instances[0]?.observed.has(document.querySelector("#visible")!)).toBe(false);
+    expect(FakeIntersectionObserver.instances[0]?.observed.has(document.querySelector("#later")!)).toBe(true);
+
+    FakeIntersectionObserver.instances[0]?.trigger(document.querySelector("#later")!);
+    await waitFor(() => session!.getStatus().translated === 2);
+    expect(requestedTexts).toEqual(["Visible lazy paragraph.", "Far lazy paragraph."]);
+  });
 });
 
 function createFakeIntersectionObserver() {
@@ -476,6 +517,18 @@ function setVisibilityState(state: DocumentVisibilityState): void {
     configurable: true,
     value: state,
   });
+}
+
+function setElementRect(element: Element, rect: Pick<DOMRect, "top" | "bottom" | "left" | "right">): void {
+  element.getBoundingClientRect = () =>
+    ({
+      ...rect,
+      width: Math.max(0, rect.right - rect.left),
+      height: Math.max(0, rect.bottom - rect.top),
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => ({}),
+    }) as DOMRect;
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {

@@ -42,6 +42,21 @@ describe("sitePolicy", () => {
     }
   });
 
+  it("uses a wider fast policy for MetaTFT", () => {
+    const policy = resolveSitePolicy("www.metatft.com");
+    const normal = resolveSitePolicy("example.com");
+
+    expect(policy.dynamicMode).toBe("normal");
+    expect(policy.dynamicModeSource).toBe("site-default");
+    expect(policy.isHighDynamic).toBe(true);
+    expect(policy.siteKey).toBe("metatft.com");
+    expect(policy.debounceMs).toBeLessThan(normal.debounceMs);
+    expect(policy.lazyRootMargin).toBe("1400px");
+    expect(policy.eagerLazyRootMargin).toBe("1800px");
+    expect(policy.maxEagerLazyRoots).toBeGreaterThan(normal.maxEagerLazyRoots);
+    expect(policy.maxRootsPerFlush).toBeGreaterThan(normal.maxRootsPerFlush);
+  });
+
   it("turns dynamic translation off when the user chooses off", () => {
     expect(resolveSitePolicy("example.com", "off").dynamicMode).toBe("off");
     expect(resolveSitePolicy("x.com", "off").dynamicMode).toBe("off");

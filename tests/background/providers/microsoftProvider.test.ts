@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { microsoftProvider } from "@/background/providers/microsoftProvider";
+import { clearMicrosoftProviderRuntimeCacheForTests, microsoftProvider } from "@/background/providers/microsoftProvider";
 
 describe("microsoftProvider", () => {
   afterEach(() => {
+    clearMicrosoftProviderRuntimeCacheForTests();
     vi.unstubAllGlobals();
   });
 
@@ -88,7 +89,7 @@ describe("microsoftProvider", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const items = Array.from({ length: 55 }, (_, index) => ({
+    const items = Array.from({ length: 85 }, (_, index) => ({
       id: `u-${index}`,
       text: `Text ${index}`,
       category: "content-block" as const,
@@ -102,9 +103,41 @@ describe("microsoftProvider", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(translateBatchSizes).toEqual([50, 5]);
-    expect(result).toHaveLength(55);
+    expect(translateBatchSizes).toEqual([80, 5]);
+    expect(result).toHaveLength(85);
     expect(result[0]).toEqual({ id: "u-0", text: "zh:Text 0", detectedLang: "en", status: "ok" });
-    expect(result[54]).toEqual({ id: "u-54", text: "zh:Text 54", detectedLang: "en", status: "ok" });
+    expect(result[84]).toEqual({ id: "u-84", text: "zh:Text 84", detectedLang: "en", status: "ok" });
+  });
+
+  it("reuses a fresh auth token across sequential batches", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      if (String(input) === "https://edge.microsoft.com/translate/auth") {
+        return {
+          ok: true,
+          text: async () => "edge-token",
+        };
+      }
+
+      const body = JSON.parse(String(init?.body ?? "[]")) as Array<{ Text: string }>;
+      return {
+        ok: true,
+        json: async () => body.map((item) => ({ translations: [{ text: `zh:${item.Text}` }] })),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await microsoftProvider.translate({
+      provider: "microsoft",
+      targetLang: "zh-Hans",
+      items: [{ id: "u-1", text: "Hello", category: "content-block" }],
+    });
+    await microsoftProvider.translate({
+      provider: "microsoft",
+      targetLang: "zh-Hans",
+      items: [{ id: "u-2", text: "World", category: "content-block" }],
+    });
+
+    const authCalls = fetchMock.mock.calls.filter((call) => String(call[0]) === "https://edge.microsoft.com/translate/auth");
+    expect(authCalls).toHaveLength(1);
   });
 });
