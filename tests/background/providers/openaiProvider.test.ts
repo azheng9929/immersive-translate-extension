@@ -39,6 +39,21 @@ describe("openaiProvider", () => {
     expect(requestInit.headers).toMatchObject({ Authorization: "Bearer secret" });
     expect(body.model).toBe("test-model");
     expect(body).not.toHaveProperty("temperature");
+    expect(body.response_format).toMatchObject({
+      type: "json_schema",
+      json_schema: {
+        name: "translation_batch",
+        strict: true,
+      },
+    });
+    expect(body.response_format.json_schema.schema.additionalProperties).toBe(false);
+    expect(body.response_format.json_schema.schema.properties.items.items.required).toEqual([
+      "id",
+      "text",
+      "status",
+      "detectedLang",
+      "error",
+    ]);
     expect(body.messages[0].content).toContain("Preserve ids, item count, and item boundaries");
     expect(JSON.parse(body.messages[1].content).items).toEqual([
       { id: "u-1", category: "content-block", text: "Hello" },
@@ -81,6 +96,7 @@ describe("openaiProvider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     const firstBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(firstBody.messages[0].content).toBe("Custom system prompt");
+    expect(firstBody.response_format?.type).toBe("json_schema");
     expect(JSON.parse(firstBody.messages[1].content).items).toHaveLength(1);
     expect(result).toEqual([
       { id: "u-1", text: "translated-u-1", status: "ok" },
@@ -228,6 +244,79 @@ describe("openaiProvider", () => {
     expect(requestSizes).toEqual([2, 1, 1, 1]);
   });
 
+  it("falls back to plain JSON prompts when structured outputs are unsupported", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({ error: { message: "Unsupported parameter: response_format" } }),
+      })
+      .mockResolvedValueOnce(openAIResponse([{ id: "u-1", text: "hello-zh", status: "ok" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      openaiProvider.translate({
+        provider: "openai-compatible",
+        endpoint: "https://api.example.test/v1/chat/completions",
+        apiKey: "secret",
+        targetLang: "zh-Hans",
+        items: [{ id: "u-1", text: "Hello", category: "content-block" }],
+      }),
+    ).resolves.toEqual([{ id: "u-1", text: "hello-zh", status: "ok" }]);
+
+    const firstBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    const secondBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
+    expect(firstBody.response_format?.type).toBe("json_schema");
+    expect(secondBody).not.toHaveProperty("response_format");
+  });
+
+  it("shrinks later OpenAI batches when rate limit headers show low token headroom", async () => {
+    let callIndex = 0;
+    const requestSizes: number[] = [];
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const userPayload = JSON.parse(body.messages[1].content);
+      requestSizes.push(userPayload.items.length);
+      callIndex += 1;
+
+      return openAIResponse(
+        userPayload.items.map((item: { id: string }) => ({
+          id: item.id,
+          text: `translated-${item.id}`,
+          status: "ok",
+        })),
+        callIndex === 1
+          ? {
+            headers: new Headers({
+              "x-ratelimit-limit-tokens": "100000",
+              "x-ratelimit-remaining-tokens": "5000",
+            }),
+          }
+          : undefined,
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = Array.from({ length: 9 }, (_, index) => ({
+      id: `u-${index + 1}`,
+      text: `Text ${index + 1}`,
+      category: "content-block" as const,
+    }));
+
+    await openaiProvider.translate({
+      provider: "openai-compatible",
+      endpoint: "https://api.example.test/v1/chat/completions",
+      apiKey: "secret",
+      maxConcurrentRequests: 1,
+      maxBatchItems: 4,
+      maxBatchChars: 1000,
+      targetLang: "zh-Hans",
+      items,
+    });
+
+    expect(requestSizes.slice(0, 3)).toEqual([4, 2, 2]);
+  });
+
   it("requires endpoint and api key", async () => {
     await expect(
       openaiProvider.translate({
@@ -239,9 +328,13 @@ describe("openaiProvider", () => {
   });
 });
 
-function openAIResponse(items: Array<{ id: string; text: string; status: string }>) {
+function openAIResponse(
+  items: Array<{ id: string; text: string; status: string }>,
+  options?: { headers?: Headers },
+) {
   return {
     ok: true,
+    headers: options?.headers ?? new Headers(),
     text: async () =>
       JSON.stringify({
         choices: [
