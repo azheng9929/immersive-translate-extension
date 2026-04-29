@@ -3,6 +3,8 @@ import { removeTranslationLoading, renderTranslation, renderTranslationLoading }
 import { restoreAll } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
 import type { DisplayMode } from "../shared/config";
+import { normalizeVisibleText } from "../shared/normalize";
+import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
 import {
@@ -21,6 +23,10 @@ export type TranslationProgressListener = (delta: TranslationProgressDelta) => v
 type TranslationRetryOptions = {
   maxAttempts: number;
   delayMs: number;
+};
+type ViewportRootOptions = {
+  rootMargin?: string;
+  maxRoots?: number;
 };
 
 type ControllerOptions = {
@@ -87,6 +93,28 @@ export class PageController {
       if (seen.has(unit.root)) continue;
       seen.add(unit.root);
       roots.push(unit.root);
+    }
+
+    return roots;
+  }
+
+  collectViewportTranslatableRoots(
+    root: ParentNode = document.body,
+    options: ViewportRootOptions = {},
+  ): HTMLElement[] {
+    const candidates = collectCandidateViewportRoots(root, this.options.preferredScanRootSelectors);
+    const roots: HTMLElement[] = [];
+    const margin = options.rootMargin ?? "900px";
+    const maxRoots = normalizeInteger(options.maxRoots, 80, 1, 500);
+
+    for (const candidate of candidates) {
+      if (roots.length >= maxRoots) break;
+      if (!candidate.isConnected) continue;
+      if (!isNearViewport(candidate, margin)) continue;
+      if (isSkippableElement(candidate, { ...(this.options.allowTooltip ? { allowTooltip: true } : {}) })) continue;
+      const text = normalizeVisibleText(candidate.textContent ?? "");
+      if (!isMeaningfulText(text, classifyViewportCandidate(candidate))) continue;
+      addRoot(roots, candidate);
     }
 
     return roots;
@@ -473,6 +501,67 @@ function collectScanRoots(root: ParentNode, preferredSelectors: readonly string[
   return roots;
 }
 
+const DEFAULT_VIEWPORT_ROOT_SELECTORS = [
+  "main p",
+  "main li",
+  "article p",
+  "article li",
+  "section p",
+  "section li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "p",
+  "blockquote",
+  "figcaption",
+  "li",
+  "td",
+  "th",
+  "[role='listitem']",
+] as const;
+
+function collectCandidateViewportRoots(root: ParentNode, preferredSelectors: readonly string[] | undefined): HTMLElement[] {
+  const selectorText = (preferredSelectors && preferredSelectors.length > 0
+    ? preferredSelectors
+    : DEFAULT_VIEWPORT_ROOT_SELECTORS).join(",");
+  const candidates: HTMLElement[] = [];
+
+  const addCandidate = (element: HTMLElement): void => {
+    if (candidates.includes(element)) return;
+    candidates.push(element);
+  };
+
+  try {
+    if (root instanceof HTMLElement && root.matches(selectorText)) addCandidate(root);
+    root.querySelectorAll?.(selectorText).forEach((element) => {
+      if (element instanceof HTMLElement) addCandidate(element);
+    });
+  } catch {
+    return [];
+  }
+
+  return candidates;
+}
+
+function addRoot(roots: HTMLElement[], candidate: HTMLElement): void {
+  for (const existing of [...roots]) {
+    if (existing === candidate || existing.contains(candidate)) return;
+    if (candidate.contains(existing)) roots.splice(roots.indexOf(existing), 1);
+  }
+  roots.push(candidate);
+}
+
+function classifyViewportCandidate(element: HTMLElement): UnitCategory {
+  if (element.matches("td,th")) return "table-cell";
+  if (element.matches("li,[role='listitem']")) return "list-item";
+  if (element.matches("h1,h2,h3,h4,h5,h6")) return "heading";
+  if (element.matches("p,blockquote,figcaption")) return "content-block";
+  return "fallback";
+}
+
 function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {
   const accepted: ParentNode[] = [];
 
@@ -499,4 +588,22 @@ function dedupeParentNodes(roots: ParentNode[]): ParentNode[] {
   }
 
   return accepted;
+}
+
+function isNearViewport(element: HTMLElement, rootMargin: string): boolean {
+  const rect = element.getBoundingClientRect();
+  const margin = parseRootMarginPx(rootMargin);
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  return rect.bottom >= -margin &&
+    rect.top <= viewportHeight + margin &&
+    rect.right >= -margin &&
+    rect.left <= viewportWidth + margin;
+}
+
+function parseRootMarginPx(rootMargin: string): number {
+  const match = rootMargin.trim().match(/^(-?\d+(?:\.\d+)?)px\b/i);
+  if (!match) return 0;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }

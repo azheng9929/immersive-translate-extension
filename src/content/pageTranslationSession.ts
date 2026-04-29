@@ -1,5 +1,7 @@
 import type { PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
 import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicModeSource, type DynamicTranslationMode } from "./sitePolicy";
+import { normalizeVisibleText } from "../shared/normalize";
+import { isMeaningfulText } from "../shared/skipRules";
 import type { TranslationDiagnostics } from "./translationDiagnostics";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
@@ -33,6 +35,8 @@ type PageTranslationSessionOptions = {
   eagerLazy?: boolean;
   eagerLazyRootMargin?: string;
   maxEagerLazyRoots?: number;
+  viewportFirst?: boolean;
+  lazyDiscoveryDelayMs?: number;
   dynamicMode?: DynamicTranslationMode;
   excludedDynamicSelectors?: readonly string[];
   maxQueueSize?: number;
@@ -74,6 +78,7 @@ export class PageTranslationSession {
   private readonly pendingVisibleLazyRoots = new Set<HTMLElement>();
   private pendingVisibleLazyDynamicRun = false;
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private lazyDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
   private debounceDueAt = 0;
   private operationId = 0;
   private flushing = false;
@@ -119,6 +124,24 @@ export class PageTranslationSession {
     try {
       if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
         this.controller.restorePage();
+        if (this.options.viewportFirst) {
+          const firstWaveRoots = this.controller.collectViewportTranslatableRoots(root, {
+            rootMargin: this.options.eagerLazyRootMargin ?? this.options.lazyRootMargin ?? "900px",
+            maxRoots: this.options.maxEagerLazyRoots ?? 120,
+          });
+          const observation = this.activateDynamicObserver("translated");
+          this.setStatus({
+            ...EMPTY_SUMMARY,
+            phase: firstWaveRoots.length > 0 ? "updating" : "translated",
+            observation,
+            dynamicRuns: 0,
+            lastError: undefined,
+          });
+          this.scheduleLazyRootDiscovery(root, operationId, firstWaveRoots);
+          if (firstWaveRoots.length > 0) void this.translateRoots(firstWaveRoots, false);
+          return this.getStatus();
+        }
+
         const initialRoots = this.controller.collectTranslatableRoots(root);
         const { eagerRoots, deferredRoots } = this.partitionInitialLazyRoots(initialRoots);
         this.observeLazyRoots(deferredRoots, false);
@@ -220,6 +243,10 @@ export class PageTranslationSession {
       this.debounceTimer = undefined;
       this.debounceDueAt = 0;
     }
+    if (this.lazyDiscoveryTimer) {
+      clearTimeout(this.lazyDiscoveryTimer);
+      this.lazyDiscoveryTimer = undefined;
+    }
   }
 
   private handleMutations(mutations: MutationRecord[]): void {
@@ -231,6 +258,7 @@ export class PageTranslationSession {
       for (const node of mutation.addedNodes) {
         const root = rootFromAddedNode(node);
         if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
+        if (!hasPotentialTranslatableContent(root)) continue;
         if (isLikelyHoverOverlayRoot(root)) hasHoverOverlayRoot = true;
         roots.push(root);
       }
@@ -357,6 +385,34 @@ export class PageTranslationSession {
       this.lazyObservedRoots.add(root);
       this.lazyObserver.observe(root);
     }
+  }
+
+  private scheduleLazyRootDiscovery(root: ParentNode, operationId: number, firstWaveRoots: readonly HTMLElement[]): void {
+    if (this.lazyDiscoveryTimer) clearTimeout(this.lazyDiscoveryTimer);
+    const delayMs = Math.max(0, this.options.lazyDiscoveryDelayMs ?? 80);
+    this.lazyDiscoveryTimer = setTimeout(() => {
+      this.lazyDiscoveryTimer = undefined;
+      this.discoverLazyRoots(root, operationId, firstWaveRoots);
+    }, delayMs);
+  }
+
+  private discoverLazyRoots(root: ParentNode, operationId: number, firstWaveRoots: readonly HTMLElement[]): void {
+    if (operationId !== this.operationId || !this.options.lazy || typeof IntersectionObserver === "undefined") return;
+    const handledRoots = new Set(firstWaveRoots);
+    const initialRoots = this.controller.collectTranslatableRoots(root).filter((candidate) => {
+      if (!candidate.isConnected || this.shouldIgnoreRoot(candidate)) return false;
+      for (const handled of handledRoots) {
+        if (handled === candidate || handled.contains(candidate) || candidate.contains(handled)) return false;
+      }
+      return true;
+    });
+    const { eagerRoots, deferredRoots } = this.partitionInitialLazyRoots(initialRoots);
+    this.observeLazyRoots(deferredRoots, false);
+    if (eagerRoots.length > 0) {
+      void this.translateRoots(eagerRoots, false);
+      return;
+    }
+    this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
   }
 
   private partitionInitialLazyRoots(roots: HTMLElement[]): { eagerRoots: HTMLElement[]; deferredRoots: HTMLElement[] } {
@@ -620,6 +676,24 @@ function shouldIgnoreDynamicRoot(root: HTMLElement, selectors: readonly string[]
     } catch {
       continue;
     }
+  }
+  return false;
+}
+
+function hasPotentialTranslatableContent(root: HTMLElement): boolean {
+  const text = normalizeVisibleText(root.textContent ?? "");
+  if (text && isMeaningfulText(text, "fallback")) return true;
+
+  for (const attribute of ["placeholder", "alt", "title", "aria-label"] as const) {
+    const value = normalizeVisibleText(root.getAttribute(attribute) ?? "");
+    if (value && isMeaningfulText(value, "attribute")) return true;
+  }
+
+  const attributeElement = root.querySelector?.("[placeholder],[alt],[title],[aria-label]");
+  if (!(attributeElement instanceof HTMLElement)) return false;
+  for (const attribute of ["placeholder", "alt", "title", "aria-label"] as const) {
+    const value = normalizeVisibleText(attributeElement.getAttribute(attribute) ?? "");
+    if (value && isMeaningfulText(value, "attribute")) return true;
   }
   return false;
 }

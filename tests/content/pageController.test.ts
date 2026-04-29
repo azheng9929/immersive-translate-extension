@@ -29,6 +29,21 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   expect(predicate()).toBe(true);
 }
 
+function setElementRect(element: Element, rect: Partial<DOMRect>): void {
+  element.getBoundingClientRect = () =>
+    ({
+      x: rect.left ?? 0,
+      y: rect.top ?? 0,
+      width: (rect.right ?? 0) - (rect.left ?? 0),
+      height: (rect.bottom ?? 0) - (rect.top ?? 0),
+      top: rect.top ?? 0,
+      bottom: rect.bottom ?? 0,
+      left: rect.left ?? 0,
+      right: rect.right ?? 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+}
+
 describe("PageController", () => {
   it("translates and restores a mixed page using fake translation", async () => {
     document.body.innerHTML = `
@@ -157,6 +172,32 @@ describe("PageController", () => {
     await translatePromise;
 
     expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Second paragraph.");
+  });
+
+  it("collects only near-viewport roots for the first translation wave", () => {
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible paragraph.</p>
+        <p id="far">Far paragraph.</p>
+        <p id="visible-later">Another visible paragraph.</p>
+      </main>
+    `;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(document.querySelector("#far")!, { top: 2200, bottom: 2240, left: 0, right: 200 });
+    setElementRect(document.querySelector("#visible-later")!, { top: 120, bottom: 160, left: 0, right: 200 });
+
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    const roots = controller.collectViewportTranslatableRoots(document.body, {
+      rootMargin: "100px",
+      maxRoots: 1,
+    });
+
+    expect(roots).toEqual([document.querySelector("#visible")]);
   });
 
   it("uses cached translations instead of requesting the same text twice", async () => {

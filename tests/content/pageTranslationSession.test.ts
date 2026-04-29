@@ -398,6 +398,45 @@ describe("PageTranslationSession", () => {
     expect(document.querySelector(".imt-translation-block")).toBeNull();
   });
 
+  it("ignores textless dynamic DOM noise without suspending updates", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      maxMutationNodesPerWindow: 2,
+      mutationWindowMs: 1000,
+    });
+
+    await session.translatePage();
+    const noise = document.createDocumentFragment();
+    for (let index = 0; index < 6; index += 1) {
+      const div = document.createElement("div");
+      div.dataset.noise = String(index);
+      noise.append(div);
+    }
+    document.querySelector("main")?.append(noise);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content.";
+    document.querySelector("main")?.append(lateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
+    expect(session.getStatus()).toMatchObject({ observation: "observing", dynamicRuns: 1 });
+  });
+
   it("lazily translates page roots when they enter the viewport", async () => {
     const FakeIntersectionObserver = createFakeIntersectionObserver();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
@@ -575,6 +614,60 @@ describe("PageTranslationSession", () => {
     FakeIntersectionObserver.instances[0]?.trigger(document.querySelector("#later")!);
     await waitFor(() => session!.getStatus().translated === 2);
     expect(requestedTexts).toEqual(["Visible lazy paragraph.", "Far lazy paragraph."]);
+  });
+
+  it("starts viewport-first lazy translation before full lazy root discovery", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible first wave.</p>
+        <p id="later">Deferred second wave.</p>
+      </main>
+    `;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(document.querySelector("#later")!, { top: 2000, bottom: 2040, left: 0, right: 200 });
+
+    const requestedTexts: string[] = [];
+    let fullDiscoveryCount = 0;
+    class TrackingController extends PageController {
+      collectTranslatableRoots(root?: ParentNode): HTMLElement[] {
+        fullDiscoveryCount += 1;
+        return super.collectTranslatableRoots(root);
+      }
+    }
+    const controller = new TrackingController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      viewportFirst: true,
+      eagerLazyRootMargin: "100px",
+      lazyDiscoveryDelayMs: 100,
+      maxEagerLazyRoots: 10,
+    });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().translated === 1);
+
+    expect(fullDiscoveryCount).toBe(0);
+    expect(requestedTexts).toEqual(["Visible first wave."]);
+    expect(document.querySelector("#visible .imt-translation-block")?.textContent).toBe("[zh-Hans] Visible first wave.");
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(fullDiscoveryCount).toBe(1);
+    expect(FakeIntersectionObserver.instances[0]?.observed.has(document.querySelector("#later")!)).toBe(true);
+
+    FakeIntersectionObserver.instances[0]?.trigger(document.querySelector("#later")!);
+    await waitFor(() => session!.getStatus().translated === 2);
+    expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
   });
 });
 
