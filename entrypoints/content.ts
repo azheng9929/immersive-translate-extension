@@ -92,6 +92,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
+    allowTooltip: sitePolicy.allowTooltip,
     getPageTitle: readPageTitleContext,
     ...progressivePageBatchOptions(config),
     retry: { maxAttempts: 3, delayMs: 800 },
@@ -130,6 +131,7 @@ function createPageSession(config: ExtensionConfig): PageTranslationSession {
     maxObservedRoots: sitePolicy.maxObservedRoots,
     maxMutationNodesPerWindow: sitePolicy.maxMutationNodesPerWindow,
     mutationWindowMs: sitePolicy.mutationWindowMs,
+    tooltipDebounceMs: 120,
     site: {
       hostname: sitePolicy.hostname,
       siteKey: sitePolicy.siteKey,

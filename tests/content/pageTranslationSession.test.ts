@@ -128,7 +128,7 @@ describe("PageTranslationSession", () => {
     ]);
   });
 
-  it("does not dynamically translate tooltips, buttons, or extension UI", async () => {
+  it("does not dynamically translate buttons or extension UI", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
     const requestedTexts: string[] = [];
@@ -142,10 +142,6 @@ describe("PageTranslationSession", () => {
     session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
 
     await session.translatePage();
-    const tooltip = document.createElement("div");
-    tooltip.setAttribute("role", "tooltip");
-    tooltip.textContent = "218 likes. Like";
-    document.body.append(tooltip);
     const button = document.createElement("button");
     button.textContent = "New button";
     document.body.append(button);
@@ -160,10 +156,81 @@ describe("PageTranslationSession", () => {
     await vi.advanceTimersByTimeAsync(20);
 
     expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
-    expect(tooltip.querySelector(".imt-translation-block")).toBeNull();
     expect(button.textContent).toBe("New button");
     expect(extensionUi.textContent).toBe("Plugin panel");
     expect(session.getStatus()).toMatchObject({ dynamicRuns: 1, observation: "observing" });
+  });
+
+  it("dynamically translates tooltip content when the site policy allows it", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      allowTooltip: true,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 1500,
+      tooltipDebounceMs: 20,
+    });
+
+    await session.translatePage();
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.innerHTML = `
+      <h2>Void Staff</h2>
+      <p>Damage from attacks and Abilities shreds the target.</p>
+    `;
+    document.body.append(tooltip);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual([
+      "Hello world.",
+      "Void Staff",
+      "Damage from attacks and Abilities shreds the target.",
+    ]);
+    expect(
+      Array.from(tooltip.querySelectorAll(".imt-translation-block, .imt-translation-compact")).map((node) => node.textContent),
+    ).toEqual([
+      "[zh-Hans] Void Staff",
+      "[zh-Hans] Damage from attacks and Abilities shreds the target.",
+    ]);
+  });
+
+  it("keeps tooltip translation disabled when a site policy excludes hover overlays", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Hello world.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      allowTooltip: false,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      excludedDynamicSelectors: ['[role="tooltip"]'],
+    });
+
+    await session.translatePage();
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.textContent = "218 likes. Like";
+    document.body.append(tooltip);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world."]);
+    expect(tooltip.querySelector(".imt-translation-block")).toBeNull();
   });
 
   it("keeps dynamic translation off when the site policy disables it", async () => {

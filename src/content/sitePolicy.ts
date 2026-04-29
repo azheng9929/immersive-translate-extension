@@ -13,6 +13,7 @@ export type SitePolicy = {
   dynamicMode: DynamicTranslationMode;
   attributeNames: readonly TranslatableAttributeName[];
   preferredScanRootSelectors: readonly string[];
+  allowTooltip: boolean;
   debounceMs: number;
   lazyRootMargin: string;
   lazyThreshold: number;
@@ -37,8 +38,6 @@ export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
   '[data-imt-state="translated"]',
   '[translate="no"]',
   ".notranslate",
-  '[role="tooltip"]',
-  "[popover]",
   "script",
   "style",
   "template",
@@ -56,8 +55,11 @@ export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
   '[role="menuitem"]',
 ] as const;
 
+const TOOLTIP_DYNAMIC_SELECTORS = ['[role="tooltip"]', "[popover]"] as const;
+
 const TWITTER_EXCLUDED_DYNAMIC_SELECTORS = [
   ...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
+  ...TOOLTIP_DYNAMIC_SELECTORS,
   '[data-testid="HoverCard"]',
   '[data-testid="hoverCardParent"]',
   '[data-testid="placementTracking"]',
@@ -121,6 +123,7 @@ const DEFAULT_SITE_POLICY: SitePolicy = {
   dynamicMode: "normal",
   attributeNames: SAFE_TRANSLATABLE_ATTRIBUTES,
   preferredScanRootSelectors: [],
+  allowTooltip: true,
   debounceMs: 1500,
   lazyRootMargin: "200px",
   lazyThreshold: 0.1,
@@ -180,11 +183,24 @@ const METATFT_FAST_DYNAMIC_LIMITS = {
   maxMutationNodesPerWindow: 2200,
 } satisfies Partial<SitePolicy>;
 
+const TACTICS_TOOLS_FAST_DYNAMIC_LIMITS = {
+  dynamicMode: "normal",
+  debounceMs: 120,
+  lazyRootMargin: "1200px",
+  eagerLazyRootMargin: "1400px",
+  maxEagerLazyRoots: 180,
+  maxQueueSize: 300,
+  maxRootsPerFlush: 32,
+  maxObservedRoots: 500,
+  maxMutationNodesPerWindow: 1200,
+} satisfies Partial<SitePolicy>;
+
 const TWITTER_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
   ...TWITTER_FAST_DYNAMIC_LIMITS,
   attributeNames: [],
   preferredScanRootSelectors: TWITTER_PREFERRED_SCAN_ROOT_SELECTORS,
+  allowTooltip: false,
   excludedDynamicSelectors: TWITTER_EXCLUDED_DYNAMIC_SELECTORS,
 };
 
@@ -203,6 +219,12 @@ const REDDIT_SITE_POLICY: SitePolicy = {
 const METATFT_SITE_POLICY: SitePolicy = {
   ...DEFAULT_SITE_POLICY,
   ...METATFT_FAST_DYNAMIC_LIMITS,
+};
+
+const TACTICS_TOOLS_SITE_POLICY: SitePolicy = {
+  ...DEFAULT_SITE_POLICY,
+  ...TACTICS_TOOLS_FAST_DYNAMIC_LIMITS,
+  allowTooltip: true,
 };
 
 export function resolveSitePolicy(
@@ -259,6 +281,9 @@ function resolveBasePolicy(hostname: string): { policy: SitePolicy; siteKey: str
   }
   if (matchesDomain(hostname, "metatft.com")) {
     return { policy: METATFT_SITE_POLICY, siteKey: "metatft.com", isHighDynamic: true };
+  }
+  if (matchesDomain(hostname, "tactics.tools")) {
+    return { policy: TACTICS_TOOLS_SITE_POLICY, siteKey: "tactics.tools", isHighDynamic: true };
   }
   return { policy: DEFAULT_SITE_POLICY, siteKey: hostname, isHighDynamic: false };
 }

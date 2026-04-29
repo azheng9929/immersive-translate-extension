@@ -32,6 +32,7 @@ type ControllerOptions = {
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
   preferredScanRootSelectors?: readonly string[];
+  allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
   progressiveBatchItems?: number;
   progressiveBatchChars?: number;
@@ -170,6 +171,7 @@ export class PageController {
     const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
     const scanOptions = {
       ...(hostname ? { hostname } : {}),
+      ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
       targetLang: this.options.targetLang,
       diagnostics,
     };
@@ -187,6 +189,7 @@ export class PageController {
       revision,
       targetLang: this.options.targetLang,
       hostname,
+      ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
       diagnostics,
     });
   }

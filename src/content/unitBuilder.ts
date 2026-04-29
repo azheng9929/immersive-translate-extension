@@ -19,6 +19,7 @@ type BuildInput = {
   revision: number;
   targetLang: string;
   hostname?: string;
+  allowTooltip?: boolean;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -48,6 +49,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   for (const [root, textNodes] of rootToTexts) {
     const collected = collectUnitText(root, textNodes, {
       ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.allowTooltip ? { allowTooltip: true } : {}),
       targetLang: input.targetLang,
     });
     if (!collected.text) {
@@ -98,7 +100,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
 function collectUnitText(
   root: HTMLElement,
   fallbackTextNodes: Text[],
-  options: GranularityOptions,
+  options: GranularityOptions & { allowTooltip?: boolean },
 ): { text: string; skipReason?: string } {
   let rawText = "";
   let text = "";
@@ -106,7 +108,7 @@ function collectUnitText(
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
-      if (isSkippableElement(parent)) return NodeFilter.FILTER_REJECT;
+      if (isSkippableElement(parent, options)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },

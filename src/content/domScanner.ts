@@ -36,6 +36,7 @@ function getScannerCategory(element: HTMLElement): UnitCategory {
 }
 
 export type TextScanOptions = GranularityOptions & {
+  allowTooltip?: boolean;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -47,7 +48,7 @@ export function scanDocumentText(root: ParentNode, options: TextScanOptions = {}
       recordScanSeen(options.diagnostics, "text");
       const parent = node.parentElement;
       if (!parent) return rejectText(options.diagnostics, "no-parent");
-      if (isSkippableElement(parent)) return rejectText(options.diagnostics, "global-selector");
+      if (isSkippableElement(parent, options)) return rejectText(options.diagnostics, "global-selector");
       if (!isVisibleElement(parent)) return rejectText(options.diagnostics, "hidden");
       const decision = resolveTextGranularity(parent, text, options);
       if (decision.skip) return rejectText(options.diagnostics, decision.reason);
@@ -98,7 +99,7 @@ export function scanTranslatableAttributes(
       const text = normalizeVisibleText(value);
       if (!text) continue;
       recordScanSeen(options.diagnostics, "attributes");
-      if (isSkippableElement(element)) {
+      if (isSkippableElement(element, options)) {
         recordScanSkipped(options.diagnostics, "attributes", "global-selector");
         continue;
       }

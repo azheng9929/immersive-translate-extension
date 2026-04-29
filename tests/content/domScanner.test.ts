@@ -39,6 +39,21 @@ describe("scanDocumentText", () => {
     expect(texts).not.toContain("Managed translation");
   });
 
+  it("scans tooltip text only when tooltip translation is allowed", () => {
+    mountFixture(`
+      <div role="tooltip">
+        <h2>Void Staff</h2>
+        <p>Damage from attacks and Abilities shreds the target.</p>
+      </div>
+    `);
+
+    expect(scanDocumentText(document.body).map((item) => item.text)).toEqual([]);
+    expect(scanDocumentText(document.body, { allowTooltip: true }).map((item) => item.text)).toEqual([
+      "Void Staff",
+      "Damage from attacks and Abilities shreds the target.",
+    ]);
+  });
+
   it("skips text inside hidden ancestors", () => {
     mountFixture(`
       <p>Visible text</p>

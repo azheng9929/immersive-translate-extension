@@ -40,6 +40,7 @@ type PageTranslationSessionOptions = {
   maxObservedRoots?: number;
   maxMutationNodesPerWindow?: number;
   mutationWindowMs?: number;
+  tooltipDebounceMs?: number;
   site?: PageTranslationSiteStatus;
 };
 
@@ -73,6 +74,7 @@ export class PageTranslationSession {
   private readonly pendingVisibleLazyRoots = new Set<HTMLElement>();
   private pendingVisibleLazyDynamicRun = false;
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private debounceDueAt = 0;
   private operationId = 0;
   private flushing = false;
   private dynamicSuspended = false;
@@ -216,6 +218,7 @@ export class PageTranslationSession {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = undefined;
+      this.debounceDueAt = 0;
     }
   }
 
@@ -223,10 +226,12 @@ export class PageTranslationSession {
     if (!this.canHandleDynamicMutations()) return;
 
     const roots: HTMLElement[] = [];
+    let hasHoverOverlayRoot = false;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         const root = rootFromAddedNode(node);
         if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
+        if (isLikelyHoverOverlayRoot(root)) hasHoverOverlayRoot = true;
         roots.push(root);
       }
     }
@@ -239,7 +244,7 @@ export class PageTranslationSession {
     }
 
     if (this.pendingRoots.size === 0) return;
-    this.scheduleFlush();
+    this.scheduleFlush(hasHoverOverlayRoot ? this.tooltipDebounceMs() : undefined);
   }
 
   private handleVisibilityChange(): void {
@@ -250,6 +255,7 @@ export class PageTranslationSession {
       if (this.debounceTimer) {
         clearTimeout(this.debounceTimer);
         this.debounceTimer = undefined;
+        this.debounceDueAt = 0;
       }
       this.setStatus({ ...this.status, observation: "paused" });
       return;
@@ -280,18 +286,25 @@ export class PageTranslationSession {
     return true;
   }
 
-  private scheduleFlush(): void {
+  private scheduleFlush(delayMs = this.dynamicDebounceMs()): void {
     if (this.dynamicSuspended) return;
     if (!this.isPageVisible()) {
       this.setStatus({ ...this.status, observation: "paused" });
       return;
     }
+    const dueAt = Date.now() + delayMs;
+    if (this.debounceTimer && this.debounceDueAt > 0 && this.debounceDueAt <= dueAt) {
+      this.setStatus({ ...this.status, observation: "queued" });
+      return;
+    }
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.setStatus({ ...this.status, observation: "queued" });
+    this.debounceDueAt = dueAt;
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
+      this.debounceDueAt = 0;
       void this.flushPendingRoots();
-    }, this.options.debounceMs ?? 250);
+    }, delayMs);
   }
 
   private async flushPendingRoots(): Promise<void> {
@@ -486,6 +499,7 @@ export class PageTranslationSession {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = undefined;
+      this.debounceDueAt = 0;
     }
     this.disconnectMutationObserver();
     this.removeVisibilityListener();
@@ -503,6 +517,14 @@ export class PageTranslationSession {
 
   private dynamicMode(): DynamicTranslationMode {
     return this.options.dynamicMode ?? "normal";
+  }
+
+  private dynamicDebounceMs(): number {
+    return this.options.debounceMs ?? 250;
+  }
+
+  private tooltipDebounceMs(): number {
+    return Math.min(this.dynamicDebounceMs(), this.options.tooltipDebounceMs ?? 120);
   }
 
   private maxQueueSize(): number {
@@ -600,6 +622,35 @@ function shouldIgnoreDynamicRoot(root: HTMLElement, selectors: readonly string[]
     }
   }
   return false;
+}
+
+function isLikelyHoverOverlayRoot(root: HTMLElement): boolean {
+  try {
+    if (
+      root.closest(
+        [
+          '[role="tooltip"]',
+          "[popover]",
+          "[data-tippy-root]",
+          ".tippy-box",
+          ".tooltip",
+          ".popover",
+          '[class*="tooltip"]',
+          '[class*="popover"]',
+        ].join(","),
+      )
+    ) {
+      return true;
+    }
+  } catch {
+    // Fall through to the positioned-overlay heuristic.
+  }
+
+  const text = root.textContent?.trim();
+  if (!text || text.length > 2000) return false;
+  const style = window.getComputedStyle(root);
+  const zIndex = Number.parseInt(style.zIndex, 10);
+  return (style.position === "fixed" || style.position === "absolute") && Number.isFinite(zIndex) && zIndex >= 10;
 }
 
 function isNearViewport(element: HTMLElement, rootMargin: string): boolean {

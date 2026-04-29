@@ -34,13 +34,17 @@ const UI_CATEGORIES = new Set<UnitCategory>([
   "table-cell",
 ]);
 
-export function isSkippableElement(element: Element): boolean {
+export type SkipRuleOptions = {
+  allowTooltip?: boolean;
+};
+
+export function isSkippableElement(element: Element, options: SkipRuleOptions = {}): boolean {
   if (element.closest('[data-imt-managed="true"]')) return true;
   if (element.closest('[data-imt-skip="true"]')) return true;
   if (element.closest('[data-imt-state="loading"]')) return true;
   if (element.closest('[data-imt-state="translated"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
-  if (element.closest('[role="tooltip"], [popover]')) return true;
+  if (!options.allowTooltip && element.closest('[role="tooltip"], [popover]')) return true;
   if (
     element.closest(
       [

@@ -17,6 +17,13 @@ describe("isSkippableElement", () => {
     document.body.innerHTML = '<span data-imt-managed="true">Translated</span>';
     expect(isSkippableElement(document.querySelector("span")!)).toBe(true);
   });
+
+  it("allows tooltip text only when the caller opts in", () => {
+    document.body.innerHTML = '<div role="tooltip"><p>Damage from attacks and Abilities.</p></div>';
+
+    expect(isSkippableElement(document.querySelector("p")!)).toBe(true);
+    expect(isSkippableElement(document.querySelector("p")!, { allowTooltip: true })).toBe(false);
+  });
 });
 
 describe("isMeaningfulText", () => {

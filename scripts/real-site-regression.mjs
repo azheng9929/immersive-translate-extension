@@ -169,7 +169,6 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
 
     const metrics = await evaluate(pageSession, `(() => {
       const forbiddenTranslations = document.querySelectorAll([
-        '[role="tooltip"] .imt-translation-block',
         '[data-testid="HoverCard"] .imt-translation-block',
         '[data-imt-managed="true"] .imt-translation-block',
         '[data-imt-managed="true"] [data-imt-state="translated"]',

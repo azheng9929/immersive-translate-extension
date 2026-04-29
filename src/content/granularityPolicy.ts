@@ -5,6 +5,7 @@ import type { UnitCategory } from "../shared/types";
 export type GranularityOptions = {
   hostname?: string;
   targetLang?: string;
+  allowTooltip?: boolean;
 };
 
 export type TextGranularityDecision = {
@@ -75,6 +76,10 @@ const GLOBAL_SKIP_SELECTORS = [
   ".visuallyhidden",
   ".sr-only",
 ] as const;
+
+const GLOBAL_SKIP_SELECTORS_WITH_ALLOWED_TOOLTIPS = GLOBAL_SKIP_SELECTORS.filter(
+  (selector) => selector !== '[role="tooltip"]' && selector !== "[popover]",
+);
 
 const GLOBAL_SKIP_TEXT_PATTERNS = [
   /^@[A-Za-z0-9_.-]{1,50}$/,
@@ -337,7 +342,7 @@ export function resolveTextGranularity(
   const text = normalizeVisibleText(value);
   if (!text) return { skip: true, reason: "empty" };
 
-  if (matchesClosest(element, GLOBAL_SKIP_SELECTORS)) return { skip: true, reason: "global-selector" };
+  if (matchesClosest(element, globalSkipSelectors(options))) return { skip: true, reason: "global-selector" };
   if (matchesAnyPattern(text, GLOBAL_SKIP_TEXT_PATTERNS)) return { skip: true, reason: "global-text" };
   if (shouldSkipForTargetLanguage(text, options.targetLang)) return { skip: true, reason: "target-language" };
 
@@ -358,6 +363,10 @@ export function resolveTextGranularity(
   if (matchesAnyPattern(text, policy.skipTextPatterns)) return { skip: true, reason: "site-text" };
 
   return { skip: false };
+}
+
+function globalSkipSelectors(options: GranularityOptions): readonly string[] {
+  return options.allowTooltip ? GLOBAL_SKIP_SELECTORS_WITH_ALLOWED_TOOLTIPS : GLOBAL_SKIP_SELECTORS;
 }
 
 function resolvePolicy(hostname = ""): SiteGranularityPolicy | undefined {
