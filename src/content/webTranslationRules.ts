@@ -2,6 +2,7 @@ import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import type { DynamicMode } from "../shared/config";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
+import { IMPORTED_IMMERSIVE_WEB_RULES } from "./importedImmersiveRules";
 
 export type RuleArrayValue<T> = readonly T[] | {
   replace?: readonly T[];
@@ -27,7 +28,7 @@ export type WebTranslationRule = {
   injectedCss?: RuleArrayValue<string>;
   contentSelectors?: RuleArrayValue<RuleContentSelector>;
   attributeNames?: RuleArrayValue<TranslatableAttributeName>;
-  dynamicPreset?: "normal" | "conservative" | "twitter-fast" | "metatft-fast" | "tactics-fast";
+  dynamicPreset?: "normal" | "conservative" | "twitter-fast" | "metatft-fast" | "tactics-fast" | "chat-stream";
   isHighDynamic?: boolean;
   allowTooltip?: boolean;
   paragraphMinTextCount?: number;
@@ -167,6 +168,17 @@ const DYNAMIC_PRESETS = {
     maxObservedRoots: 500,
     maxMutationNodesPerWindow: 1200,
   },
+  "chat-stream": {
+    dynamicMode: "normal",
+    debounceMs: 800,
+    lazyRootMargin: "600px",
+    eagerLazyRootMargin: "500px",
+    maxEagerLazyRoots: 0,
+    maxQueueSize: 160,
+    maxRootsPerFlush: 12,
+    maxObservedRoots: 260,
+    maxMutationNodesPerWindow: 500,
+  },
 } satisfies Record<string, Partial<SitePolicy>>;
 
 export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
@@ -183,7 +195,7 @@ export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
   blockMinWordCount: 4,
 };
 
-export const BUILTIN_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
+const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
   {
     id: "x",
     siteKey: "x.com",
@@ -474,12 +486,18 @@ shreddit-comment,
   },
 ] as const;
 
+export const BUILTIN_WEB_TRANSLATION_RULES = [
+  ...CORE_WEB_TRANSLATION_RULES,
+  ...IMPORTED_IMMERSIVE_WEB_RULES,
+] as const satisfies readonly WebTranslationRule[];
+
 export function matchWebTranslationRule(
   url: string,
   doc: Document | undefined = globalThis.document,
   rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
 ): WebTranslationRule | undefined {
-  return rules.find((rule) => matchesRule(url, doc, rule));
+  return rules.find((rule) => hasSelectorConditions(rule) && matchesRule(url, doc, rule)) ??
+    rules.find((rule) => !hasSelectorConditions(rule) && matchesRule(url, doc, rule));
 }
 
 export function selectWebTranslationRulesForContent(
@@ -674,13 +692,39 @@ function matchesUrlPattern(url: string, pattern: string): boolean {
   const normalizedPattern = pattern.trim().toLowerCase();
 
   if (!normalizedPattern.includes("://")) {
-    const domain = normalizedPattern.replace(/^www\./, "");
-    const host = parsed.hostname.replace(/^www\./, "");
-    return host === domain || host.endsWith(`.${domain}`);
+    return matchesHostPattern(parsed, normalizedPattern);
   }
 
   const escaped = normalizedPattern.split("*").map(escapeRegExp).join(".*");
   return new RegExp(`^${escaped}$`, "i").test(parsed.href.toLowerCase());
+}
+
+function matchesHostPattern(parsed: URL, pattern: string): boolean {
+  const host = parsed.hostname.toLowerCase();
+  const hostAndPath = `${host}${parsed.pathname}${parsed.search}${parsed.hash}`.toLowerCase();
+
+  if (pattern.includes("/")) {
+    return wildcardPatternToRegExp(pattern).test(hostAndPath);
+  }
+
+  const normalizedHost = host.replace(/^www\./, "");
+  const normalizedPattern = pattern.replace(/^www\./, "");
+
+  if (normalizedPattern.startsWith("*.")) {
+    const domain = normalizedPattern.slice(2);
+    return host === domain || host.endsWith(`.${domain}`);
+  }
+
+  if (normalizedPattern.includes("*")) {
+    return wildcardPatternToRegExp(normalizedPattern).test(normalizedHost);
+  }
+
+  return normalizedHost === normalizedPattern || normalizedHost.endsWith(`.${normalizedPattern}`);
+}
+
+function wildcardPatternToRegExp(pattern: string): RegExp {
+  const escaped = pattern.split("*").map(escapeRegExp).join(".*");
+  return new RegExp(`^${escaped}$`, "i");
 }
 
 function hasSelector(doc: Document, selector: string): boolean {

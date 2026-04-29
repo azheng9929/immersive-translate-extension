@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUILTIN_WEB_TRANSLATION_RULES,
   compileRulePolicy,
   matchWebTranslationRule,
   mergeWebTranslationRules,
+  resolveWebTranslationPolicy,
   selectWebTranslationRulesForContent,
   type WebTranslationRule,
 } from "@/content/webTranslationRules";
@@ -33,6 +35,18 @@ describe("webTranslationRules", () => {
     expect(matchWebTranslationRule("https://x.com/settings/profile", undefined, rules)).toBeUndefined();
   });
 
+  it("matches imported host wildcard and host path patterns", () => {
+    const rules: WebTranslationRule[] = [
+      { id: "wikipedia", matches: ["*.wikipedia.org"] },
+      { id: "telegram", matches: ["web.telegram.org/z/*"] },
+    ];
+
+    expect(matchWebTranslationRule("https://en.wikipedia.org/wiki/Translation", undefined, rules)?.id).toBe(
+      "wikipedia",
+    );
+    expect(matchWebTranslationRule("https://web.telegram.org/z/#-123", undefined, rules)?.id).toBe("telegram");
+  });
+
   it("uses selectorMatches and excludeSelectorMatches to detect page shape", () => {
     document.body.innerHTML = `<main data-reader><p>Article body.</p></main>`;
     const rules: WebTranslationRule[] = [
@@ -48,6 +62,16 @@ describe("webTranslationRules", () => {
 
     document.body.innerHTML = `<main data-reader><div class="paywall">Subscribe</div></main>`;
     expect(matchWebTranslationRule("https://example.com/story", document, rules)).toBeUndefined();
+  });
+
+  it("prefers matching DOM-shape rules over broader URL rules", () => {
+    document.body.innerHTML = `<main data-reader><p>Article body.</p></main>`;
+    const rules: WebTranslationRule[] = [
+      { id: "generic-news", matches: ["example.com"], selectors: ["body"] },
+      { id: "reader-shape", matches: ["example.com"], selectorMatches: ["main[data-reader]"], selectors: ["main"] },
+    ];
+
+    expect(matchWebTranslationRule("https://example.com/story", document, rules)?.id).toBe("reader-shape");
   });
 
   it("merges general rules with site deltas using add and remove operations", () => {
@@ -126,5 +150,38 @@ describe("webTranslationRules", () => {
       "paywall-shape",
       "news",
     ]);
+  });
+
+  it("ships a scaled imported rule library with DOM-shape guarded rules", () => {
+    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeGreaterThan(80);
+
+    document.head.innerHTML = "";
+    document.body.innerHTML = `<article><p>Looks like an article, but not Medium.</p></article>`;
+    expect(resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", { document })).toMatchObject({
+      isHighDynamic: false,
+      preferredScanRootSelectors: [],
+    });
+
+    document.head.innerHTML = `<meta property="al:ios:url" content="medium://p/example">`;
+    expect(resolveWebTranslationPolicy("https://medium.com/@writer/story", "normal", { document })).toMatchObject({
+      siteKey: "medium.com",
+      isHighDynamic: true,
+    });
+  });
+
+  it("maps imported always-on advanceMergeConfig rules to chat-style scheduling", () => {
+    const discordPolicy = resolveWebTranslationPolicy("https://discord.com/channels/1/2", "normal");
+    const telegramPolicy = resolveWebTranslationPolicy("https://web.telegram.org/z/#-123", "normal");
+
+    expect(discordPolicy).toMatchObject({
+      siteKey: "discord.com",
+      isHighDynamic: true,
+      maxEagerLazyRoots: 0,
+    });
+    expect(telegramPolicy).toMatchObject({
+      siteKey: "web.telegram.org",
+      isHighDynamic: true,
+      maxEagerLazyRoots: 0,
+    });
   });
 });
