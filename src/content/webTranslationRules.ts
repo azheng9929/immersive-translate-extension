@@ -912,6 +912,77 @@ p.title > a.title,
     isHighDynamic: true,
   },
   {
+    id: "promptot",
+    siteKey: "promptot.com",
+    matches: ["*://promptot.com/*", "*://*.promptot.com/*"],
+    mainFrameSelector: "main",
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main section p",
+      "main section li",
+      "main section blockquote",
+      "main section figcaption",
+      "main section [class*='card']",
+      "main section [class*='feature']",
+      "main section [class*='pricing']",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3", category: "heading" },
+      { selector: "main section p, main section li", category: "content-block" },
+      { selector: "main section blockquote, main section figcaption", category: "content-block" },
+      { selector: "main section [class*='card'], main section [class*='feature']", category: "card-text" },
+      { selector: "main section [class*='pricing']", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "header",
+      "nav",
+      "footer",
+      "menu",
+      "button",
+      '[role="button"]',
+      "input",
+      "textarea",
+      "select",
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+      "script",
+      "style",
+      "svg",
+      "canvas",
+      '[aria-hidden="true"]',
+    ],
+    mutationExcludeSelectors: ["header", "nav", "footer", "pre", "code", "script", "style", "svg", "canvas"],
+    injectedCss: [
+      `
+main h1,
+main h2,
+main h3,
+main section p,
+main section li,
+main section [class*='card'],
+main section [class*='feature'],
+main section [class*='pricing'] {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+  white-space: normal !important;
+}
+`,
+    ],
+    extraBlockSelectors: [
+      "main section [class*='card']",
+      "main section [class*='feature']",
+      "main section [class*='pricing']",
+    ],
+    bodyRule: { enable: false },
+    detectParagraphLanguage: true,
+  },
+  {
     id: "inworld",
     siteKey: "inworld.ai",
     matches: ["*://inworld.ai/*", "*://*.inworld.ai/*"],

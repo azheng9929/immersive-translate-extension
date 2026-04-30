@@ -431,6 +431,32 @@ describe("webTranslationRules", () => {
     expect(policy.excludeSelectors).toContain("footer");
   });
 
+  it("uses a landing-page rule for PromptOT instead of generic structure-only scanning", () => {
+    const policy = resolveWebTranslationPolicy("https://www.promptot.com/", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "promptot.com",
+      ruleId: "promptot",
+      ruleCapability: "content-ready",
+      fallbackProfile: "generic",
+      mainFrameSelector: "main",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("main h1");
+    expect(policy.preferredScanRootSelectors).toContain("main section p");
+    expect(policy.preferredScanRootSelectors).toContain("main section li");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "main h1, main h2, main h3",
+      category: "heading",
+    });
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "main section p, main section li",
+      category: "content-block",
+    });
+    expect(policy.excludeSelectors).toContain("pre");
+    expect(policy.excludeSelectors).toContain("code");
+    expect(policy.bodyRule).toEqual({ enable: false });
+  });
+
   it("keeps Xvideos core capability when imported style-only rule is merged", () => {
     const policy = resolveWebTranslationPolicy("https://www.xvideos.com/", "normal", {
       rules: [
