@@ -31,6 +31,7 @@ const STYLE_TEXT = `
   z-index: 2147483646;
   display: grid;
   justify-items: end;
+  gap: 5px;
   color: #0f2a5f;
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
@@ -70,11 +71,11 @@ const STYLE_TEXT = `
   display: grid;
   place-items: center;
   width: 44px;
-  height: 64px;
+  height: 48px;
   margin-right: 0;
   border: 1px solid rgba(16, 36, 63, 0.14);
   border-right: 0;
-  border-radius: 17px 0 0 17px;
+  border-radius: 18px 0 0 18px;
   color: var(--imt-ink);
   background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,248,252,0.9) 100%);
   box-shadow: 0 16px 34px rgba(16, 36, 63, 0.14), 0 2px 8px rgba(16, 36, 63, 0.1);
@@ -88,8 +89,8 @@ const STYLE_TEXT = `
   content: "";
   position: absolute;
   left: 0;
-  top: 9px;
-  bottom: 9px;
+  top: 8px;
+  bottom: 8px;
   width: 3px;
   border-radius: 999px;
   background: var(--imt-state);
@@ -97,8 +98,8 @@ const STYLE_TEXT = `
 .imt-floating-logo {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   color: #ffffff;
   background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
@@ -110,7 +111,7 @@ const STYLE_TEXT = `
   left: 6px;
   top: 50%;
   width: 3px;
-  height: 22px;
+  height: 18px;
   border-radius: 999px;
   background: rgba(16, 36, 63, 0.16);
   transform: translateY(-50%);
@@ -165,6 +166,39 @@ const STYLE_TEXT = `
   border-radius: 999px;
   background: var(--imt-state);
   box-shadow: 0 0 0 3px var(--imt-state-soft);
+}
+.imt-floating-settings-dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border: 1px solid rgba(16, 36, 63, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 20px rgba(16, 36, 63, 0.13);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.imt-floating-settings-dot::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: inherit;
+  background: var(--imt-state);
+  box-shadow: 0 0 0 3px var(--imt-state-soft);
+}
+.imt-floating-settings-dot:hover,
+.imt-floating-settings-dot[aria-expanded="true"] {
+  opacity: 1;
+  transform: translateX(-4px);
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(16, 36, 63, 0.18);
+}
+.imt-floating-root[data-collapsed="true"] .imt-floating-settings-dot {
+  opacity: 0.78;
 }
 .imt-floating-panel {
   position: absolute;
@@ -441,6 +475,7 @@ export class FloatingTranslationControl {
   private detailsExpanded = false;
   private renderState: PageRenderState = "smart";
   private unsubscribeStatus: (() => void) | undefined;
+  private translationRequestVersion = 0;
 
   constructor(private readonly options: FloatingTranslationControlOptions) {}
 
@@ -459,14 +494,17 @@ export class FloatingTranslationControl {
 
   async translate(): Promise<void> {
     if (!this.root || this.state === "translating" || this.state === "updating") return;
+    const requestVersion = ++this.translationRequestVersion;
     this.state = "translating";
     this.error = undefined;
     this.render();
 
     try {
       const summary = await this.options.translatePage();
+      if (requestVersion !== this.translationRequestVersion || !this.root) return;
       this.applyStatus(summary);
     } catch (error) {
+      if (requestVersion !== this.translationRequestVersion || !this.root) return;
       this.error = error instanceof Error ? error.message : String(error);
       this.state = "failed";
     }
@@ -475,6 +513,7 @@ export class FloatingTranslationControl {
   }
 
   restore(): void {
+    this.translationRequestVersion += 1;
     this.options.restorePage();
     this.state = "idle";
     this.summary = undefined;
@@ -484,6 +523,7 @@ export class FloatingTranslationControl {
   }
 
   hide(): void {
+    this.translationRequestVersion += 1;
     this.unsubscribeStatus?.();
     this.unsubscribeStatus = undefined;
     this.root?.remove();
@@ -499,6 +539,35 @@ export class FloatingTranslationControl {
     }
     this.expanded = !this.expanded;
     this.render();
+  }
+
+  private handlePrimaryClick(): void {
+    if (this.hasActiveTranslation()) {
+      this.restore();
+      return;
+    }
+    void this.translate();
+  }
+
+  private hasActiveTranslation(): boolean {
+    return (
+      this.state === "translating" ||
+      this.state === "updating" ||
+      this.state === "partial" ||
+      (this.summary?.translated ?? 0) > 0
+    );
+  }
+
+  private primaryActionLabel(): string {
+    if (this.hasActiveTranslation()) return "取消翻译并恢复原文";
+    if (this.state === "failed") return "重新翻译当前页面";
+    return "翻译当前页面";
+  }
+
+  private settingsLabel(): string {
+    if (this.collapsed) return "显示翻译控制台";
+    if (this.expanded) return "关闭翻译控制台";
+    return "打开翻译控制台";
   }
 
   private collapseToEdge(): void {
@@ -522,8 +591,8 @@ export class FloatingTranslationControl {
     ball.type = "button";
     ball.className = "imt-floating-ball";
     ball.dataset.imtControl = "ball";
-    ball.setAttribute("aria-label", this.collapsed ? "显示翻译控制台" : this.expanded ? "关闭翻译控制台" : "打开翻译控制台");
-    ball.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
+    ball.dataset.imtPrimaryAction = this.hasActiveTranslation() ? "restore" : "translate";
+    ball.setAttribute("aria-label", this.primaryActionLabel());
     const grip = document.createElement("span");
     grip.className = "imt-floating-grip";
     grip.dataset.imtControl = "handle-grip";
@@ -535,16 +604,26 @@ export class FloatingTranslationControl {
     logo.dataset.imtControl = "logo";
     logo.append(createTranslateIcon());
     ball.append(logo);
-    ball.addEventListener("click", () => this.toggleExpanded());
+    ball.addEventListener("click", () => this.handlePrimaryClick());
 
     const dot = document.createElement("span");
     dot.className = "imt-floating-dot";
     dot.setAttribute("aria-hidden", "true");
     ball.append(dot);
 
+    const settingsDot = document.createElement("button");
+    settingsDot.type = "button";
+    settingsDot.className = "imt-floating-settings-dot";
+    settingsDot.dataset.imtControl = "settings-dot";
+    settingsDot.setAttribute("aria-label", this.settingsLabel());
+    settingsDot.setAttribute("aria-expanded", String(this.expanded && !this.collapsed));
+    settingsDot.title = this.settingsLabel();
+    settingsDot.addEventListener("click", () => this.toggleExpanded());
+
     this.root.append(style);
     if (this.expanded && !this.collapsed) this.root.append(this.createPanel());
     this.root.append(ball);
+    this.root.append(settingsDot);
   }
 
   private createPanel(): HTMLElement {

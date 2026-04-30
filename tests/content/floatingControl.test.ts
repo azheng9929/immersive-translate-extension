@@ -7,7 +7,13 @@ describe("FloatingTranslationControl", () => {
     document.body.innerHTML = "";
   });
 
-  it("mounts as a quiet collapsed control and expands on click", () => {
+  function openPanel(): void {
+    const settingsDot = document.querySelector<HTMLButtonElement>("[data-imt-control='settings-dot']");
+    expect(settingsDot).not.toBeNull();
+    settingsDot?.click();
+  }
+
+  it("keeps the settings panel hidden behind a small dot", () => {
     const control = new FloatingTranslationControl({
       translatePage: async () => ({ total: 0, translated: 0, failed: 0, skipped: 0 }),
       restorePage: () => undefined,
@@ -17,20 +23,78 @@ describe("FloatingTranslationControl", () => {
 
     const root = document.querySelector<HTMLElement>("[data-imt-control='root']");
     const ball = document.querySelector<HTMLButtonElement>("[data-imt-control='ball']");
+    const settingsDot = document.querySelector<HTMLButtonElement>("[data-imt-control='settings-dot']");
     expect(root?.dataset.imtSurface).toBe("edge-tray");
     expect(ball).not.toBeNull();
+    expect(settingsDot).not.toBeNull();
     expect(ball?.querySelector("[data-imt-control='handle-grip']")).not.toBeNull();
-    expect(ball?.getAttribute("aria-expanded")).toBe("false");
+    expect(settingsDot?.getAttribute("aria-expanded")).toBe("false");
     expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
 
-    ball?.click();
+    settingsDot?.click();
 
-    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector("[data-imt-control='settings-dot']")?.getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
     expect(document.querySelector("[data-imt-control='panel-controls']")).not.toBeNull();
     expect(document.querySelector("[data-imt-action='collapse']")).not.toBeNull();
     expect(document.querySelector("[data-imt-action='hide']")).not.toBeNull();
     expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("就绪");
+  });
+
+  it("uses the primary dot to translate and then restore without opening settings", async () => {
+    const translatePage = vi.fn().mockResolvedValue({ total: 1, translated: 1, failed: 0, skipped: 0 });
+    const restorePage = vi.fn();
+    const control = new FloatingTranslationControl({
+      translatePage,
+      restorePage,
+    });
+
+    control.mount(document.body);
+
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(translatePage).toHaveBeenCalledTimes(1);
+    expect(restorePage).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
+
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    expect(restorePage).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
+  });
+
+  it("ignores a pending primary translation after the primary dot cancels it", async () => {
+    let finishTranslation: ((summary: { total: number; translated: number; failed: number; skipped: number }) => void) | undefined;
+    const translatePage = vi.fn(
+      () =>
+        new Promise<{ total: number; translated: number; failed: number; skipped: number }>((resolve) => {
+          finishTranslation = resolve;
+        }),
+    );
+    const restorePage = vi.fn();
+    const control = new FloatingTranslationControl({
+      translatePage,
+      restorePage,
+    });
+
+    control.mount(document.body);
+
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    finishTranslation?.({ total: 1, translated: 1, failed: 0, skipped: 0 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(translatePage).toHaveBeenCalledTimes(1);
+    expect(restorePage).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-label")).toBe("翻译当前页面");
+
+    openPanel();
+
+    expect(document.querySelector("[data-imt-control='status']")?.textContent).toBe("就绪");
+    expect(document.querySelector("[data-imt-control='summary']")?.textContent).toBe("暂无整页翻译");
   });
 
   it("docks at the right center and can collapse into an edge handle", () => {
@@ -47,16 +111,16 @@ describe("FloatingTranslationControl", () => {
     expect(root?.querySelector("style")?.textContent).toContain("top: 50%");
     expect(root?.querySelector("style")?.textContent).toContain("right: 0");
 
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
     expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
 
     document.querySelector<HTMLButtonElement>("[data-imt-action='collapse']")?.click();
 
     expect(document.querySelector<HTMLElement>("[data-imt-control='root']")?.dataset.collapsed).toBe("true");
     expect(document.querySelector("[data-imt-control='panel']")).toBeNull();
-    expect(document.querySelector("[data-imt-control='ball']")?.getAttribute("aria-label")).toBe("显示翻译控制台");
+    expect(document.querySelector("[data-imt-control='settings-dot']")?.getAttribute("aria-label")).toBe("显示翻译控制台");
 
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     expect(document.querySelector<HTMLElement>("[data-imt-control='root']")?.dataset.collapsed).toBe("false");
     expect(document.querySelector("[data-imt-control='panel']")).not.toBeNull();
@@ -86,7 +150,7 @@ describe("FloatingTranslationControl", () => {
     expect(ball?.querySelector("[data-imt-control='logo']")).not.toBeNull();
     expect(ball?.textContent?.trim()).toBe("");
 
-    ball?.click();
+    openPanel();
 
     expect(document.querySelector("[data-imt-control='panel-title']")?.textContent).toBe("整页翻译");
     expect(document.querySelector("[data-imt-control='progress']")?.getAttribute("aria-valuenow")).toBe("63");
@@ -102,7 +166,7 @@ describe("FloatingTranslationControl", () => {
       restorePage: () => undefined,
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     document.querySelector<HTMLButtonElement>("[data-imt-action='translate']")?.click();
     await Promise.resolve();
@@ -125,7 +189,7 @@ describe("FloatingTranslationControl", () => {
       },
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     listener?.({
       phase: "updating",
@@ -156,7 +220,7 @@ describe("FloatingTranslationControl", () => {
       },
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     listener?.({
       phase: "translated",
@@ -200,7 +264,7 @@ describe("FloatingTranslationControl", () => {
       },
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     listener?.({
       phase: "translated",
@@ -267,7 +331,7 @@ describe("FloatingTranslationControl", () => {
       },
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     listener?.({
       phase: "translated",
@@ -338,7 +402,7 @@ describe("FloatingTranslationControl", () => {
       restorePage,
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
     document.querySelector<HTMLButtonElement>("[data-imt-action='translate']")?.click();
     await Promise.resolve();
     await Promise.resolve();
@@ -372,7 +436,7 @@ describe("FloatingTranslationControl", () => {
       }),
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     document.querySelector<HTMLButtonElement>("[data-imt-action='render-original']")?.click();
 
@@ -387,7 +451,7 @@ describe("FloatingTranslationControl", () => {
       restorePage: () => undefined,
     });
     control.mount(document.body);
-    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+    openPanel();
 
     document.querySelector<HTMLButtonElement>("[data-imt-action='hide']")?.click();
 
