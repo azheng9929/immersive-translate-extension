@@ -1,6 +1,7 @@
 import type { TranslationPageSummary } from "./pageController";
 import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
 import type { DiagnosticReasonCounts, TranslationDiagnostics } from "./translationDiagnostics";
+import { RuleTargetInspector } from "./ruleTargetInspector";
 import type { PageRenderState } from "../shared/config";
 
 type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed" | "paused" | "suspended";
@@ -12,6 +13,7 @@ type FloatingTranslationControlOptions = {
   setRenderState?: (renderState: PageRenderState) => void;
   getStatus?: () => PageTranslationStatus;
   subscribeStatus?: (listener: (status: PageTranslationStatus) => void) => () => void;
+  collectTranslatableRoots?: () => HTMLElement[];
 };
 
 const STYLE_TEXT = `
@@ -469,6 +471,11 @@ const STYLE_TEXT = `
 .imt-floating-button-subtle:hover {
   background: #f4f7fb;
 }
+.imt-floating-button-subtle[data-active="true"] {
+  border-color: rgba(23, 105, 209, 0.18);
+  background: var(--imt-state-soft);
+  color: var(--imt-state);
+}
 @keyframes imt-panel-in {
   from {
     opacity: 0;
@@ -499,8 +506,14 @@ export class FloatingTranslationControl {
   private renderState: PageRenderState = "smart";
   private unsubscribeStatus: (() => void) | undefined;
   private translationRequestVersion = 0;
+  private readonly ruleTargetInspector: RuleTargetInspector;
 
-  constructor(private readonly options: FloatingTranslationControlOptions) {}
+  constructor(private readonly options: FloatingTranslationControlOptions) {
+    this.ruleTargetInspector = new RuleTargetInspector({
+      getStatus: () => this.options.getStatus?.(),
+      collectTranslatableRoots: () => this.options.collectTranslatableRoots?.() ?? [],
+    });
+  }
 
   mount(parent: HTMLElement = document.body): void {
     if (this.root) return;
@@ -547,6 +560,7 @@ export class FloatingTranslationControl {
 
   hide(): void {
     this.translationRequestVersion += 1;
+    this.ruleTargetInspector.stop();
     this.unsubscribeStatus?.();
     this.unsubscribeStatus = undefined;
     this.root?.remove();
@@ -606,6 +620,7 @@ export class FloatingTranslationControl {
     this.root.dataset.imtDock = "right-center";
     this.root.dataset.imtSurface = "edge-tray";
     this.root.dataset.collapsed = String(this.collapsed);
+    this.root.dataset.inspectingRules = String(this.ruleTargetInspector.isActive());
 
     const style = document.createElement("style");
     style.textContent = STYLE_TEXT;
@@ -751,6 +766,21 @@ export class FloatingTranslationControl {
       );
       actions.append(detailsButton);
     }
+    const locatorButton = this.createButton(
+      this.ruleTargetInspector.isActive() ? "退出定位" : "定位问题",
+      "toggle-rule-locator",
+      "imt-floating-button imt-floating-button-subtle",
+      () => this.toggleRuleLocator(),
+    );
+    locatorButton.dataset.active = String(this.ruleTargetInspector.isActive());
+    actions.append(locatorButton);
+    if (this.ruleTargetInspector.isActive()) {
+      const locatorHint = document.createElement("p");
+      locatorHint.className = "imt-floating-diagnostics";
+      locatorHint.dataset.imtControl = "rule-locator-hint";
+      locatorHint.textContent = "定位已开启：点击页面文字，查看它为什么翻译、未翻译或被排除。";
+      panel.append(locatorHint);
+    }
     const detailRows = detailedDiagnosticsLabels(this.summary);
     if (this.detailsExpanded && detailRows.length > 0) {
       const details = document.createElement("div");
@@ -832,6 +862,15 @@ export class FloatingTranslationControl {
 
   private toggleDetails(): void {
     this.detailsExpanded = !this.detailsExpanded;
+    this.render();
+  }
+
+  private toggleRuleLocator(): void {
+    if (this.ruleTargetInspector.isActive()) {
+      this.ruleTargetInspector.stop();
+    } else {
+      this.ruleTargetInspector.start();
+    }
     this.render();
   }
 }

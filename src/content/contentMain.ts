@@ -72,6 +72,7 @@ export async function runContentMain(): Promise<void> {
       setRenderState: (renderState) => pageSession.setRenderState(renderState),
       getStatus: () => pageSession.getStatus(),
       subscribeStatus: (listener) => pageSession.subscribe(listener),
+      collectTranslatableRoots: () => pageSession.collectTranslatableRoots(),
     });
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();

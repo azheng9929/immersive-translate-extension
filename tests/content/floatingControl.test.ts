@@ -395,6 +395,67 @@ describe("FloatingTranslationControl", () => {
     expect(details).toContain("服务请求 1，失败 0，跳过 0");
   });
 
+  it("opens a page issue locator from the floating panel and explains clicked elements", () => {
+    document.body.innerHTML = `
+      <main>
+        <p class="missed-title">This text was not matched by the active selectors.</p>
+      </main>
+    `;
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      getStatus: () => createRuleStatus(),
+    });
+    control.mount(document.body);
+    openPanel();
+
+    const locatorButton = document.querySelector<HTMLButtonElement>("[data-imt-action='toggle-rule-locator']");
+    expect(locatorButton).not.toBeNull();
+    expect(locatorButton?.textContent).toBe("定位问题");
+
+    locatorButton?.click();
+    expect(document.querySelector("[data-imt-control='root']")?.getAttribute("data-inspecting-rules")).toBe("true");
+
+    document.querySelector<HTMLElement>(".missed-title")?.click();
+
+    const inspectorText = document.querySelector("[data-imt-rule-target-inspector='true']")?.textContent ?? "";
+    expect(inspectorText).toContain("未命中规则 selector");
+    expect(inspectorText).toContain("p.missed-title");
+    expect(inspectorText).toContain("文本: This text was not matched");
+
+    locatorButton?.click();
+    expect(document.querySelector("[data-imt-rule-target-inspector='true']")).toBeNull();
+  });
+
+  it("explains translated roots from the floating panel issue locator", () => {
+    document.body.innerHTML = `
+      <main>
+        <p class="body-text" data-imt-state="translated">
+          Hello world
+          <span class="imt-translation-block">你好，世界</span>
+        </p>
+      </main>
+    `;
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage: () => undefined,
+      getStatus: () => createRuleStatus(),
+    });
+    control.mount(document.body);
+    openPanel();
+
+    document.querySelector<HTMLButtonElement>("[data-imt-action='toggle-rule-locator']")?.click();
+    document.querySelector<HTMLElement>(".imt-translation-block")?.click();
+
+    const inspectorText = document.querySelector("[data-imt-rule-target-inspector='true']")?.textContent ?? "";
+    expect(inspectorText).toContain("已翻译");
+    expect(inspectorText).toContain("content:comment");
+    expect(inspectorText).toContain("p.body-text");
+
+    control.hide();
+    expect(document.querySelector("[data-imt-rule-target-inspector='true']")).toBeNull();
+  });
+
   it("runs restore and returns to ready state", async () => {
     const restorePage = vi.fn();
     const control = new FloatingTranslationControl({
@@ -458,3 +519,55 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='root']")).toBeNull();
   });
 });
+
+function createRuleStatus(): PageTranslationStatus {
+  return {
+    phase: "translated",
+    observation: "observing",
+    pendingRoots: 0,
+    observedRoots: 0,
+    total: 1,
+    translated: 1,
+    failed: 0,
+    skipped: 0,
+    dynamicRuns: 0,
+    lastError: undefined,
+    site: {
+      hostname: "example.com",
+      siteKey: "example.com",
+      ruleId: "example",
+      ruleSource: "core",
+      ruleCapability: "content-ready",
+      fallbackProfile: "generic",
+      mergedRuleIds: ["example"],
+      dynamicMode: "normal",
+      dynamicModeSource: "global",
+      isHighDynamic: false,
+      ruleDiagnostics: {
+        scanRootSelectorCount: 1,
+        contentSelectorCount: 1,
+        excludeSelectorCount: 1,
+        buildContainerSelectorCount: 0,
+        skipBuildContainerSelectorCount: 0,
+        injectedCssRuleCount: 0,
+        globalAttributeRuleCount: 0,
+        attributeNameCount: 0,
+        translationClassCount: 0,
+        allowTooltip: true,
+        observeUrlChange: true,
+        urlChangeDelay: 250,
+        maxQueueSize: 300,
+        maxRootsPerFlush: 20,
+        maxObservedRoots: 300,
+        maxMutationNodesPerWindow: 1000,
+        mutationWindowMs: 5000,
+        viewportSupplement: false,
+        viewportSupplementMaxRoots: 20,
+        visualizationSelectors: [
+          { group: "content", selector: ".body-text", label: "comment" },
+          { group: "exclude", selector: ".action" },
+        ],
+      },
+    },
+  };
+}
