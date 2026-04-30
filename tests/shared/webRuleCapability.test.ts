@@ -46,4 +46,22 @@ describe("webRuleCapability", () => {
     });
     expect(summary.reasons).toContain("3 scope anchors");
   });
+
+  it("classifies pure observer and scheduling rules as dynamic-only", () => {
+    const summary = analyzeWebTranslationRuleCapability({
+      id: "spa-scheduler",
+      matches: ["app.example.com"],
+      dynamicPreset: "chat-stream",
+      observeUrlChange: true,
+      urlChangeDelay: 500,
+    } as WebTranslationRule);
+
+    expect(summary).toMatchObject({
+      capability: "dynamic-only",
+      hasContentAnchors: false,
+      hasScopeAnchors: false,
+      hasDynamicHints: true,
+    });
+    expect(summary.reasons).toContain("dynamic hints");
+  });
 });

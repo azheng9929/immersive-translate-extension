@@ -2,7 +2,12 @@ import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import { compileFilterRule, type CompiledFilterRule } from "./compiledFilterRule";
 import type { DynamicMode } from "../shared/config";
 import { analyzeWebTranslationRuleCapability } from "../shared/webRuleCapability";
-import { filterMatchingWebTranslationRules, matchWebTranslationRule } from "../shared/webRuleMatcher";
+import {
+  filterMatchingWebTranslationRules,
+  matchWebTranslationRule,
+  matchWebTranslationRulesRanked,
+  type WebTranslationRuleMatch,
+} from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
 import type {
   RuleArrayValue,
@@ -16,12 +21,16 @@ import type {
   WebTranslationRuleCapability,
   WebTranslationRuleSource,
 } from "../shared/webRuleTypes";
-import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
+import type { DynamicModeSource, SitePolicy, SitePolicyRuleResolution } from "./sitePolicy";
 
 export type { RuleArrayValue, RuleContentSelector, WebTranslationRule };
-export { matchWebTranslationRule, selectWebTranslationRulesForContent } from "../shared/webRuleMatcher";
+export {
+  matchWebTranslationRule,
+  matchWebTranslationRulesRanked,
+  selectWebTranslationRulesForContent,
+} from "../shared/webRuleMatcher";
 
-type ResolvedWebTranslationRule = Omit<
+export type ResolvedWebTranslationRule = Omit<
   WebTranslationRule,
   | "selectors"
   | "additionalSelectors"
@@ -71,6 +80,22 @@ type ResolvedWebTranslationRule = Omit<
   contentSelectors: readonly RuleContentSelector[];
   attributeNames: readonly TranslatableAttributeName[];
   bodyRule?: WebTranslationBodyRule;
+  ruleResolution?: SitePolicyRuleResolution;
+};
+
+export type RuleResolutionResult = {
+  url: string;
+  matchedRules: readonly WebTranslationRule[];
+  primaryContentRule?: WebTranslationRule;
+  primaryScopeRule?: WebTranslationRule;
+  modifierRules: readonly WebTranslationRule[];
+  structureRules: readonly WebTranslationRule[];
+  dynamicRules: readonly WebTranslationRule[];
+  matchOnlyRules: readonly WebTranslationRule[];
+  unsafeRules: readonly WebTranslationRule[];
+  finalRule: ResolvedWebTranslationRule;
+  confidence: number;
+  reasons: readonly string[];
 };
 
 export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
@@ -107,6 +132,16 @@ const DEFAULT_SITE_POLICY = {
   ruleCapability: "match-only" as WebTranslationRuleCapability,
   fallbackProfile: "generic" as WebTranslationFallbackProfile,
   mergedRuleIds: ["general"],
+  ruleResolution: {
+    matchedRuleIds: ["general"],
+    modifierRuleIds: [],
+    structureRuleIds: [],
+    dynamicRuleIds: [],
+    matchOnlyRuleIds: ["general"],
+    unsafeRuleIds: [],
+    confidence: 0,
+    reasons: ["default general rule"],
+  },
   dynamicModeSource: "global" as DynamicModeSource,
   isHighDynamic: false,
   dynamicMode: "normal" as DynamicMode,
@@ -1942,20 +1977,53 @@ export function resolveWebTranslationRule(
   doc: Document | undefined = globalThis.document,
   rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
 ): ResolvedWebTranslationRule {
-  const match = matchWebTranslationRule(url, doc, rules);
-  if (!match) return withRuleMetadata(mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }), {
-    ruleId: "general",
-    ruleSource: "core",
-    mergedRuleIds: ["general"],
-  });
-  const base = match.id === "twitter"
+  return resolveWebTranslationRuleResolution(url, doc, rules).finalRule;
+}
+
+export function resolveWebTranslationRuleResolution(
+  url: string,
+  doc: Document | undefined = globalThis.document,
+  rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
+): RuleResolutionResult {
+  const rankedMatches = matchWebTranslationRulesRanked(url, doc, rules);
+  const primary = primaryRuleFromMatches(rankedMatches);
+  if (!primary) {
+    const finalRule = withRuleMetadata(mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }), {
+      ruleId: "general",
+      ruleSource: "core",
+      mergedRuleIds: ["general"],
+    });
+    return createRuleResolutionResult(url, [], finalRule, ["no matching site rule"]);
+  }
+
+  const compatibleRules = compatibleRulesForPrimary(primary.rule, rankedMatches, normalizeHostnameFromUrl(url));
+  const mergeableRules = compatibleRules.filter((match) =>
+    analyzeWebTranslationRuleCapability(match.rule).capability !== "unsafe"
+  );
+  const base = primary.rule.id === "twitter"
     ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, coreWebTranslationRule("x"))
     : GENERAL_WEB_TRANSLATION_RULE;
-  return withRuleMetadata(mergeWebTranslationRules(base, match), {
-    ruleId: match.id,
-    ruleSource: match.ruleSource ?? "core",
-    mergedRuleIds: match.id === "twitter" ? ["x", "twitter"] : [match.id],
+  const merged = mergeableRules.reduce<ResolvedWebTranslationRule>(
+    (current, match) => mergeWebTranslationRules(current, match.rule),
+    mergeWebTranslationRules(base, { id: "general" }),
+  );
+  const finalRule = withRuleMetadata(merged, {
+    ruleId: primary.rule.id,
+    ruleSource: primary.rule.ruleSource ?? "core",
+    mergedRuleIds: primary.rule.id === "twitter"
+      ? ["x", "twitter", ...mergeableRules.filter((match) => match.rule.id !== "twitter").map((match) => match.rule.id)]
+      : mergeableRules.map((match) => match.rule.id),
   });
+
+  return createRuleResolutionResult(
+    url,
+    compatibleRules,
+    finalRule,
+    [
+      `primary:${primary.rule.id}`,
+      compatibleRules.length > 1 ? `merged:${compatibleRules.map((match) => match.rule.id).join(",")}` : "single-rule",
+    ],
+  );
 }
 
 export function mergeWebTranslationRules(base: WebTranslationRule, delta: WebTranslationRule): ResolvedWebTranslationRule {
@@ -1977,8 +2045,12 @@ export function compileRulePolicy(
   const normalizedHostname = normalizeHostname(hostname);
   const preset = DYNAMIC_PRESETS[rule.dynamicPreset ?? "normal"];
   const capability = analyzeWebTranslationRuleCapability(rule);
-  const fallbackScanRootSelectors = fallbackScanRootSelectorsForRule(rule, capability);
-  const fallbackContentSelectors = fallbackContentSelectorsForRule(rule, capability);
+  const effectiveCapability = {
+    ...capability,
+    capability: capabilityFromRuleResolution(rule.ruleResolution) ?? capability.capability,
+  };
+  const fallbackScanRootSelectors = fallbackScanRootSelectorsForRule(rule, effectiveCapability);
+  const fallbackContentSelectors = fallbackContentSelectorsForRule(rule, effectiveCapability);
   const base = {
     ...DEFAULT_SITE_POLICY,
     ...preset,
@@ -1986,9 +2058,10 @@ export function compileRulePolicy(
     siteKey: rule.siteKey || normalizedHostname,
     ruleId: rule.ruleId,
     ruleSource: rule.ruleSource,
-    ruleCapability: capability.capability,
-    fallbackProfile: capability.fallbackProfile,
+    ruleCapability: effectiveCapability.capability,
+    fallbackProfile: effectiveCapability.fallbackProfile,
     mergedRuleIds: rule.mergedRuleIds,
+    ruleResolution: rule.ruleResolution ?? defaultRuleResolutionForRule(rule, effectiveCapability),
     isHighDynamic: Boolean(rule.isHighDynamic),
     attributeNames: rule.attributeNames,
     ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
@@ -2002,7 +2075,7 @@ export function compileRulePolicy(
     weakCandidateSelectors: weakCandidateSelectorsFromRule(rule),
     excludeSelectors: rule.excludeSelectors,
     contentSelectors: unique([...rule.contentSelectors, ...fallbackContentSelectors], contentSelectorKey),
-    selectorFallbackPolicy: rule.selectorFallbackPolicy ?? defaultSelectorFallbackPolicy(capability),
+    selectorFallbackPolicy: rule.selectorFallbackPolicy ?? defaultSelectorFallbackPolicy(effectiveCapability),
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
     excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
     injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
@@ -2171,7 +2244,11 @@ function defaultSelectorFallbackPolicy(
 ): SelectorFallbackPolicy {
   if (capability.capability === "content-ready") return "conservative";
   if (capability.capability === "scope-ready") return "generic";
-  if (capability.capability === "modifier-only" || capability.capability === "structure-only") return "generic";
+  if (
+    capability.capability === "modifier-only" ||
+    capability.capability === "structure-only" ||
+    capability.capability === "dynamic-only"
+  ) return "generic";
   return capability.fallbackProfile === "generic" ? "generic" : "conservative";
 }
 
@@ -2183,11 +2260,11 @@ export function resolveWebTranslationPolicy(
   const parsed = parseUrl(url);
   const hostname = parsed?.hostname ?? normalizeHostname(url);
   const effectiveUrl = urlFromHostnameFallback(url, hostname);
-  const rule = options.rules?.length
-    ? resolveWebTranslationRuleWithImportedDeltas(effectiveUrl, options.document, options.rules, hostname)
-    : resolveWebTranslationRule(effectiveUrl, options.document, BUILTIN_WEB_TRANSLATION_RULES);
+  const resolution = options.rules?.length
+    ? resolveWebTranslationRuleResolutionWithImportedDeltas(effectiveUrl, options.document, options.rules, hostname)
+    : resolveWebTranslationRuleResolution(effectiveUrl, options.document, BUILTIN_WEB_TRANSLATION_RULES);
   return compileRulePolicy(
-    rule,
+    resolution.finalRule,
     hostname,
     preferredDynamicMode,
     options,
@@ -2200,6 +2277,15 @@ function resolveWebTranslationRuleWithImportedDeltas(
   importedRules: readonly WebTranslationRule[],
   hostname: string,
 ): ResolvedWebTranslationRule {
+  return resolveWebTranslationRuleResolutionWithImportedDeltas(url, doc, importedRules, hostname).finalRule;
+}
+
+function resolveWebTranslationRuleResolutionWithImportedDeltas(
+  url: string,
+  doc: Document | undefined,
+  importedRules: readonly WebTranslationRule[],
+  hostname: string,
+): RuleResolutionResult {
   const coreMatch = matchWebTranslationRule(url, doc, CORE_WEB_TRANSLATION_RULES);
   const importedMatches = filterMatchingWebTranslationRules(url, doc, importedRules);
 
@@ -2208,35 +2294,64 @@ function resolveWebTranslationRuleWithImportedDeltas(
     const compatibleImportedRules = importedMatches.filter((rule) =>
       rule.ruleSource !== "imported-experimental" && isSameRuleFamily(coreMatch, rule, hostname)
     );
-    if (compatibleImportedRules.length === 0) return coreRule;
+    const mergeableImportedRules = compatibleImportedRules.filter((rule) =>
+      analyzeWebTranslationRuleCapability(rule).capability !== "unsafe"
+    );
+    if (compatibleImportedRules.length === 0) {
+      return resolveWebTranslationRuleResolution(url, doc, CORE_WEB_TRANSLATION_RULES);
+    }
 
-    const merged = compatibleImportedRules.reduce<ResolvedWebTranslationRule>(
+    const merged = mergeableImportedRules.reduce<ResolvedWebTranslationRule>(
       (current, importedRule) => mergeWebTranslationRules(current, importedRule),
       coreRule,
     );
 
     const mergedWithCoreSiteKey = coreRule.siteKey ? { ...merged, siteKey: coreRule.siteKey } : merged;
-    return withRuleMetadata(mergedWithCoreSiteKey, {
+    const finalRule = withRuleMetadata(mergedWithCoreSiteKey, {
       ruleId: coreMatch.id,
       ruleSource: "core+imported",
-      mergedRuleIds: [coreMatch.id, ...compatibleImportedRules.map((rule) => rule.id)],
+      mergedRuleIds: [coreMatch.id, ...mergeableImportedRules.map((rule) => rule.id)],
     });
+    return createRuleResolutionResult(
+      url,
+      [{ rule: coreMatch, score: 0, reasons: ["core"] }, ...compatibleImportedRules.map((rule) => ({
+        rule,
+        score: 0,
+        reasons: ["imported-compatible"],
+      }))],
+      finalRule,
+      compatibleImportedRules.length
+        ? [`primary:${coreMatch.id}`, `merged-imported:${compatibleImportedRules.map((rule) => rule.id).join(",")}`]
+        : [`primary:${coreMatch.id}`],
+    );
   }
 
-  const importedPrimary = matchWebTranslationRule(url, doc, importedRules);
-  if (!importedPrimary) return resolveWebTranslationRule(url, doc, BUILTIN_WEB_TRANSLATION_RULES);
+  const importedRankedMatches = matchWebTranslationRulesRanked(url, doc, importedRules);
+  const importedPrimary = primaryRuleFromMatches(importedRankedMatches)?.rule;
+  if (!importedPrimary) return resolveWebTranslationRuleResolution(url, doc, BUILTIN_WEB_TRANSLATION_RULES);
 
   const sameFamilyRules = importedMatches.filter((rule) => isSameRuleFamily(importedPrimary, rule, hostname));
-  const merged = sameFamilyRules.reduce<ResolvedWebTranslationRule>(
+  const mergeableSameFamilyRules = sameFamilyRules.filter((rule) =>
+    analyzeWebTranslationRuleCapability(rule).capability !== "unsafe"
+  );
+  const merged = mergeableSameFamilyRules.reduce<ResolvedWebTranslationRule>(
     (current, importedRule) => mergeWebTranslationRules(current, importedRule),
     mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }),
   );
 
-  return withRuleMetadata(merged, {
+  const finalRule = withRuleMetadata(merged, {
     ruleId: importedPrimary.id,
     ruleSource: importedPrimary.ruleSource ?? "imported-experimental",
-    mergedRuleIds: sameFamilyRules.map((rule) => rule.id),
+    mergedRuleIds: mergeableSameFamilyRules.map((rule) => rule.id),
   });
+  return createRuleResolutionResult(
+    url,
+    sameFamilyRules.map((rule) => ({ rule, score: 0, reasons: ["imported-same-family"] })),
+    finalRule,
+    sameFamilyRules.length > 1
+      ? [`primary:${importedPrimary.id}`, `merged:${sameFamilyRules.map((rule) => rule.id).join(",")}`]
+      : [`primary:${importedPrimary.id}`],
+  );
 }
 
 function withRuleMetadata(
@@ -2247,6 +2362,205 @@ function withRuleMetadata(
     ...rule,
     ...metadata,
   };
+}
+
+function primaryRuleFromMatches(matches: readonly WebTranslationRuleMatch[]): WebTranslationRuleMatch | undefined {
+  const usable = matches.filter((match) => analyzeWebTranslationRuleCapability(match.rule).capability !== "unsafe");
+  return firstRuleWithCapability(usable, "content-ready") ??
+    firstRuleWithCapability(usable, "scope-ready") ??
+    firstRuleWithCapability(usable, "structure-only") ??
+    firstRuleWithCapability(usable, "modifier-only") ??
+    firstRuleWithCapability(usable, "dynamic-only") ??
+    firstRuleWithCapability(usable, "match-only") ??
+    usable[0] ??
+    matches[0];
+}
+
+function firstRuleWithCapability(
+  matches: readonly WebTranslationRuleMatch[],
+  capability: WebTranslationRuleCapability,
+): WebTranslationRuleMatch | undefined {
+  return matches.find((match) => analyzeWebTranslationRuleCapability(match.rule).capability === capability);
+}
+
+function compatibleRulesForPrimary(
+  primary: WebTranslationRule,
+  matches: readonly WebTranslationRuleMatch[],
+  hostname: string,
+): readonly WebTranslationRuleMatch[] {
+  const compatible = matches.filter((match) => isSameRuleFamily(primary, match.rule, hostname));
+  return compatible.length ? compatible : matches.filter((match) => match.rule.id === primary.id);
+}
+
+function createRuleResolutionResult(
+  url: string,
+  matches: readonly WebTranslationRuleMatch[],
+  finalRule: ResolvedWebTranslationRule,
+  reasons: readonly string[],
+): RuleResolutionResult {
+  const matchedRules = matches.map((match) => match.rule);
+  const primaryContentRule = firstRuleByCapability(matchedRules, "content-ready");
+  const primaryScopeRule = firstRuleByCapability(matchedRules, "scope-ready");
+  const modifierRules = rulesByCapability(matchedRules, "modifier-only");
+  const structureRules = rulesByCapability(matchedRules, "structure-only");
+  const dynamicRules = rulesByCapability(matchedRules, "dynamic-only");
+  const matchOnlyRules = rulesByCapability(matchedRules, "match-only");
+  const unsafeRules = rulesByCapability(matchedRules, "unsafe");
+  const confidence = confidenceForResolution({
+    primaryContentRule,
+    primaryScopeRule,
+    modifierRules,
+    structureRules,
+    dynamicRules,
+    matchOnlyRules,
+    matchedRules,
+  });
+  const enrichedReasons = unique([
+    ...reasons,
+    matchedRules.length ? `matched:${matchedRules.length}` : "matched:0",
+    primaryContentRule ? `content:${primaryContentRule.id}` : undefined,
+    primaryScopeRule ? `scope:${primaryScopeRule.id}` : undefined,
+    modifierRules.length ? `modifier:${modifierRules.map((rule) => rule.id).join(",")}` : undefined,
+    structureRules.length ? `structure:${structureRules.map((rule) => rule.id).join(",")}` : undefined,
+    dynamicRules.length ? `dynamic:${dynamicRules.map((rule) => rule.id).join(",")}` : undefined,
+  ].filter((reason): reason is string => Boolean(reason)));
+  const ruleResolution = toSitePolicyRuleResolution({
+    matchedRules,
+    primaryContentRule,
+    primaryScopeRule,
+    modifierRules,
+    structureRules,
+    dynamicRules,
+    matchOnlyRules,
+    unsafeRules,
+    confidence,
+    reasons: enrichedReasons,
+  });
+
+  return {
+    url,
+    matchedRules,
+    ...(primaryContentRule ? { primaryContentRule } : {}),
+    ...(primaryScopeRule ? { primaryScopeRule } : {}),
+    modifierRules,
+    structureRules,
+    dynamicRules,
+    matchOnlyRules,
+    unsafeRules,
+    finalRule: { ...finalRule, ruleResolution },
+    confidence,
+    reasons: enrichedReasons,
+  };
+}
+
+function firstRuleByCapability(
+  rules: readonly WebTranslationRule[],
+  capability: WebTranslationRuleCapability,
+): WebTranslationRule | undefined {
+  return rules.find((rule) => analyzeWebTranslationRuleCapability(rule).capability === capability);
+}
+
+function rulesByCapability(
+  rules: readonly WebTranslationRule[],
+  capability: WebTranslationRuleCapability,
+): readonly WebTranslationRule[] {
+  return rules.filter((rule) => analyzeWebTranslationRuleCapability(rule).capability === capability);
+}
+
+function confidenceForResolution(input: {
+  primaryContentRule?: WebTranslationRule | undefined;
+  primaryScopeRule?: WebTranslationRule | undefined;
+  modifierRules: readonly WebTranslationRule[];
+  structureRules: readonly WebTranslationRule[];
+  dynamicRules: readonly WebTranslationRule[];
+  matchOnlyRules: readonly WebTranslationRule[];
+  matchedRules: readonly WebTranslationRule[];
+}): number {
+  const base = input.primaryContentRule
+    ? 90
+    : input.primaryScopeRule
+      ? 75
+      : input.structureRules.length
+        ? 62
+        : input.modifierRules.length
+          ? 58
+          : input.dynamicRules.length
+            ? 46
+            : input.matchOnlyRules.length
+              ? 32
+              : 0;
+  return Math.min(100, base + Math.min(10, Math.max(0, input.matchedRules.length - 1) * 3));
+}
+
+function toSitePolicyRuleResolution(input: {
+  matchedRules: readonly WebTranslationRule[];
+  primaryContentRule?: WebTranslationRule | undefined;
+  primaryScopeRule?: WebTranslationRule | undefined;
+  modifierRules: readonly WebTranslationRule[];
+  structureRules: readonly WebTranslationRule[];
+  dynamicRules: readonly WebTranslationRule[];
+  matchOnlyRules: readonly WebTranslationRule[];
+  unsafeRules: readonly WebTranslationRule[];
+  confidence: number;
+  reasons: readonly string[];
+}): SitePolicyRuleResolution {
+  return {
+    matchedRuleIds: input.matchedRules.map((rule) => rule.id),
+    ...(input.primaryContentRule ? { primaryContentRuleId: input.primaryContentRule.id } : {}),
+    ...(input.primaryScopeRule ? { primaryScopeRuleId: input.primaryScopeRule.id } : {}),
+    modifierRuleIds: input.modifierRules.map((rule) => rule.id),
+    structureRuleIds: input.structureRules.map((rule) => rule.id),
+    dynamicRuleIds: input.dynamicRules.map((rule) => rule.id),
+    matchOnlyRuleIds: input.matchOnlyRules.map((rule) => rule.id),
+    unsafeRuleIds: input.unsafeRules.map((rule) => rule.id),
+    confidence: input.confidence,
+    reasons: input.reasons,
+  };
+}
+
+function capabilityFromRuleResolution(
+  resolution: SitePolicyRuleResolution | undefined,
+): WebTranslationRuleCapability | undefined {
+  if (!resolution) return undefined;
+  if (resolution.primaryContentRuleId) return "content-ready";
+  if (resolution.primaryScopeRuleId) return "scope-ready";
+  if (resolution.structureRuleIds.length) return "structure-only";
+  if (resolution.modifierRuleIds.length) return "modifier-only";
+  if (resolution.dynamicRuleIds.length) return "dynamic-only";
+  if (resolution.matchOnlyRuleIds.length) return "match-only";
+  if (resolution.unsafeRuleIds.length) return "unsafe";
+  return undefined;
+}
+
+function defaultRuleResolutionForRule(
+  rule: ResolvedWebTranslationRule,
+  capability: { capability: WebTranslationRuleCapability },
+): SitePolicyRuleResolution {
+  return toSitePolicyRuleResolution({
+    matchedRules: [rule],
+    primaryContentRule: capability.capability === "content-ready" ? rule : undefined,
+    primaryScopeRule: capability.capability === "scope-ready" ? rule : undefined,
+    modifierRules: capability.capability === "modifier-only" ? [rule] : [],
+    structureRules: capability.capability === "structure-only" ? [rule] : [],
+    dynamicRules: capability.capability === "dynamic-only" ? [rule] : [],
+    matchOnlyRules: capability.capability === "match-only" ? [rule] : [],
+    unsafeRules: capability.capability === "unsafe" ? [rule] : [],
+    confidence: confidenceForResolution({
+      primaryContentRule: capability.capability === "content-ready" ? rule : undefined,
+      primaryScopeRule: capability.capability === "scope-ready" ? rule : undefined,
+      modifierRules: capability.capability === "modifier-only" ? [rule] : [],
+      structureRules: capability.capability === "structure-only" ? [rule] : [],
+      dynamicRules: capability.capability === "dynamic-only" ? [rule] : [],
+      matchOnlyRules: capability.capability === "match-only" ? [rule] : [],
+      matchedRules: [rule],
+    }),
+    reasons: [`single:${rule.ruleId}`, `capability:${capability.capability}`],
+  });
+}
+
+function normalizeHostnameFromUrl(url: string): string {
+  const parsed = parseUrl(url);
+  return parsed?.hostname ? normalizeHostname(parsed.hostname) : normalizeHostname(url);
 }
 
 function isSameRuleFamily(base: WebTranslationRule, candidate: WebTranslationRule, hostname: string): boolean {

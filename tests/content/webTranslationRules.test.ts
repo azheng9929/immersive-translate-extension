@@ -5,6 +5,7 @@ import {
   matchWebTranslationRule,
   mergeWebTranslationRules,
   resolveWebTranslationPolicy,
+  resolveWebTranslationRuleResolution,
   selectWebTranslationRulesForContent,
   type WebTranslationRule,
 } from "@/content/webTranslationRules";
@@ -766,6 +767,66 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain(".title");
   });
 
+  it("exposes a layered rule resolution result before policy compilation", () => {
+    const resolution = resolveWebTranslationRuleResolution("https://docs.example.com/guide", undefined, [
+      {
+        id: "docs-content",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        selectors: ["article p"],
+        contentSelectors: [{ selector: "article p", category: "content-block" }],
+      },
+      {
+        id: "docs-style",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        globalStyles: {
+          ".article-title": "-webkit-line-clamp: unset;",
+        },
+      },
+      {
+        id: "docs-structure",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        extraInlineSelectors: ["kbd"],
+      },
+      {
+        id: "docs-dynamic",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        dynamicPreset: "chat-stream",
+      },
+      {
+        id: "docs-unsafe",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        ruleCapability: "unsafe",
+        selectors: [".should-not-merge"],
+      },
+    ]);
+
+    expect(resolution.primaryContentRule?.id).toBe("docs-content");
+    expect(resolution.modifierRules.map((rule) => rule.id)).toEqual(["docs-style"]);
+    expect(resolution.structureRules.map((rule) => rule.id)).toEqual(["docs-structure"]);
+    expect(resolution.dynamicRules.map((rule) => rule.id)).toEqual(["docs-dynamic"]);
+    expect(resolution.unsafeRules.map((rule) => rule.id)).toEqual(["docs-unsafe"]);
+    expect(resolution.finalRule.mergedRuleIds).toEqual([
+      "docs-content",
+      "docs-structure",
+      "docs-style",
+      "docs-dynamic",
+    ]);
+    expect(resolution.finalRule.selectors).toContain("article p");
+    expect(resolution.finalRule.selectors).not.toContain(".should-not-merge");
+    expect(resolution.finalRule.ruleResolution).toMatchObject({
+      primaryContentRuleId: "docs-content",
+      modifierRuleIds: ["docs-style"],
+      structureRuleIds: ["docs-structure"],
+      dynamicRuleIds: ["docs-dynamic"],
+      unsafeRuleIds: ["docs-unsafe"],
+    });
+  });
+
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {
@@ -906,7 +967,7 @@ describe("webTranslationRules", () => {
     });
   });
 
-  it("lets generic structure-only rules use text-driven root scoring instead of fixed fallback selectors", () => {
+  it("lets generic dynamic-only rules use text-driven root scoring instead of fixed fallback selectors", () => {
     const policy = resolveWebTranslationPolicy("https://dashboard.example/cards", "normal", {
       rules: [
         {
@@ -921,7 +982,7 @@ describe("webTranslationRules", () => {
 
     expect(policy).toMatchObject({
       ruleId: "dashboard-shape",
-      ruleCapability: "structure-only",
+      ruleCapability: "dynamic-only",
       fallbackProfile: "generic",
     });
     expect(policy.preferredScanRootSelectors).toEqual([]);

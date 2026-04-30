@@ -93,7 +93,9 @@ export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): W
     hasDynamicHints,
   });
   const explicitCapability = rule.ruleCapability;
-  const capability = hasContentAnchors
+  const capability = explicitCapability === "unsafe"
+    ? "unsafe"
+    : hasContentAnchors
     ? "content-ready"
     : explicitCapability && explicitCapability !== "content-ready"
       ? explicitCapability
@@ -130,7 +132,8 @@ function deriveCapability(input: {
   if (input.hasContentAnchors) return "content-ready";
   if (input.hasScopeAnchors) return "scope-ready";
   if (input.hasLayoutHints) return "modifier-only";
-  if (input.hasStructureHints || input.hasDynamicHints) return "structure-only";
+  if (input.hasStructureHints) return "structure-only";
+  if (input.hasDynamicHints) return "dynamic-only";
   return "match-only";
 }
 

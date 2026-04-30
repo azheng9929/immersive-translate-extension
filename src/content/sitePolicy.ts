@@ -25,6 +25,19 @@ export type SiteContentSelector = {
   category: UnitCategory;
 };
 
+export type SitePolicyRuleResolution = {
+  matchedRuleIds: readonly string[];
+  primaryContentRuleId?: string;
+  primaryScopeRuleId?: string;
+  modifierRuleIds: readonly string[];
+  structureRuleIds: readonly string[];
+  dynamicRuleIds: readonly string[];
+  matchOnlyRuleIds: readonly string[];
+  unsafeRuleIds: readonly string[];
+  confidence: number;
+  reasons: readonly string[];
+};
+
 export type SitePolicy = {
   hostname: string;
   siteKey: string;
@@ -33,6 +46,7 @@ export type SitePolicy = {
   ruleCapability: WebTranslationRuleCapability;
   fallbackProfile: WebTranslationFallbackProfile;
   mergedRuleIds: readonly string[];
+  ruleResolution: SitePolicyRuleResolution;
   dynamicModeSource: DynamicModeSource;
   isHighDynamic: boolean;
   dynamicMode: DynamicTranslationMode;

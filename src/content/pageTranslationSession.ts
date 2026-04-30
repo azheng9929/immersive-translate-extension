@@ -1,5 +1,10 @@
 import type { PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
-import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicModeSource, type DynamicTranslationMode } from "./sitePolicy";
+import {
+  DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
+  type DynamicModeSource,
+  type DynamicTranslationMode,
+  type SitePolicyRuleResolution,
+} from "./sitePolicy";
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText } from "../shared/skipRules";
 import type { PageRenderState } from "../shared/config";
@@ -21,6 +26,7 @@ export type PageTranslationSiteStatus = {
   ruleCapability: WebTranslationRuleCapability;
   fallbackProfile: WebTranslationFallbackProfile;
   mergedRuleIds: readonly string[];
+  ruleResolution?: SitePolicyRuleResolution;
   dynamicMode: DynamicTranslationMode;
   dynamicModeSource: DynamicModeSource;
   isHighDynamic: boolean;

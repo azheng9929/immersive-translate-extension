@@ -25,6 +25,7 @@ export type WebTranslationRuleCapability =
   | "scope-ready"
   | "modifier-only"
   | "structure-only"
+  | "dynamic-only"
   | "match-only"
   | "unsafe";
 export type WebTranslationFallbackProfile = "none" | "article" | "video" | "social" | "forum" | "commerce" | "generic";

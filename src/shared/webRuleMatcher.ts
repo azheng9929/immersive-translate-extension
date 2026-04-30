@@ -142,6 +142,8 @@ function capabilityPriority(rule: WebTranslationRule): number {
       return 35;
     case "modifier-only":
       return 25;
+    case "dynamic-only":
+      return 15;
     case "match-only":
       return 5;
     case "unsafe":
