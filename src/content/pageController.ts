@@ -219,7 +219,7 @@ export class PageController {
           unit,
           item: {
             id: unit.id,
-            text: unit.originalText,
+            text: translationRequestText(unit),
             category: unit.category,
             ...(lookup ? { cacheKey: lookup.key } : {}),
           },
@@ -538,6 +538,8 @@ export class PageController {
 }
 
 function translationOnlyMode(unit: TranslationUnit): RenderMode {
+  if (unit.piecePlan?.kind === "complex") return "compact-bilingual";
+  if (unit.piecePlan?.kind === "inline-rich") return "replace-rich-inline";
   return unit.category === "attribute" ? "replace-attribute" : "replace-text";
 }
 
@@ -556,6 +558,10 @@ function bilingualMode(unit: TranslationUnit): RenderMode {
 
 function isFragileCategory(category: UnitCategory): boolean {
   return category === "button" || category === "nav" || category === "menu" || category === "label" || category === "inline-ui";
+}
+
+function translationRequestText(unit: TranslationUnit): string {
+  return unit.modelText ?? unit.originalText;
 }
 
 function createSessionId(): string {

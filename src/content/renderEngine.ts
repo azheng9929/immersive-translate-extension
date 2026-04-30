@@ -1,4 +1,4 @@
-import type { RestoreRecord, TranslationUnit } from "../shared/types";
+import type { RestoreRecord, TranslationPiecePlaceholder, TranslationUnit } from "../shared/types";
 import { ensureRuntimeStyle } from "./style";
 
 const ORIGINAL_TEXT_ATTRIBUTE = "data-imt-original-text";
@@ -56,6 +56,10 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
     ];
   }
 
+  if (unit.renderMode === "replace-rich-inline") {
+    return renderRichInlineReplacement(unit, translatedText);
+  }
+
   if (unit.renderMode === "replace-text") {
     return shouldUseRichTextReplacement(unit)
       ? renderRichTextReplacement(unit, translatedText)
@@ -69,7 +73,7 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
     unit.renderMode === "compact-bilingual" ? "imt-translation-compact" : "imt-translation-block",
     ...(unit.translationClasses ?? []),
   ].filter(Boolean).join(" ");
-  span.textContent = withWrapperText(unit, translatedText);
+  appendTranslatedContent(span, unit, translatedText);
   unit.root.appendChild(span);
   return [{ type: "inserted-node", unitId: unit.id, node: span }];
 }
@@ -88,18 +92,54 @@ function renderTextReplacement(unit: TranslationUnit, translatedText: string): R
 
 function renderRichTextReplacement(unit: TranslationUnit, translatedText: string): RestoreRecord[] {
   const records: RestoreRecord[] = [];
+  const sourceTextNodes = textNodesForReplacement(unit);
   const replacement = document.createElement("span");
   replacement.setAttribute("data-imt-managed", "true");
   replacement.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
   replacement.className = ["imt-translation-replacement", ...(unit.translationClasses ?? [])]
     .filter(Boolean)
     .join(" ");
-  replacement.textContent = withWrapperText(unit, translatedText);
+  appendTranslatedContent(replacement, unit, translatedText);
 
   unit.root.insertBefore(replacement, unit.root.firstChild);
   records.push({ type: "inserted-node", unitId: unit.id, node: replacement });
 
-  unit.textNodes.forEach((node) => {
+  sourceTextNodes.forEach((node) => {
+    records.push({ type: "text-replace", unitId: unit.id, textNode: node, originalText: node.textContent ?? "" });
+    node.textContent = "";
+  });
+
+  for (const child of Array.from(unit.root.children)) {
+    if (!(child instanceof HTMLElement) || child === replacement || child.dataset.imtManaged === "true") continue;
+    records.push({
+      type: "style-change",
+      unitId: unit.id,
+      element: child,
+      property: "display",
+      originalValue: child.style.getPropertyValue("display"),
+    });
+    child.style.setProperty("display", "none");
+  }
+
+  unit.root.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
+  return records;
+}
+
+function renderRichInlineReplacement(unit: TranslationUnit, translatedText: string): RestoreRecord[] {
+  const records: RestoreRecord[] = [];
+  const sourceTextNodes = textNodesForReplacement(unit);
+  const replacement = document.createElement("span");
+  replacement.setAttribute("data-imt-managed", "true");
+  replacement.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
+  replacement.className = ["imt-translation-replacement", ...(unit.translationClasses ?? [])]
+    .filter(Boolean)
+    .join(" ");
+  appendTranslatedContent(replacement, unit, translatedText);
+
+  unit.root.insertBefore(replacement, unit.root.firstChild);
+  records.push({ type: "inserted-node", unitId: unit.id, node: replacement });
+
+  sourceTextNodes.forEach((node) => {
     records.push({ type: "text-replace", unitId: unit.id, textNode: node, originalText: node.textContent ?? "" });
     node.textContent = "";
   });
@@ -125,6 +165,85 @@ function shouldUseRichTextReplacement(unit: TranslationUnit): boolean {
   return Array.from(unit.root.children).some((child) =>
     child instanceof HTMLElement && child.dataset.imtManaged !== "true"
   );
+}
+
+function appendTranslatedContent(parent: HTMLElement, unit: TranslationUnit, translatedText: string): void {
+  const richNodes = translatedNodesFromPieces(unit, translatedText);
+  if (!richNodes) {
+    parent.textContent = withWrapperText(unit, translatedText);
+    return;
+  }
+
+  if (unit.wrapperPrefix) parent.append(document.createTextNode(unit.wrapperPrefix));
+  for (const node of richNodes) parent.append(node);
+  if (unit.wrapperSuffix) parent.append(document.createTextNode(unit.wrapperSuffix));
+}
+
+function translatedNodesFromPieces(unit: TranslationUnit, translatedText: string): Node[] | undefined {
+  if (!unit.piecePlan || unit.piecePlan.placeholders.length === 0) return undefined;
+  const placeholders = new Map(unit.piecePlan.placeholders.map((placeholder) => [placeholder.id, placeholder]));
+  const nodes: Node[] = [];
+  const pattern = /<x\s+id=["']([^"']+)["']\s*\/>|<x\s+id=["']([^"']+)["']\s*>([\s\S]*?)<\/x>/g;
+  let lastIndex = 0;
+  let matchedKnownPlaceholder = false;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(translatedText)) !== null) {
+    if (match.index > lastIndex) nodes.push(document.createTextNode(translatedText.slice(lastIndex, match.index)));
+    const id = match[1] ?? match[2];
+    const placeholder = id ? placeholders.get(id) : undefined;
+    if (!placeholder) {
+      nodes.push(document.createTextNode(match[0]));
+    } else {
+      matchedKnownPlaceholder = true;
+      nodes.push(nodeForPlaceholder(placeholder, match[3]));
+    }
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < translatedText.length) nodes.push(document.createTextNode(translatedText.slice(lastIndex)));
+  return matchedKnownPlaceholder ? nodes : undefined;
+}
+
+function nodeForPlaceholder(placeholder: TranslationPiecePlaceholder, translatedInnerText: string | undefined): Node {
+  const tagName = safePlaceholderTagName(placeholder.tagName);
+  const element = document.createElement(tagName.toLowerCase());
+  for (const [name, value] of Object.entries(placeholder.attributes ?? {})) {
+    if (!isSafePlaceholderAttribute(tagName, name)) continue;
+    element.setAttribute(name, value);
+  }
+  element.textContent = placeholder.kind === "stay-original"
+    ? placeholder.text
+    : translatedInnerText && translatedInnerText.trim()
+      ? translatedInnerText
+      : placeholder.text;
+  return element;
+}
+
+function safePlaceholderTagName(tagName: string): string {
+  const upper = tagName.toUpperCase();
+  if (["A", "ABBR", "B", "CITE", "CODE", "EM", "I", "KBD", "MARK", "SAMP", "SMALL", "SPAN", "STRONG", "SUB", "SUP", "U", "VAR"].includes(upper)) {
+    return upper;
+  }
+  return "SPAN";
+}
+
+function isSafePlaceholderAttribute(tagName: string, name: string): boolean {
+  if (name === "href") return tagName === "A";
+  return name === "title" || name === "lang" || name === "dir" || name === "class";
+}
+
+function textNodesForReplacement(unit: TranslationUnit): Text[] {
+  if (!unit.piecePlan) return unit.textNodes;
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(unit.root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const parent = node.parentElement;
+    if (parent?.dataset.imtManaged !== "true") nodes.push(node as Text);
+    node = walker.nextNode();
+  }
+  return nodes;
 }
 
 function withWrapperText(unit: TranslationUnit, translatedText: string): string {

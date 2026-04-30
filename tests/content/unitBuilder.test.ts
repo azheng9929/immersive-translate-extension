@@ -69,7 +69,7 @@ describe("buildTranslationUnits", () => {
     expect(units[0]!.category).toBe("menu");
   });
 
-  it("does not reintroduce skipped code text when building unit text", () => {
+  it("uses stay-original placeholders for skipped inline code", () => {
     mountFixture(`<p>Hello <code>const value = 1</code> world.</p>`);
     const units = buildTranslationUnits({
       scannedTexts: scanDocumentText(document.body),
@@ -80,7 +80,31 @@ describe("buildTranslationUnits", () => {
     });
 
     expect(units).toHaveLength(1);
-    expect(units[0]!.originalText).toBe("Hello world.");
+    expect(units[0]!.originalText).toBe("Hello const value = 1 world.");
+    expect(units[0]!.modelText).toBe('Hello <x id="p1"/> world.');
+    expect(units[0]!.piecePlan).toMatchObject({
+      kind: "inline-rich",
+      placeholders: [{ id: "p1", kind: "stay-original", tagName: "CODE", text: "const value = 1" }],
+    });
+  });
+
+  it("builds inline-rich placeholders for links and emphasis without changing readable original text", () => {
+    mountFixture(`<p>Read the <a href="/docs">documentation</a> for <strong>production rollout</strong>.</p>`);
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    });
+
+    expect(units).toHaveLength(1);
+    expect(units[0]!.originalText).toBe("Read the documentation for production rollout.");
+    expect(units[0]!.modelText).toBe('Read the <x id="p1">documentation</x> for <x id="p2">production rollout</x>.');
+    expect(units[0]!.piecePlan?.placeholders).toMatchObject([
+      { id: "p1", kind: "inline", tagName: "A", text: "documentation", attributes: { href: "/docs" } },
+      { id: "p2", kind: "inline", tagName: "STRONG", text: "production rollout" },
+    ]);
   });
 
   it("creates attribute units", () => {
@@ -222,9 +246,10 @@ describe("buildTranslationUnits", () => {
 
     expect(units.map((unit) => unit.originalText)).toEqual([
       "Compact description text.",
-      "Hello rocket world.",
+      "Hello rocket world const value = 1.",
       "Card headline text.",
     ]);
+    expect(units[1]!.modelText).toBe('Hello rocket world <x id="p1"/>.');
     expect(units[0]!.root).toBe(document.querySelector("[itemprop=description]"));
     expect(units[2]!.root).toBe(document.querySelector(".headline"));
   });

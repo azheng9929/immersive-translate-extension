@@ -11,6 +11,7 @@ import {
 } from "./compiledFilterRule";
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
+import { buildTranslationPiecePlan } from "./pieceBuilder";
 import {
   recordDuplicateUnits,
   recordUnitBuilt,
@@ -79,8 +80,18 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       continue;
     }
     const originalText = collected.text;
+    const piecePlan = buildTranslationPiecePlan(root, {
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.allowTooltip ? { allowTooltip: true } : {}),
+      ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
+      ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
+      targetLang: input.targetLang,
+      ...(input.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: input.lineBreakMaxTextCount } : {}),
+    }, input.filterRule);
+    const displayText = piecePlan?.displayText || originalText;
+    const modelText = piecePlan?.modelText || displayText;
     const category = categoryFromScanned(rootToCategories.get(root)) ?? classifyRoot(root);
-    recordUnitBuilt(input.diagnostics, category, originalText.length, {
+    recordUnitBuilt(input.diagnostics, category, displayText.length, {
       code: isCodeLikeRoot(root),
       ui: isUiCategory(category),
     });
@@ -90,14 +101,16 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       revision: input.revision,
       root,
       textNodes,
-      originalText,
-      normalizedText: normalizeForCache(originalText),
+      originalText: displayText,
+      ...(modelText !== displayText ? { modelText } : {}),
+      normalizedText: normalizeForCache(modelText),
       targetLang: input.targetLang,
       category,
-      renderMode: decideRenderMode(category, root, originalText),
+      renderMode: decideRenderMode(category, root, displayText),
       ...(input.translationClasses ? { translationClasses: input.translationClasses } : {}),
       ...(input.wrapperPrefix !== undefined ? { wrapperPrefix: input.wrapperPrefix } : {}),
       ...(input.wrapperSuffix !== undefined ? { wrapperSuffix: input.wrapperSuffix } : {}),
+      ...(piecePlan && piecePlan.kind !== "plain" ? { piecePlan } : {}),
       priority: priorityForCategory(category),
       state: "pending",
     });

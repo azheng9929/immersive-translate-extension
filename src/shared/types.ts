@@ -17,6 +17,7 @@ export type RenderMode =
   | "bilingual-inside"
   | "bilingual-after"
   | "replace-text"
+  | "replace-rich-inline"
   | "replace-attribute"
   | "compact-bilingual"
   | "skip";
@@ -31,6 +32,21 @@ export type TranslatableAttribute = {
   originalValue: string;
 };
 
+export type TranslationPiecePlan = {
+  kind: "plain" | "inline-rich" | "complex";
+  modelText: string;
+  displayText: string;
+  placeholders: readonly TranslationPiecePlaceholder[];
+};
+
+export type TranslationPiecePlaceholder = {
+  id: string;
+  kind: "inline" | "stay-original";
+  tagName: string;
+  text: string;
+  attributes?: Readonly<Record<string, string>>;
+};
+
 export type TranslationUnit = {
   id: string;
   sessionId: string;
@@ -39,6 +55,7 @@ export type TranslationUnit = {
   textNodes: Text[];
   attribute?: TranslatableAttribute;
   originalText: string;
+  modelText?: string;
   normalizedText: string;
   translatedText?: string;
   sourceLang?: string;
@@ -48,6 +65,7 @@ export type TranslationUnit = {
   translationClasses?: readonly string[];
   wrapperPrefix?: string;
   wrapperSuffix?: string;
+  piecePlan?: TranslationPiecePlan;
   priority: number;
   state: UnitState;
   reason?: string;
