@@ -69,6 +69,7 @@ export class DebugOverlay {
     this.root.replaceChildren(
       createTitle(),
       createRuleVisualizationButton(this.ruleVisualizationActive, () => this.toggleRuleVisualization()),
+      createRow("候选", candidateLabel(status), "debug-overlay-candidates"),
       createRow("规则", ruleLabel(status), "debug-overlay-rule"),
       createRow("字段", ruleShapeLabel(status), "debug-overlay-rule-shape"),
       createRow("过滤", ruleFiltersLabel(status), "debug-overlay-rule-filters"),
@@ -226,6 +227,16 @@ function scanLabel(status: PageTranslationStatus): string {
     ? `; attr ${attributes.seen} / ${attributes.accepted} / ${attributes.skipped}${reasonSuffix(attributes.skippedByReason)}`
     : "";
   return `${text.seen} / ${text.accepted} / ${text.skipped}${reasonSuffix(text.skippedByReason)}${attributeLabel}`;
+}
+
+function candidateLabel(status: PageTranslationStatus): string {
+  const candidates = status.diagnostics?.candidates;
+  if (!candidates) return "0 / 0";
+  const profileSummary = (Object.entries(candidates.acceptedByProfile) as Array<[string, number]>)
+    .sort((left, right) => right[1] - left[1])
+    .map(([profile, count]) => `${profile} ${count}`)
+    .join(", ");
+  return [`${candidates.evaluated} / ${candidates.accepted}`, profileSummary].filter(Boolean).join("; ");
 }
 
 function unitsLabel(status: PageTranslationStatus): string {

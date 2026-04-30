@@ -937,4 +937,22 @@ describe("webTranslationRules", () => {
       maxEagerLazyRoots: 0,
     });
   });
+
+  it("derives weak candidate selectors from style-only layout repair rules", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "style-only",
+        matches: "style.example",
+        globalStyles: {
+          ".clamp-title": "-webkit-line-clamp: unset; max-height: none;",
+          ".clamp-desc": "overflow: visible;",
+          ".toolbar": "display: flex;",
+        },
+      }),
+      "style.example",
+      "normal",
+    );
+
+    expect(policy.weakCandidateSelectors).toEqual([".clamp-title", ".clamp-desc"]);
+  });
 });

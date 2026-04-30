@@ -43,6 +43,8 @@ describe("DebugOverlay", () => {
     expect(root?.querySelector("[data-testid='debug-overlay-cache']")?.textContent).toContain("3 / 4");
     expect(root?.querySelector("[data-testid='debug-overlay-provider']")?.textContent).toContain("5 / 1");
     expect(root?.querySelector("[data-testid='debug-overlay-scan']")?.textContent).toContain("10 / 8 / 2");
+    expect(root?.querySelector("[data-testid='debug-overlay-candidates']")?.textContent).toContain("6 / 2");
+    expect(rowText(root, "debug-overlay-candidates")).toContain("landing 2");
     expect(rowText(root, "debug-overlay-scan")).toContain("hidden 2");
     expect(rowText(root, "debug-overlay-units")).toContain("7 / 1");
     expect(rowText(root, "debug-overlay-units")).toContain("target-language 1");
@@ -281,6 +283,17 @@ function createStatus(): PageTranslationStatus {
           accepted: 2,
           skipped: 1,
           skippedByReason: { hidden: 1 },
+        },
+      },
+      candidates: {
+        evaluated: 6,
+        accepted: 2,
+        byProfile: {
+          landing: 2,
+          "video-list": 4,
+        },
+        acceptedByProfile: {
+          landing: 2,
         },
       },
       units: {

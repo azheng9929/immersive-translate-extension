@@ -67,4 +67,20 @@ describe("rootScoring", () => {
       document.querySelector("#tts"),
     ]);
   });
+
+  it("keeps high-link video list containers as confident content roots", () => {
+    document.body.innerHTML = `
+      <header><a href="/home">Home</a><a href="/categories">Categories</a><button>Upload</button></header>
+      <div class="video-grid">
+        <a class="video-card" href="/v/1"><img alt="" /><span class="video-title">Deep dive into browser translation engines</span></a>
+        <a class="video-card" href="/v/2"><img alt="" /><span class="video-title">How layout preserving translation works</span></a>
+        <a class="video-card" href="/v/3"><img alt="" /><span class="video-title">Building reliable dynamic page translation</span></a>
+        <a class="video-card" href="/v/4"><img alt="" /><span class="video-title">Debugging multilingual web applications</span></a>
+      </div>
+    `;
+
+    expect(selectHighConfidenceTranslationRoots(document.body, { profileHint: "video" })).toEqual([
+      document.querySelector(".video-grid"),
+    ]);
+  });
 });

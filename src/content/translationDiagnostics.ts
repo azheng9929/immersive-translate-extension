@@ -13,11 +13,19 @@ export type UnitDiagnostics = {
   droppedByReason: DiagnosticReasonCounts;
 };
 
+export type CandidateDiagnostics = {
+  evaluated: number;
+  accepted: number;
+  byProfile: DiagnosticReasonCounts;
+  acceptedByProfile: DiagnosticReasonCounts;
+};
+
 export type TranslationDiagnostics = {
   scan: {
     text: ScanDiagnosticBucket;
     attributes: ScanDiagnosticBucket;
   };
+  candidates: CandidateDiagnostics;
   units: UnitDiagnostics;
   cache: {
     hits: number;
@@ -37,6 +45,12 @@ export function createTranslationDiagnostics(): TranslationDiagnostics {
     scan: {
       text: createScanBucket(),
       attributes: createScanBucket(),
+    },
+    candidates: {
+      evaluated: 0,
+      accepted: 0,
+      byProfile: {},
+      acceptedByProfile: {},
     },
     units: {
       built: 0,
@@ -60,6 +74,12 @@ export function cloneTranslationDiagnostics(diagnostics: TranslationDiagnostics)
     scan: {
       text: cloneScanBucket(diagnostics.scan.text),
       attributes: cloneScanBucket(diagnostics.scan.attributes),
+    },
+    candidates: {
+      evaluated: diagnostics.candidates.evaluated,
+      accepted: diagnostics.candidates.accepted,
+      byProfile: { ...diagnostics.candidates.byProfile },
+      acceptedByProfile: { ...diagnostics.candidates.acceptedByProfile },
     },
     units: {
       built: diagnostics.units.built,
@@ -101,6 +121,24 @@ export function recordScanSkipped(
 export function recordUnitBuilt(diagnostics: TranslationDiagnostics | undefined): void {
   if (!diagnostics) return;
   diagnostics.units.built += 1;
+}
+
+export function recordCandidateEvaluated(
+  diagnostics: TranslationDiagnostics | undefined,
+  profile: string,
+): void {
+  if (!diagnostics) return;
+  diagnostics.candidates.evaluated += 1;
+  incrementReason(diagnostics.candidates.byProfile, profile);
+}
+
+export function recordCandidateAccepted(
+  diagnostics: TranslationDiagnostics | undefined,
+  profile: string,
+): void {
+  if (!diagnostics) return;
+  diagnostics.candidates.accepted += 1;
+  incrementReason(diagnostics.candidates.acceptedByProfile, profile);
 }
 
 export function recordUnitDropped(diagnostics: TranslationDiagnostics | undefined, reason = "empty"): void {

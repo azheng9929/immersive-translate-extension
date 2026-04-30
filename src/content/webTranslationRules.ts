@@ -113,6 +113,7 @@ const DEFAULT_SITE_POLICY = {
   buildContainerSelectors: [],
   skipBuildContainerSelectors: [],
   preferredScanRootSelectors: [],
+  weakCandidateSelectors: [],
   excludeSelectors: [],
   contentSelectors: [],
   allowTooltip: true,
@@ -1908,6 +1909,7 @@ export function compileRulePolicy(
     buildContainerSelectors: rule.buildContainerSelectors,
     skipBuildContainerSelectors: rule.skipBuildContainerSelectors,
     preferredScanRootSelectors: unique([...rule.selectors, ...fallbackScanRootSelectors]),
+    weakCandidateSelectors: weakCandidateSelectorsFromRule(rule),
     excludeSelectors: rule.excludeSelectors,
     contentSelectors: unique([...rule.contentSelectors, ...fallbackContentSelectors], contentSelectorKey),
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
@@ -2444,6 +2446,29 @@ function upperKey(item: string): string {
 
 function globalStylesToCss(globalStyles: Readonly<Record<string, string>>): string[] {
   return Object.entries(globalStyles).map(([selector, style]) => `${selector} { ${style} }`);
+}
+
+const WEAK_CANDIDATE_SELECTOR_TEXT = /(title|text|content|summary|name|desc|description|headline|body|caption|excerpt|abstract|comment|message|post)/i;
+const LAYOUT_REPAIR_STYLE_TEXT = /(line-clamp|max-height|overflow|white-space|\bheight\b|\bdisplay\b)/i;
+
+function weakCandidateSelectorsFromRule(rule: ResolvedWebTranslationRule): readonly string[] {
+  const selectors: string[] = [];
+  for (const [selectorText, styleText] of Object.entries(rule.globalStyles)) {
+    if (!LAYOUT_REPAIR_STYLE_TEXT.test(styleText)) continue;
+    for (const selector of selectorText.split(",")) {
+      const trimmed = selector.trim();
+      if (!trimmed || isUnsafeWeakCandidateSelector(trimmed)) continue;
+      if (WEAK_CANDIDATE_SELECTOR_TEXT.test(trimmed)) selectors.push(trimmed);
+    }
+  }
+  return unique(selectors);
+}
+
+function isUnsafeWeakCandidateSelector(selector: string): boolean {
+  if (selector === "*" || selector === "body" || selector === "html") return true;
+  if (/immersive-translate|imt-/i.test(selector)) return true;
+  if (/[{}]/.test(selector)) return true;
+  return false;
 }
 
 function applyDynamicMode(policy: SitePolicy, dynamicMode: DynamicMode): SitePolicy {

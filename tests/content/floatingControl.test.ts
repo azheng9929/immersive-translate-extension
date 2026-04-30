@@ -313,6 +313,12 @@ describe("FloatingTranslationControl", () => {
           failed: 0,
           skipped: 0,
         },
+        candidates: {
+          evaluated: 0,
+          accepted: 0,
+          byProfile: {},
+          acceptedByProfile: {},
+        },
       },
     });
 
@@ -379,6 +385,12 @@ describe("FloatingTranslationControl", () => {
           requested: 1,
           failed: 0,
           skipped: 0,
+        },
+        candidates: {
+          evaluated: 0,
+          accepted: 0,
+          byProfile: {},
+          acceptedByProfile: {},
         },
       },
     });

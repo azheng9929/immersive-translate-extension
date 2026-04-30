@@ -44,6 +44,7 @@ export type SitePolicy = {
   buildContainerSelectors: readonly string[];
   skipBuildContainerSelectors: readonly string[];
   preferredScanRootSelectors: readonly string[];
+  weakCandidateSelectors: readonly string[];
   excludeSelectors: readonly string[];
   contentSelectors: readonly SiteContentSelector[];
   allowTooltip: boolean;

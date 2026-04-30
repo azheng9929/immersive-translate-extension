@@ -11,6 +11,12 @@ describe("shouldSkipForTargetLanguage", () => {
     expect(shouldSkipForTargetLanguage("React Server Components stream UI from the server.", "zh-Hans")).toBe(false);
   });
 
+  it("does not skip English snippets with localized Chinese dates", () => {
+    expect(
+      shouldSkipForTargetLanguage("2025\u5e744\u67083\u65e5 - OpenAI creates AI models and products.", "zh-Hans"),
+    ).toBe(false);
+  });
+
   it("does not treat Japanese or Korean text as Chinese just because Han characters appear", () => {
     expect(shouldSkipForTargetLanguage("これは漢字と API の説明です。", "zh-Hans")).toBe(false);
     expect(shouldSkipForTargetLanguage("이 문서는 漢字 API 설명입니다.", "zh-Hans")).toBe(false);

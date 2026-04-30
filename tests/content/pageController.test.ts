@@ -956,6 +956,46 @@ describe("PageController", () => {
     expect(requestedTexts.join("\n")).not.toContain("curl https://api.inworld.ai");
   });
 
+  it("translates Google search snippets that include localized date spans", async () => {
+    document.body.innerHTML = `
+      <div id="search">
+        <div class="g">
+          <div class="VwiC3b">
+            <span>2025\u5e744\u67083\u65e5</span>
+            <span>OpenAI creates AI models and products.</span>
+          </div>
+        </div>
+        <div class="g">
+          <div class="VwiC3b">
+            <span>OpenAI develops safe and beneficial AI systems.</span>
+          </div>
+        </div>
+      </div>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.google.com/search?q=openai", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "OpenAI creates AI models and products.",
+      "OpenAI develops safe and beneficial AI systems.",
+    ]);
+    expect(document.querySelectorAll("#search .VwiC3b .imt-translation-compact")).toHaveLength(2);
+  });
+
   it("translates Product Hunt feed card anchors without translating vote controls", async () => {
     document.body.innerHTML = `
       <main>
@@ -1059,6 +1099,62 @@ describe("PageController", () => {
 
     expect(result.total).toBe(0);
     expect(requestedTexts).toEqual([]);
+  });
+
+  it("uses style-only weak candidate hints when generic fallback selectors do not match", async () => {
+    document.body.innerHTML = `
+      <header>
+        <a href="/pricing">Pricing</a>
+        <a href="/docs">Docs</a>
+      </header>
+      <div class="app-shell">
+        <div class="clamp-title">Revenue intelligence for product teams</div>
+        <div class="clamp-desc">Turn messy user feedback into clear priorities across every roadmap discussion.</div>
+      </div>
+    `;
+    const policy = resolveWebTranslationPolicy("https://style.example/", "normal", {
+      rules: [
+        {
+          id: "style-only",
+          matches: ["style.example"],
+          ruleSource: "imported-experimental",
+          globalStyles: {
+            ".clamp-title": "-webkit-line-clamp: unset;",
+            ".clamp-desc": "overflow: visible;",
+          },
+        },
+      ],
+    });
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      weakCandidateSelectors: policy.weakCandidateSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Revenue intelligence for product teams",
+      "Turn messy user feedback into clear priorities across every roadmap discussion.",
+    ]);
+    expect(controller.getDiagnostics().candidates).toMatchObject({
+      evaluated: expect.any(Number),
+      accepted: expect.any(Number),
+      byProfile: {
+        landing: expect.any(Number),
+      },
+    });
+    expect(document.body.textContent).toContain("Pricing");
+    expect(document.body.textContent).not.toContain("[zh-Hans] Pricing");
   });
 
   it("uses containerMinTextCount to drop tiny configured scan roots", async () => {

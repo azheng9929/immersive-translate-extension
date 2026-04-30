@@ -1,4 +1,14 @@
 import { normalizeVisibleText } from "../shared/normalize";
+import {
+  collectTextDrivenCandidates,
+  type PageContentProfile,
+} from "./contentCandidateEngine";
+import type { WebTranslationFallbackProfile } from "../shared/webRuleTypes";
+import {
+  recordCandidateAccepted,
+  recordCandidateEvaluated,
+  type TranslationDiagnostics,
+} from "./translationDiagnostics";
 
 export type TranslationRootScore = {
   element: HTMLElement;
@@ -9,6 +19,12 @@ export type TranslationRootScore = {
   buttonDensity: number;
   repeatedTextDensity: number;
   visibleArea: number;
+};
+
+export type TranslationRootScoreOptions = {
+  profileHint?: WebTranslationFallbackProfile | PageContentProfile;
+  weakCandidateSelectors?: readonly string[];
+  diagnostics?: TranslationDiagnostics;
 };
 
 const CANDIDATE_ROOT_SELECTOR = [
@@ -60,10 +76,33 @@ export function scoreTranslationRoot(element: HTMLElement): TranslationRootScore
   };
 }
 
-export function selectHighConfidenceTranslationRoots(root: ParentNode): HTMLElement[] {
-  const candidates = collectCandidateRoots(root)
+export function selectHighConfidenceTranslationRoots(
+  root: ParentNode,
+  options: TranslationRootScoreOptions = {},
+): HTMLElement[] {
+  const selectorCandidates = collectCandidateRoots(root)
     .map(scoreTranslationRoot)
-    .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH && candidate.score >= MIN_CONFIDENT_SCORE)
+    .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH && candidate.score >= MIN_CONFIDENT_SCORE);
+  const textDrivenOptions: Parameters<typeof collectTextDrivenCandidates>[1] = {};
+  if (options.profileHint) textDrivenOptions.profileHint = options.profileHint;
+  if (options.weakCandidateSelectors?.length) {
+    textDrivenOptions.weakCandidateSelectors = options.weakCandidateSelectors;
+  }
+  const rawTextDrivenCandidates = collectTextDrivenCandidates(root, textDrivenOptions);
+  for (const candidate of rawTextDrivenCandidates) recordCandidateEvaluated(options.diagnostics, candidate.profile);
+  const profileByElement = new Map(rawTextDrivenCandidates.map((candidate) => [candidate.element, candidate.profile]));
+  const textDrivenCandidates = rawTextDrivenCandidates.map((candidate) => ({
+    element: candidate.element,
+    score: candidate.score,
+    textLength: candidate.stats.textLength,
+    wordCount: candidate.stats.wordCount,
+    linkDensity: candidate.stats.textLength > 0 ? candidate.stats.linkTextLength / candidate.stats.textLength : 0,
+    buttonDensity: candidate.stats.textLength > 0 ? candidate.stats.buttonTextLength / candidate.stats.textLength : 0,
+    repeatedTextDensity: 1 - candidate.stats.uniqueTextRatio,
+    visibleArea: visibleElementArea(candidate.element),
+  }));
+  const candidates = mergeCandidateScores(selectorCandidates, textDrivenCandidates)
+    .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH || candidate.score >= MIN_CONFIDENT_SCORE)
     .sort((left, right) => right.score - left.score);
 
   const selected: HTMLElement[] = [];
@@ -71,9 +110,23 @@ export function selectHighConfidenceTranslationRoots(root: ParentNode): HTMLElem
     if (selected.length >= MAX_CONFIDENT_ROOTS) break;
     if (selected.some((element) => element.contains(candidate.element) || candidate.element.contains(element))) continue;
     selected.push(candidate.element);
+    const profile = profileByElement.get(candidate.element);
+    if (profile) recordCandidateAccepted(options.diagnostics, profile);
   }
 
   return selected.sort(compareDocumentOrder);
+}
+
+function mergeCandidateScores(
+  left: readonly TranslationRootScore[],
+  right: readonly TranslationRootScore[],
+): TranslationRootScore[] {
+  const byElement = new Map<HTMLElement, TranslationRootScore>();
+  for (const candidate of [...left, ...right]) {
+    const existing = byElement.get(candidate.element);
+    if (!existing || candidate.score > existing.score) byElement.set(candidate.element, candidate);
+  }
+  return [...byElement.values()];
 }
 
 function collectCandidateRoots(root: ParentNode): HTMLElement[] {
