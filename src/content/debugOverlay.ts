@@ -1,4 +1,6 @@
 import type { ExtensionConfig } from "../shared/config";
+import { diagnosticReasonLabel } from "./diagnosticLabels";
+import { buildRuleTargetExplanation } from "./ruleTargetInspector";
 import type {
   PageTranslationRuleVisualizationGroup,
   PageTranslationSiteStatus,
@@ -268,7 +270,7 @@ function topReasonsLabel(counts: Partial<Record<string, number>> | undefined): s
     .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .slice(0, 3)
-    .map(([reason, count]) => `${reason} ${count}`)
+    .map(([reason, count]) => `${diagnosticReasonLabel(reason)} ${count}`)
     .join(", ");
 }
 
@@ -291,6 +293,8 @@ class RuleVisualizer {
   private styleElement: HTMLStyleElement | undefined;
   private legendElement: HTMLElement | undefined;
   private inspectorElement: HTMLElement | undefined;
+  private currentStatus: PageTranslationStatus | undefined;
+  private currentTextCandidates: readonly HTMLElement[] = [];
   private readonly handleInspectClick = (event: MouseEvent): void => {
     const element = inspectableElementFromEvent(event);
     if (!element || isExtensionElement(element)) return;
@@ -301,6 +305,8 @@ class RuleVisualizer {
 
   show(status: PageTranslationStatus, textCandidates: readonly HTMLElement[] = []): void {
     this.hide();
+    this.currentStatus = status;
+    this.currentTextCandidates = textCandidates;
     const selectors = status.site?.ruleDiagnostics?.visualizationSelectors ?? [];
     this.ensureStyle();
     document.addEventListener("click", this.handleInspectClick, true);
@@ -359,6 +365,8 @@ class RuleVisualizer {
     this.inspectorElement = undefined;
     this.styleElement?.remove();
     this.styleElement = undefined;
+    this.currentStatus = undefined;
+    this.currentTextCandidates = [];
   }
 
   private showInspector(element: Element, clientX: number, clientY: number): void {
@@ -366,7 +374,10 @@ class RuleVisualizer {
     const inspector = document.createElement("aside");
     inspector.dataset.imtManaged = "true";
     inspector.dataset.imtRuleVisualizerInspector = "true";
-    inspector.textContent = elementInspectionText(element);
+    inspector.textContent = buildRuleTargetExplanation(element, {
+      ...(this.currentStatus ? { status: this.currentStatus } : {}),
+      textCandidates: this.currentTextCandidates,
+    });
     const left = Math.min(Math.max(clientX + 12, 12), Math.max(window.innerWidth - 320, 12));
     const top = Math.min(Math.max(clientY + 12, 12), Math.max(window.innerHeight - 120, 12));
     Object.assign(inspector.style, {
@@ -481,35 +492,6 @@ function visualizedElementFromEvent(event: MouseEvent): Element | undefined {
   const target = event.target;
   if (!(target instanceof Element)) return undefined;
   return target.closest("[data-imt-rule-visualization]") ?? undefined;
-}
-
-function elementInspectionText(element: Element): string {
-  const translatedRoot = element.closest("[data-imt-state='translated']");
-  const ruleReason = element.getAttribute("data-imt-rule-visualization-reason") ??
-    element.closest("[data-imt-rule-visualization]")?.getAttribute("data-imt-rule-visualization-reason");
-  const rows = [
-    `状态: ${translatedRoot ? "已翻译" : "未翻译"}`,
-    `元素: ${elementLabel(element)}`,
-    `规则: ${ruleReason ?? "未命中规则 selector"}`,
-  ];
-  const textPreview = elementTextPreview(element);
-  if (textPreview) rows.push(`文本: ${textPreview}`);
-  return rows.join("\n");
-}
-
-function elementLabel(element: Element): string {
-  const tag = element.tagName.toLowerCase();
-  const id = element.id ? `#${element.id}` : "";
-  const classes = Array.from(element.classList)
-    .filter((className) => /^[\w-]+$/.test(className))
-    .slice(0, 3)
-    .map((className) => `.${className}`)
-    .join("");
-  return `${tag}${id}${classes}`;
-}
-
-function elementTextPreview(element: Element): string {
-  return (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTMLElement {

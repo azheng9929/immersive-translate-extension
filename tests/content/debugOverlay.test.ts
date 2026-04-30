@@ -45,9 +45,9 @@ describe("DebugOverlay", () => {
     expect(root?.querySelector("[data-testid='debug-overlay-scan']")?.textContent).toContain("10 / 8 / 2");
     expect(root?.querySelector("[data-testid='debug-overlay-candidates']")?.textContent).toContain("6 / 2");
     expect(rowText(root, "debug-overlay-candidates")).toContain("landing 2");
-    expect(rowText(root, "debug-overlay-scan")).toContain("hidden 2");
+    expect(rowText(root, "debug-overlay-scan")).toContain("隐藏文本 2");
     expect(rowText(root, "debug-overlay-units")).toContain("7 / 1");
-    expect(rowText(root, "debug-overlay-units")).toContain("target-language 1");
+    expect(rowText(root, "debug-overlay-units")).toContain("目标语言 1");
 
     overlay.unmount();
     expect(document.querySelector("[data-imt-debug-overlay='true']")).toBeNull();
@@ -86,6 +86,7 @@ describe("DebugOverlay", () => {
 
     expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent).toContain("exclude");
     expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent).toContain(".action");
+    expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent).toContain("原因: 命中排除规则");
 
     document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
 
