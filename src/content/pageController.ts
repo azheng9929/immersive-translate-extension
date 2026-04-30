@@ -9,7 +9,7 @@ import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
-import type { WebTranslationBodyRule, WebTranslationFallbackProfile } from "../shared/webRuleTypes";
+import type { SelectorFallbackPolicy, WebTranslationBodyRule, WebTranslationFallbackProfile } from "../shared/webRuleTypes";
 import type { CompiledFilterRule } from "./compiledFilterRule";
 import type { SiteContentSelector } from "./sitePolicy";
 import {
@@ -51,6 +51,7 @@ type ControllerOptions = {
   skipBuildContainerSelectors?: readonly string[];
   preferredScanRootSelectors?: readonly string[];
   weakCandidateSelectors?: readonly string[];
+  selectorFallbackPolicy?: SelectorFallbackPolicy;
   fallbackProfile?: WebTranslationFallbackProfile;
   excludeSelectors?: readonly string[];
   contentSelectors?: readonly SiteContentSelector[];
@@ -292,7 +293,12 @@ export class PageController {
       ...(this.options.weakCandidateSelectors !== undefined
         ? { weakCandidateSelectors: this.options.weakCandidateSelectors }
         : {}),
+      ...(this.options.selectorFallbackPolicy !== undefined
+        ? { selectorFallbackPolicy: this.options.selectorFallbackPolicy }
+        : {}),
       ...(this.options.fallbackProfile !== undefined ? { fallbackProfile: this.options.fallbackProfile } : {}),
+      ...(this.options.excludeSelectors !== undefined ? { excludeSelectors: this.options.excludeSelectors } : {}),
+      ...(this.options.filterRule !== undefined ? { filterRule: this.options.filterRule } : {}),
       ...(this.options.buildContainerSelectors !== undefined
         ? { buildContainerSelectors: this.options.buildContainerSelectors }
         : {}),
@@ -630,7 +636,10 @@ type ScanRootOptions = {
   skipBuildContainerSelectors?: readonly string[];
   preferredScanRootSelectors?: readonly string[];
   weakCandidateSelectors?: readonly string[];
+  selectorFallbackPolicy?: SelectorFallbackPolicy;
   fallbackProfile?: WebTranslationFallbackProfile;
+  excludeSelectors?: readonly string[];
+  filterRule?: CompiledFilterRule;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -645,6 +654,10 @@ function collectScanRoots(root: ParentNode, options: ScanRootOptions): ParentNod
   const preferredRoots = scoringRoots.flatMap((containerRoot) =>
     collectPreferredScanRoots(containerRoot, options.preferredScanRootSelectors),
   );
+  if (options.preferredScanRootSelectors?.length && preferredRoots.length === 0) {
+    return collectPreferredSelectorFallbackRoots(scoringRoots, options)
+      .filter((scanRoot) => passesContainerTextThreshold(scanRoot, options));
+  }
   const scanRoots = preferredRoots.length > 0
     ? preferredRoots
     : collectWeakCandidateRoots(scoringRoots, options);
@@ -773,20 +786,40 @@ function hasBodyRuleSelectors(bodyRule: WebTranslationBodyRule | undefined): boo
 
 function collectWeakCandidateRoots(roots: ParentNode[], options: ScanRootOptions): ParentNode[] {
   const selectors = options.weakCandidateSelectors;
-  if (!selectors?.length) return options.preferredScanRootSelectors?.length ? [] : roots;
+  if (!selectors?.length) return options.preferredScanRootSelectors?.length
+    ? collectPreferredSelectorFallbackRoots(roots, options)
+    : roots;
 
   const weakRoots = roots.flatMap((root) =>
     selectHighConfidenceTranslationRoots(root, createRootScoreOptions({ ...options, weakCandidateSelectors: selectors })),
   );
-  return weakRoots.length > 0 ? weakRoots : options.preferredScanRootSelectors?.length ? [] : roots;
+  return weakRoots.length > 0
+    ? weakRoots
+    : options.preferredScanRootSelectors?.length
+      ? collectPreferredSelectorFallbackRoots(roots, options)
+      : roots;
 }
 
 function createRootScoreOptions(options: ScanRootOptions): Parameters<typeof selectHighConfidenceTranslationRoots>[1] {
   const scoreOptions: NonNullable<Parameters<typeof selectHighConfidenceTranslationRoots>[1]> = {};
   if (options.fallbackProfile) scoreOptions.profileHint = options.fallbackProfile;
   if (options.weakCandidateSelectors?.length) scoreOptions.weakCandidateSelectors = options.weakCandidateSelectors;
+  if (options.excludeSelectors?.length) scoreOptions.excludeSelectors = options.excludeSelectors;
+  if (options.filterRule) scoreOptions.filterRule = options.filterRule;
   if (options.diagnostics) scoreOptions.diagnostics = options.diagnostics;
   return scoreOptions;
+}
+
+function collectPreferredSelectorFallbackRoots(roots: ParentNode[], options: ScanRootOptions): ParentNode[] {
+  const policy = options.selectorFallbackPolicy ?? "none";
+  if (policy === "none") return [];
+
+  const { preferredScanRootSelectors: _preferredScanRootSelectors, ...fallbackOptions } = options;
+  const scoredRoots = roots.flatMap((root) =>
+    selectHighConfidenceTranslationRoots(root, createRootScoreOptions(fallbackOptions)),
+  );
+  if (scoredRoots.length > 0) return scoredRoots;
+  return policy === "generic" ? roots : [];
 }
 
 function isGenericBodyFallbackDisabled(root: ParentNode, options: ScanRootOptions): boolean {

@@ -4,6 +4,7 @@ import {
   type PageContentProfile,
 } from "./contentCandidateEngine";
 import type { WebTranslationFallbackProfile } from "../shared/webRuleTypes";
+import { classifyElementForTranslation, matchesClosestSelector, type CompiledFilterRule } from "./compiledFilterRule";
 import {
   recordCandidateAccepted,
   recordCandidateEvaluated,
@@ -24,6 +25,8 @@ export type TranslationRootScore = {
 export type TranslationRootScoreOptions = {
   profileHint?: WebTranslationFallbackProfile | PageContentProfile;
   weakCandidateSelectors?: readonly string[];
+  excludeSelectors?: readonly string[];
+  filterRule?: CompiledFilterRule;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -45,15 +48,26 @@ const MIN_CONFIDENT_SCORE = 35;
 const MAX_CONFIDENT_ROOTS = 24;
 
 export function scoreTranslationRoot(element: HTMLElement): TranslationRootScore {
-  const text = translationRootText(element);
+  return scoreTranslationRootWithOptions(element, {});
+}
+
+function scoreTranslationRootWithOptions(
+  element: HTMLElement,
+  options: TranslationRootScoreOptions,
+): TranslationRootScore {
+  const text = translationRootText(element, options);
   const textLength = text.length;
   const wordCount = countWords(text);
-  const linkDensity = textDensity(element, "a");
-  const buttonDensity = textDensity(element, "button,[role='button'],input,select,textarea");
+  const linkDensity = textDensity(element, "a", options);
+  const buttonDensity = textDensity(element, "button,[role='button'],input,select,textarea", options);
   const repeatedTextDensity = repeatedDensity(text);
   const visibleArea = visibleElementArea(element);
   const semanticBonus = semanticRootBonus(element);
   const areaBonus = visibleArea > 0 ? Math.min(10, Math.log10(visibleArea + 1)) : 4;
+  const rawTextLength = normalizeVisibleText(element.textContent ?? "").length;
+  const excludedTextPenalty = rawTextLength > textLength
+    ? Math.min(25, ((rawTextLength - textLength) / Math.max(rawTextLength, 1)) * 35)
+    : 0;
 
   const score =
     Math.min(30, textLength / 12) +
@@ -62,7 +76,8 @@ export function scoreTranslationRoot(element: HTMLElement): TranslationRootScore
     areaBonus -
     linkDensity * 60 -
     buttonDensity * 55 -
-    repeatedTextDensity * 24;
+    repeatedTextDensity * 24 -
+    excludedTextPenalty;
 
   return {
     element,
@@ -81,13 +96,16 @@ export function selectHighConfidenceTranslationRoots(
   options: TranslationRootScoreOptions = {},
 ): HTMLElement[] {
   const selectorCandidates = collectCandidateRoots(root)
-    .map(scoreTranslationRoot)
+    .filter((element) => isAllowedScoringRoot(element, options))
+    .map((element) => scoreTranslationRootWithOptions(element, options))
     .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH && candidate.score >= MIN_CONFIDENT_SCORE);
   const textDrivenOptions: Parameters<typeof collectTextDrivenCandidates>[1] = {};
   if (options.profileHint) textDrivenOptions.profileHint = options.profileHint;
   if (options.weakCandidateSelectors?.length) {
     textDrivenOptions.weakCandidateSelectors = options.weakCandidateSelectors;
   }
+  if (options.excludeSelectors?.length) textDrivenOptions.excludeSelectors = options.excludeSelectors;
+  if (options.filterRule) textDrivenOptions.filterRule = options.filterRule;
   const rawTextDrivenCandidates = collectTextDrivenCandidates(root, textDrivenOptions);
   for (const candidate of rawTextDrivenCandidates) recordCandidateEvaluated(options.diagnostics, candidate.profile);
   const profileByElement = new Map(rawTextDrivenCandidates.map((candidate) => [candidate.element, candidate.profile]));
@@ -115,6 +133,13 @@ export function selectHighConfidenceTranslationRoots(
   }
 
   return selected.sort(compareDocumentOrder);
+}
+
+function isAllowedScoringRoot(element: HTMLElement, options: TranslationRootScoreOptions): boolean {
+  if (matchesClosestSelector(element, options.excludeSelectors ?? [])) return false;
+  if (!options.filterRule) return true;
+  const classification = classifyElementForTranslation(element, options.filterRule);
+  return classification.kind !== "excluded" && classification.kind !== "stay-original";
 }
 
 function mergeCandidateScores(
@@ -148,14 +173,16 @@ function collectCandidateRoots(root: ParentNode): HTMLElement[] {
   return candidates.filter((element) => !element.closest("nav,header,footer,aside,[data-imt-managed='true']"));
 }
 
-function textDensity(root: HTMLElement, selector: string): number {
-  const rootTextLength = translationRootText(root).length;
+function textDensity(root: HTMLElement, selector: string, options: TranslationRootScoreOptions): number {
+  const rootTextLength = translationRootText(root, options).length;
   if (rootTextLength === 0) return 0;
 
   let matchedTextLength = 0;
   try {
     root.querySelectorAll(selector).forEach((element) => {
-      matchedTextLength += normalizeVisibleText(element.textContent || "").length;
+      if (element instanceof HTMLElement && isAllowedScoringRoot(element, options)) {
+        matchedTextLength += translationRootText(element, options).length;
+      }
     });
   } catch {
     return 0;
@@ -163,12 +190,13 @@ function textDensity(root: HTMLElement, selector: string): number {
   return Math.min(1, matchedTextLength / rootTextLength);
 }
 
-function translationRootText(root: HTMLElement): string {
+function translationRootText(root: HTMLElement, options: TranslationRootScoreOptions): string {
   const parts: string[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent || isIgnoredScoringElement(parent)) return NodeFilter.FILTER_REJECT;
+      if (!isAllowedScoringRoot(parent, options)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });

@@ -5,6 +5,7 @@ import type {
   WebTranslationGlobalAttributes,
   WebTranslationRuleCapability,
   WebTranslationRuleSource,
+  SelectorFallbackPolicy,
 } from "../shared/webRuleTypes";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
@@ -47,6 +48,7 @@ export type SitePolicy = {
   weakCandidateSelectors: readonly string[];
   excludeSelectors: readonly string[];
   contentSelectors: readonly SiteContentSelector[];
+  selectorFallbackPolicy: SelectorFallbackPolicy;
   allowTooltip: boolean;
   debounceMs: number;
   lazyRootMargin: string;

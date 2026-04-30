@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { compileFilterRule } from "@/content/compiledFilterRule";
 import { scoreTranslationRoot, selectHighConfidenceTranslationRoots } from "@/content/rootScoring";
 
 describe("rootScoring", () => {
@@ -82,5 +83,33 @@ describe("rootScoring", () => {
     expect(selectHighConfidenceTranslationRoots(document.body, { profileHint: "video" })).toEqual([
       document.querySelector(".video-grid"),
     ]);
+  });
+
+  it("respects compiled filter and exclude selectors before scoring roots", () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="promo">
+          <h2>Popular links that should not drive the page root</h2>
+          <p>
+            This excluded promotional section has enough text to look like real content,
+            but the active site rule explicitly excludes it from page translation.
+          </p>
+        </section>
+        <article>
+          <h1>Primary article title</h1>
+          <p>
+            The accepted article body should be the only confident root because it is
+            outside the excluded selector and remains eligible after rule filtering.
+          </p>
+        </article>
+      </main>
+    `;
+
+    const filterRule = compileFilterRule({ excludeSelectors: [".promo"] });
+
+    expect(selectHighConfidenceTranslationRoots(document.body, {
+      filterRule,
+      excludeSelectors: [".promo"],
+    })).toEqual([document.querySelector("article")]);
   });
 });

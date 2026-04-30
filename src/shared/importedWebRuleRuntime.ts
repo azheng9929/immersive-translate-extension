@@ -6,6 +6,8 @@ const SUPPORTED_RULE_KEYS = new Set([
   "ruleSource",
   "ruleCapability",
   "fallbackProfile",
+  "globalSelectorRule",
+  "selectorFallbackPolicy",
   "siteKey",
   "matches",
   "excludeMatches",
@@ -173,16 +175,16 @@ function sanitizeImportedRule(rule: WebTranslationRule): WebTranslationRule {
   const output: WebTranslationRule = { ...rule };
 
   if (rule.globalStyles !== undefined) {
-    setOrDelete(output, "globalStyles", sanitizeGlobalStyles(plainRecordValue(rule.globalStyles)));
+    setOrDelete(output, "globalStyles", sanitizeRecordRuleValue(rule.globalStyles, sanitizeGlobalStyles));
   }
   if (rule.injectedCss !== undefined) {
-    setOrDelete(output, "injectedCss", sanitizeInjectedCssList(arrayValue(rule.injectedCss)));
+    setOrDelete(output, "injectedCss", sanitizeArrayRuleValue(rule.injectedCss, sanitizeInjectedCssList));
   }
   if (rule.additionalInjectedCss !== undefined) {
-    setOrDelete(output, "additionalInjectedCss", sanitizeInjectedCssList(arrayValue(rule.additionalInjectedCss)));
+    setOrDelete(output, "additionalInjectedCss", sanitizeArrayRuleValue(rule.additionalInjectedCss, sanitizeInjectedCssList));
   }
   if (rule.globalAttributes !== undefined) {
-    setOrDelete(output, "globalAttributes", sanitizeGlobalAttributes(plainRecordValue(rule.globalAttributes)));
+    setOrDelete(output, "globalAttributes", sanitizeRecordRuleValue(rule.globalAttributes, sanitizeGlobalAttributes));
   }
 
   return output;
@@ -380,7 +382,9 @@ function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
   return Array.isArray(value) ? value as readonly T[] : [value as T];
 }
 
-function arrayValue<T>(value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[] } | undefined): readonly T[] {
+function arrayValue<T>(
+  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] } | undefined,
+): readonly T[] {
   if (value === undefined) return [];
   if (Array.isArray(value)) return value;
   if (!isArrayOperation(value)) return [value as T];
@@ -388,18 +392,64 @@ function arrayValue<T>(value: T | readonly T[] | { replace?: T | readonly T[]; a
 }
 
 function isArrayOperation<T>(
-  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[] } | undefined,
-): value is { replace?: T | readonly T[]; add?: T | readonly T[] } {
+  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] } | undefined,
+): value is { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] } {
   return Boolean(
     value &&
       typeof value === "object" &&
       !Array.isArray(value) &&
-      ("replace" in value || "add" in value),
+      ("replace" in value || "add" in value || "remove" in value),
   );
 }
 
+function sanitizeArrayRuleValue<T>(
+  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] },
+  sanitize: (values: readonly T[]) => readonly T[],
+): T | readonly T[] | { replace?: readonly T[]; add?: readonly T[]; remove?: readonly T[] } | undefined {
+  if (!isArrayOperation(value)) return sanitize(listValue(value));
+
+  const replace = value.replace !== undefined ? sanitize(listValue(value.replace)) : undefined;
+  const add = value.add !== undefined ? sanitize(listValue(value.add)) : undefined;
+  const remove = value.remove !== undefined ? listValue(value.remove) : undefined;
+  if (!replace?.length && !add?.length && !remove?.length) return undefined;
+  return {
+    ...(replace?.length ? { replace } : {}),
+    ...(add?.length ? { add } : {}),
+    ...(remove?.length ? { remove } : {}),
+  };
+}
+
+function sanitizeRecordRuleValue<T>(
+  value: Readonly<Record<string, T>> | {
+    replace?: Readonly<Record<string, T>>;
+    add?: Readonly<Record<string, T>>;
+    remove?: readonly string[];
+  },
+  sanitize: (values: Readonly<Record<string, T>>) => Readonly<Record<string, T>>,
+): Readonly<Record<string, T>> | {
+  replace?: Readonly<Record<string, T>>;
+  add?: Readonly<Record<string, T>>;
+  remove?: readonly string[];
+} | undefined {
+  if (!isRecordOperation(value)) return sanitize(plainRecordValue(value));
+
+  const replace = value.replace !== undefined ? sanitize(plainRecordValue(value.replace)) : undefined;
+  const add = value.add !== undefined ? sanitize(plainRecordValue(value.add)) : undefined;
+  const remove = value.remove;
+  if (!Object.keys(replace ?? {}).length && !Object.keys(add ?? {}).length && !remove?.length) return undefined;
+  return {
+    ...(replace && Object.keys(replace).length ? { replace } : {}),
+    ...(add && Object.keys(add).length ? { add } : {}),
+    ...(remove?.length ? { remove } : {}),
+  };
+}
+
 function plainRecordValue<T>(
-  value: Readonly<Record<string, T>> | { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> } | undefined,
+  value: Readonly<Record<string, T>> | {
+    replace?: Readonly<Record<string, T>>;
+    add?: Readonly<Record<string, T>>;
+    remove?: readonly string[];
+  } | undefined,
 ): Readonly<Record<string, T>> {
   if (!value || Array.isArray(value) || typeof value !== "object") return {};
   if (isRecordOperation(value)) return { ...(value.replace ?? {}), ...(value.add ?? {}) };
@@ -407,9 +457,17 @@ function plainRecordValue<T>(
 }
 
 function isRecordOperation<T>(
-  value: Readonly<Record<string, T>> | { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> },
-): value is { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> } {
-  return "replace" in value || "add" in value;
+  value: Readonly<Record<string, T>> | {
+    replace?: Readonly<Record<string, T>>;
+    add?: Readonly<Record<string, T>>;
+    remove?: readonly string[];
+  },
+): value is {
+  replace?: Readonly<Record<string, T>>;
+  add?: Readonly<Record<string, T>>;
+  remove?: readonly string[];
+} {
+  return "replace" in value || "add" in value || "remove" in value;
 }
 
 function importedRuleSource(rule: WebTranslationRule): WebTranslationRuleSource {

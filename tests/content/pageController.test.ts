@@ -117,6 +117,35 @@ describe("PageController", () => {
     expect(document.body.textContent).not.toContain("[zh-Hans] Generic page chrome should stay original.");
   });
 
+  it("falls back conservatively when configured selectors no longer exist", async () => {
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <h1>Changed article title</h1>
+          <p>
+            The upstream selector moved, but the readable article body should still be found
+            by the conservative fallback instead of leaving the entire page untranslated.
+          </p>
+        </article>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: [".old-article-selector"],
+      selectorFallbackPolicy: "conservative",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts.join("\n")).toContain("Changed article title");
+    expect(document.querySelector(".imt-translation-block")?.textContent).toContain("[zh-Hans]");
+  });
+
   it("collects near-viewport preferred roots inside open shadow roots", () => {
     document.body.innerHTML = `<main><article-card></article-card></main>`;
     const host = document.querySelector<HTMLElement>("article-card")!;

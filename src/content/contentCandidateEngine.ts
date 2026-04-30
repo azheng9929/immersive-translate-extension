@@ -17,6 +17,7 @@ export type PageContentProfile =
 
 export type CandidateStats = {
   textLength: number;
+  rawTextLength: number;
   wordCount: number;
   textNodeCount: number;
   headingCount: number;
@@ -172,7 +173,7 @@ function addTextNodeToAncestorCandidates(
   while (current && current !== document.body && current !== document.documentElement && depth < maxAncestorDepth) {
     if (isDisqualifyingAncestor(current, options)) break;
     if (isStableContainerCandidate(current, options)) {
-      addContribution(statsFor(statsByElement, current), current, text);
+      addContribution(statsFor(statsByElement, current), current, text, textNode.parentElement);
     }
     current = current.parentElement;
     depth += 1;
@@ -215,6 +216,7 @@ function statsFor(statsByElement: Map<HTMLElement, MutableStats>, element: HTMLE
   if (!stats) {
     stats = {
       textLength: 0,
+      rawTextLength: 0,
       wordCount: 0,
       textNodeCount: 0,
       headingCount: 0,
@@ -241,12 +243,19 @@ function statsFor(statsByElement: Map<HTMLElement, MutableStats>, element: HTMLE
   return stats;
 }
 
-function addContribution(stats: MutableStats, element: HTMLElement, text: string): void {
+function addContribution(
+  stats: MutableStats,
+  element: HTMLElement,
+  text: string,
+  textParent: HTMLElement | null,
+): void {
   stats.textLength += text.length;
   stats.wordCount += countWords(text);
   stats.textNodeCount += 1;
   stats.texts.push(text);
   stats.uniqueTexts.add(text.toLowerCase());
+  if (textParent?.closest("a")) stats.linkTextLength += text.length;
+  if (textParent?.closest("button,[role='button']")) stats.buttonTextLength += text.length;
   if (element.matches("h1,h2,h3,h4,h5,h6")) stats.headingCount += 1;
   if (element.matches("p,blockquote,figcaption")) stats.paragraphCount += 1;
   if (element.matches("li,[role='listitem']")) stats.listItemCount += 1;
@@ -260,14 +269,16 @@ function finalizeStats(
   stats: MutableStats,
   options: TextDrivenCandidateOptions,
 ): CandidateStats {
-  const textLength = normalizeVisibleText(element.textContent ?? "").length || stats.textLength;
-  const linkTextLength = textLengthForSelector(element, "a");
-  const buttonTextLength = textLengthForSelector(element, "button,[role='button']");
+  const rawTextLength = normalizeVisibleText(element.textContent ?? "").length;
+  const textLength = stats.textLength;
+  const linkTextLength = stats.linkTextLength;
+  const buttonTextLength = stats.buttonTextLength;
   const childSignatureCount = maxRepeatedChildSignatureCount(element);
   const weakCandidateHitCount = countSelectorMatches(element, options.weakCandidateSelectors);
 
   return {
     textLength,
+    rawTextLength,
     wordCount: stats.wordCount,
     textNodeCount: stats.textNodeCount,
     headingCount: stats.headingCount + element.querySelectorAll("h1,h2,h3,h4,h5,h6").length,
@@ -293,6 +304,7 @@ function collectElementStats(element: HTMLElement): CandidateStats {
   const text = normalizeVisibleText(element.textContent ?? "");
   return {
     textLength: text.length,
+    rawTextLength: text.length,
     wordCount: countWords(text),
     textNodeCount: text ? 1 : 0,
     headingCount: element.matches("h1,h2,h3,h4,h5,h6") ? 1 : element.querySelectorAll("h1,h2,h3,h4,h5,h6").length,

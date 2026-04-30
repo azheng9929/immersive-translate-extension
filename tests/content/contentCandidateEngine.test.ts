@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyCandidateProfile,
+  collectTextDrivenCandidates,
   selectTextDrivenTranslationRoots,
 } from "@/content/contentCandidateEngine";
 
@@ -59,5 +60,33 @@ describe("contentCandidateEngine", () => {
     });
 
     expect(roots).toEqual([document.querySelector(".app-shell")]);
+  });
+
+  it("scores candidates from accepted text instead of raw excluded descendants", () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="shell">
+          <span class="real-copy">
+            <p>
+              This is the real readable sentence that should contribute to root scoring
+              because it survives the active exclusion rules.
+            </p>
+          </span>
+          <aside class="excluded">
+            ${Array.from({ length: 20 }, (_, index) => `<p>Excluded sidebar copy ${index} that must not inflate candidate text.</p>`).join("")}
+          </aside>
+        </section>
+      </main>
+    `;
+
+    const main = document.querySelector<HTMLElement>("main")!;
+    const candidates = collectTextDrivenCandidates(document.body, {
+      excludeSelectors: [".excluded"],
+      weakCandidateSelectors: [".shell"],
+    });
+    const candidate = candidates.find((entry) => entry.element === main) ?? candidates[0];
+
+    expect(candidate?.stats.textLength).toBeLessThan(180);
+    expect(candidate?.stats.rawTextLength).toBeGreaterThan(900);
   });
 });

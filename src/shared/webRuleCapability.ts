@@ -10,10 +10,12 @@ export type WebTranslationRuleCapabilitySummary = {
   capability: WebTranslationRuleCapability;
   fallbackProfile: WebTranslationFallbackProfile;
   hasContentAnchors: boolean;
+  hasScopeAnchors: boolean;
   hasLayoutHints: boolean;
   hasStructureHints: boolean;
   hasDynamicHints: boolean;
   contentAnchorCount: number;
+  scopeAnchorCount: number;
   reasons: readonly string[];
 };
 
@@ -62,7 +64,9 @@ const ARTICLE_HINTS = [
 
 export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): WebTranslationRuleCapabilitySummary {
   const contentAnchorCount = countContentAnchors(rule);
+  const scopeAnchorCount = countScopeAnchors(rule);
   const hasContentAnchors = contentAnchorCount > 0;
+  const hasScopeAnchors = scopeAnchorCount > 0;
   const hasLayoutHints = hasAnyRecordValue(rule.globalStyles) || hasAnyArrayValue(rule.injectedCss);
   const hasStructureHints = [
     rule.extraBlockSelectors,
@@ -83,23 +87,32 @@ export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): W
   );
   const derivedCapability = deriveCapability({
     hasContentAnchors,
+    hasScopeAnchors,
     hasLayoutHints,
     hasStructureHints,
     hasDynamicHints,
   });
-  const capability = hasContentAnchors ? "content-ready" : rule.ruleCapability ?? derivedCapability;
+  const explicitCapability = rule.ruleCapability;
+  const capability = hasContentAnchors
+    ? "content-ready"
+    : explicitCapability && explicitCapability !== "content-ready"
+      ? explicitCapability
+      : derivedCapability;
   const fallbackProfile = rule.fallbackProfile ?? inferFallbackProfile(rule);
 
   return {
     capability,
     fallbackProfile,
     hasContentAnchors,
+    hasScopeAnchors,
     hasLayoutHints,
     hasStructureHints,
     hasDynamicHints,
     contentAnchorCount,
+    scopeAnchorCount,
     reasons: capabilityReasons({
       contentAnchorCount,
+      scopeAnchorCount,
       hasLayoutHints,
       hasStructureHints,
       hasDynamicHints,
@@ -109,11 +122,13 @@ export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): W
 
 function deriveCapability(input: {
   hasContentAnchors: boolean;
+  hasScopeAnchors: boolean;
   hasLayoutHints: boolean;
   hasStructureHints: boolean;
   hasDynamicHints: boolean;
 }): WebTranslationRuleCapability {
   if (input.hasContentAnchors) return "content-ready";
+  if (input.hasScopeAnchors) return "scope-ready";
   if (input.hasLayoutHints) return "modifier-only";
   if (input.hasStructureHints || input.hasDynamicHints) return "structure-only";
   return "match-only";
@@ -124,10 +139,15 @@ function countContentAnchors(rule: WebTranslationRule): number {
     ...arrayValue(rule.selectors),
     ...arrayValue(rule.additionalSelectors),
     ...arrayValue<RuleContentSelector>(rule.contentSelectors).map((entry) => entry.selector),
+    aiMessageAnchorSelector(rule),
+  ].filter(Boolean).length;
+}
+
+function countScopeAnchors(rule: WebTranslationRule): number {
+  return [
     rule.mainFrameSelector,
     rule.bodyRule?.bodySelector,
     rule.bodyRule?.articleSelector,
-    aiMessageAnchorSelector(rule),
   ].filter(Boolean).length;
 }
 
@@ -202,12 +222,14 @@ function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
 
 function capabilityReasons(input: {
   contentAnchorCount: number;
+  scopeAnchorCount: number;
   hasLayoutHints: boolean;
   hasStructureHints: boolean;
   hasDynamicHints: boolean;
 }): readonly string[] {
   const reasons: string[] = [];
   if (input.contentAnchorCount > 0) reasons.push(`${input.contentAnchorCount} content anchors`);
+  if (input.scopeAnchorCount > 0) reasons.push(`${input.scopeAnchorCount} scope anchors`);
   if (input.hasLayoutHints) reasons.push("layout hints");
   if (input.hasStructureHints) reasons.push("structure hints");
   if (input.hasDynamicHints) reasons.push("dynamic hints");

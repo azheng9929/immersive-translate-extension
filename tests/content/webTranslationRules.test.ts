@@ -792,18 +792,17 @@ describe("webTranslationRules", () => {
     expect(policy.urlChangeDelay).toBe(100);
   });
 
-  it("selects only DOM-detection rules plus the current URL rule for content-side matching", () => {
+  it("selects URL-compatible rules for content-side matching without global selector bleed", () => {
     const rules: WebTranslationRule[] = [
       { id: "news", matches: ["news.example.com"], selectors: ["article p"] },
-      { id: "reader-shape", selectorMatches: ["main[data-reader]"], selectors: ["main p"] },
+      { id: "reader-shape", matches: ["news.example.com"], selectorMatches: ["main[data-reader]"], selectors: ["main p"] },
       { id: "shop", matches: ["shop.example.com"], selectors: [".product-title"] },
       { id: "paywall-shape", selectorMatches: [".paywall"], excludeSelectorMatches: [".logged-in"] },
     ];
 
     expect(selectWebTranslationRulesForContent("https://news.example.com/story", rules).map((rule) => rule.id)).toEqual([
-      "reader-shape",
-      "paywall-shape",
       "news",
+      "reader-shape",
     ]);
   });
 

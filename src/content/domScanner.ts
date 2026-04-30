@@ -9,6 +9,7 @@ import {
 } from "./compiledFilterRule";
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import {
+  recordDetectionTrace,
   recordScanAccepted,
   recordScanSeen,
   recordScanSkipped,
@@ -57,16 +58,17 @@ export function scanDocumentText(root: ParentNode, options: TextScanOptions = {}
         if (!text) return NodeFilter.FILTER_REJECT;
         recordScanSeen(options.diagnostics, "text");
         const parent = node.parentElement;
-        if (!parent) return rejectText(options.diagnostics, "no-parent");
-        if (isSkippableElement(parent, options)) return rejectText(options.diagnostics, "global-selector");
-        if (isFilteredByCompiledRule(parent, options.filterRule)) return rejectText(options.diagnostics, "compiled-filter");
-        if (!isVisibleElement(parent)) return rejectText(options.diagnostics, "hidden");
+        if (!parent) return rejectText(options.diagnostics, "no-parent", undefined, text);
+        if (isSkippableElement(parent, options)) return rejectText(options.diagnostics, "global-selector", parent, text);
+        if (isFilteredByCompiledRule(parent, options.filterRule)) return rejectText(options.diagnostics, "compiled-filter", parent, text);
+        if (!isVisibleElement(parent)) return rejectText(options.diagnostics, "hidden", parent, text);
         const decision = resolveTextGranularity(parent, text, options);
-        if (decision.skip) return rejectText(options.diagnostics, decision.reason);
+        if (decision.skip) return rejectText(options.diagnostics, decision.reason, parent, text);
         if (!isMeaningfulText(text, decision.category ?? getScannerCategory(parent))) {
-          return rejectText(options.diagnostics, "not-meaningful");
+          return rejectText(options.diagnostics, "not-meaningful", parent, text);
         }
         recordScanAccepted(options.diagnostics, "text");
+        recordScanTrace(options.diagnostics, "accepted", "accepted", parent, text);
         return NodeFilter.FILTER_ACCEPT;
       },
     });
@@ -112,26 +114,33 @@ export function scanTranslatableAttributes(
         recordScanSeen(options.diagnostics, "attributes");
         if (isSkippableElement(element, options)) {
           recordScanSkipped(options.diagnostics, "attributes", "global-selector");
+          recordScanTrace(options.diagnostics, "rejected", "global-selector", element, text);
           continue;
         }
         if (isFilteredByCompiledRule(element, options.filterRule)) {
           recordScanSkipped(options.diagnostics, "attributes", "compiled-filter");
+          recordScanTrace(options.diagnostics, "rejected", "compiled-filter", element, text);
           continue;
         }
         if (!isVisibleElement(element)) {
           recordScanSkipped(options.diagnostics, "attributes", "hidden");
+          recordScanTrace(options.diagnostics, "rejected", "hidden", element, text);
           continue;
         }
         const decision = resolveTextGranularity(element, text, options);
         if (decision.skip) {
-          recordScanSkipped(options.diagnostics, "attributes", decision.reason);
+          const reason = decision.reason ?? "granularity";
+          recordScanSkipped(options.diagnostics, "attributes", reason);
+          recordScanTrace(options.diagnostics, "rejected", reason, element, text);
           continue;
         }
         if (!isMeaningfulText(text, "attribute")) {
           recordScanSkipped(options.diagnostics, "attributes", "not-meaningful");
+          recordScanTrace(options.diagnostics, "rejected", "not-meaningful", element, text);
           continue;
         }
         recordScanAccepted(options.diagnostics, "attributes");
+        recordScanTrace(options.diagnostics, "accepted", "accepted", element, text);
         attrs.push({ element, name, originalValue: text });
       }
     }
@@ -167,9 +176,41 @@ function elementsInRoot(root: ParentNode): HTMLElement[] {
   return root instanceof HTMLElement ? [root, ...descendants] : descendants;
 }
 
-function rejectText(diagnostics: TranslationDiagnostics | undefined, reason = "unknown"): number {
+function rejectText(
+  diagnostics: TranslationDiagnostics | undefined,
+  reason = "unknown",
+  element?: HTMLElement,
+  text?: string,
+): number {
   recordScanSkipped(diagnostics, "text", reason);
+  recordScanTrace(diagnostics, "rejected", reason, element, text);
   return NodeFilter.FILTER_REJECT;
+}
+
+function recordScanTrace(
+  diagnostics: TranslationDiagnostics | undefined,
+  decision: "accepted" | "rejected",
+  reason: string,
+  element: HTMLElement | undefined,
+  text: string | undefined,
+): void {
+  recordDetectionTrace(diagnostics, {
+    stage: "scan",
+    decision,
+    reasons: [reason],
+    ...(element ? { elementPath: elementPath(element) } : {}),
+    ...(text ? { textPreview: text.slice(0, 120) } : {}),
+  });
+}
+
+function elementPath(element: HTMLElement): string {
+  const parts: string[] = [];
+  for (let current: HTMLElement | null = element; current && parts.length < 5; current = current.parentElement) {
+    const id = current.id ? `#${current.id}` : "";
+    const classes = Array.from(current.classList).slice(0, 2).map((className) => `.${className}`).join("");
+    parts.unshift(`${current.tagName.toLowerCase()}${id}${classes}`);
+  }
+  return parts.join(" > ");
 }
 
 function isFilteredByCompiledRule(element: HTMLElement, filterRule: CompiledFilterRule | undefined): boolean {

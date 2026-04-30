@@ -213,6 +213,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     skipBuildContainerSelectors: sitePolicy.skipBuildContainerSelectors,
     preferredScanRootSelectors: sitePolicy.preferredScanRootSelectors,
     weakCandidateSelectors: sitePolicy.weakCandidateSelectors,
+    selectorFallbackPolicy: sitePolicy.selectorFallbackPolicy,
     fallbackProfile: sitePolicy.fallbackProfile,
     excludeSelectors: sitePolicy.excludeSelectors,
     contentSelectors: sitePolicy.contentSelectors,

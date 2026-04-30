@@ -225,6 +225,27 @@ describe("scanDocumentText", () => {
         "target-language": 1,
       },
     });
+    expect(diagnostics.traces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stage: "scan",
+          decision: "accepted",
+          reasons: ["accepted"],
+          textPreview: "Translate this paragraph.",
+        }),
+        expect.objectContaining({
+          stage: "scan",
+          decision: "rejected",
+          reasons: ["hidden"],
+          textPreview: "Hidden paragraph.",
+        }),
+        expect.objectContaining({
+          stage: "scan",
+          decision: "rejected",
+          reasons: ["target-language"],
+        }),
+      ]),
+    );
   });
 });
 

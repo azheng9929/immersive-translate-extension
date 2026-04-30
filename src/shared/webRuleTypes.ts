@@ -20,8 +20,15 @@ export type RuleContentSelector = {
 };
 
 export type WebTranslationRuleSource = "core" | "core+imported" | "imported-stable" | "imported-experimental";
-export type WebTranslationRuleCapability = "content-ready" | "modifier-only" | "structure-only" | "match-only" | "unsafe";
+export type WebTranslationRuleCapability =
+  | "content-ready"
+  | "scope-ready"
+  | "modifier-only"
+  | "structure-only"
+  | "match-only"
+  | "unsafe";
 export type WebTranslationFallbackProfile = "none" | "article" | "video" | "social" | "forum" | "commerce" | "generic";
+export type SelectorFallbackPolicy = "none" | "conservative" | "generic";
 export type WebTranslationGlobalAttributes = Readonly<Record<string, Readonly<Record<string, string | null>>>>;
 
 export type WebTranslationBodyRule = {
@@ -38,6 +45,8 @@ export type WebTranslationRule = {
   ruleSource?: WebTranslationRuleSource;
   ruleCapability?: WebTranslationRuleCapability;
   fallbackProfile?: WebTranslationFallbackProfile;
+  globalSelectorRule?: boolean;
+  selectorFallbackPolicy?: SelectorFallbackPolicy;
   siteKey?: string;
   matches?: RuleListValue<string>;
   excludeMatches?: RuleListValue<string>;

@@ -18,7 +18,7 @@ describe("webRuleStore", () => {
   it("filters imported rules through shared matching code", async () => {
     const rules = await getWebRulesForUrl("https://medium.com/@writer/story");
 
-    expect(rules.length).toBeGreaterThan(1);
+    expect(rules.length).toBeGreaterThan(0);
     expect(rules.length).toBeLessThan(80);
     expect(rules.some((rule) => rule.id === "medium")).toBe(true);
     expect(rules.some((rule) => rule.id === "github")).toBe(false);

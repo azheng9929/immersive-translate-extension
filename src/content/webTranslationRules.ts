@@ -8,6 +8,7 @@ import type {
   RuleArrayValue,
   RuleContentSelector,
   RuleRecordValue,
+  SelectorFallbackPolicy,
   WebTranslationBodyRule,
   WebTranslationFallbackProfile,
   WebTranslationGlobalAttributes,
@@ -116,6 +117,7 @@ const DEFAULT_SITE_POLICY = {
   weakCandidateSelectors: [],
   excludeSelectors: [],
   contentSelectors: [],
+  selectorFallbackPolicy: "generic" as SelectorFallbackPolicy,
   allowTooltip: true,
   debounceMs: 1500,
   lazyRootMargin: "200px",
@@ -2000,6 +2002,7 @@ export function compileRulePolicy(
     weakCandidateSelectors: weakCandidateSelectorsFromRule(rule),
     excludeSelectors: rule.excludeSelectors,
     contentSelectors: unique([...rule.contentSelectors, ...fallbackContentSelectors], contentSelectorKey),
+    selectorFallbackPolicy: rule.selectorFallbackPolicy ?? defaultSelectorFallbackPolicy(capability),
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
     excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
     injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
@@ -2161,6 +2164,15 @@ function shouldApplyFallbackExtractor(
   if (capability.capability === "content-ready" || capability.fallbackProfile === "none") return false;
   if (capability.capability === "match-only" && capability.fallbackProfile === "generic") return false;
   return true;
+}
+
+function defaultSelectorFallbackPolicy(
+  capability: { capability: WebTranslationRuleCapability; fallbackProfile: WebTranslationFallbackProfile },
+): SelectorFallbackPolicy {
+  if (capability.capability === "content-ready") return "conservative";
+  if (capability.capability === "scope-ready") return "generic";
+  if (capability.capability === "modifier-only" || capability.capability === "structure-only") return "generic";
+  return capability.fallbackProfile === "generic" ? "generic" : "conservative";
 }
 
 export function resolveWebTranslationPolicy(

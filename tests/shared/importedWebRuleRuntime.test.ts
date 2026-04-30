@@ -83,6 +83,48 @@ describe("importedWebRuleRuntime", () => {
     ]);
   });
 
+  it("preserves imported delta operations while sanitizing CSS payloads", () => {
+    const rules: WebTranslationRule[] = [
+      {
+        id: "deltaStyles",
+        siteKey: "example.com",
+        matches: ["example.com"],
+        injectedCss: {
+          replace: [".headline { -webkit-line-clamp: unset; }"],
+          add: [".summary { max-height: unset; }", "body { display: none; }"],
+          remove: [".legacy { overflow: hidden; }"],
+        },
+        globalStyles: {
+          replace: {
+            ".headline": "-webkit-line-clamp: unset;",
+            body: "overflow:hidden",
+          },
+          add: {
+            ".summary": "max-height: unset;",
+          },
+          remove: [".old-title"],
+        },
+      },
+    ];
+
+    const prepared = prepareImportedWebTranslationRules(rules);
+
+    expect(prepared[0]?.injectedCss).toEqual({
+      replace: [".headline { -webkit-line-clamp: unset; }"],
+      add: [".summary { max-height: unset; }"],
+      remove: [".legacy { overflow: hidden; }"],
+    });
+    expect(prepared[0]?.globalStyles).toEqual({
+      replace: {
+        ".headline": "-webkit-line-clamp: unset;",
+      },
+      add: {
+        ".summary": "max-height: unset;",
+      },
+      remove: [".old-title"],
+    });
+  });
+
   it("preserves imported global attribute repairs while dropping event handlers", () => {
     const rules: WebTranslationRule[] = [
       {

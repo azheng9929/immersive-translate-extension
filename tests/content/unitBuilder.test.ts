@@ -34,6 +34,27 @@ describe("buildTranslationUnits", () => {
     expect(units.map((unit) => unit.category)).toEqual(["button", "content-block"]);
   });
 
+  it("does not prefer nested UI controls over readable content blocks", () => {
+    mountFixture(`
+      <p>
+        Review the <button>Detailed report</button> before changing the rollout plan.
+      </p>
+    `);
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    });
+
+    expect(units).toHaveLength(1);
+    expect(units[0]).toMatchObject({
+      category: "content-block",
+      originalText: "Review the Detailed report before changing the rollout plan.",
+    });
+  });
+
   it("classifies menu links as menu units", () => {
     mountFixture(`<menu><a href="/open">Open</a></menu>`);
     const units = buildTranslationUnits({

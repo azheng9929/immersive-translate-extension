@@ -344,7 +344,7 @@ function rootsOverlap(a: HTMLElement, b: HTMLElement): boolean {
 }
 
 function shouldPreferUnit(unit: TranslationUnit): boolean {
-  return unit.category === "button" || unit.category === "nav" || unit.category === "label";
+  return priorityForCategory(unit.category) >= 80;
 }
 
 function sortUnitsByDocumentOrder(units: TranslationUnit[]): TranslationUnit[] {

@@ -20,6 +20,16 @@ export type CandidateDiagnostics = {
   acceptedByProfile: DiagnosticReasonCounts;
 };
 
+export type DetectionTrace = {
+  stage: "rule-match" | "root-scoring" | "scan" | "granularity" | "unit-build" | "translation" | "render";
+  decision: "accepted" | "rejected" | "pending" | "translated";
+  reasons: readonly string[];
+  elementPath?: string;
+  textPreview?: string;
+  scores?: Readonly<Record<string, number | string>>;
+  matchedRuleIds?: readonly string[];
+};
+
 export type TranslationDiagnostics = {
   scan: {
     text: ScanDiagnosticBucket;
@@ -36,6 +46,7 @@ export type TranslationDiagnostics = {
     failed: number;
     skipped: number;
   };
+  traces?: DetectionTrace[];
 };
 
 type ScanBucketName = "text" | "attributes";
@@ -66,6 +77,7 @@ export function createTranslationDiagnostics(): TranslationDiagnostics {
       failed: 0,
       skipped: 0,
     },
+    traces: [],
   };
 }
 
@@ -95,6 +107,7 @@ export function cloneTranslationDiagnostics(diagnostics: TranslationDiagnostics)
       failed: diagnostics.provider.failed,
       skipped: diagnostics.provider.skipped,
     },
+    traces: (diagnostics.traces ?? []).map((trace) => ({ ...trace })),
   };
 }
 
@@ -167,6 +180,16 @@ export function recordProviderUsage(
   diagnostics.provider.requested += requested;
   diagnostics.provider.failed += failed;
   diagnostics.provider.skipped += skipped;
+}
+
+export function recordDetectionTrace(
+  diagnostics: TranslationDiagnostics | undefined,
+  trace: DetectionTrace,
+): void {
+  if (!diagnostics) return;
+  diagnostics.traces ??= [];
+  if (diagnostics.traces.length >= 200) return;
+  diagnostics.traces.push(trace);
 }
 
 function createScanBucket(): ScanDiagnosticBucket {

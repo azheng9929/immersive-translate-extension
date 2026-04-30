@@ -1,21 +1,41 @@
 import type { WebTranslationRule } from "./webRuleTypes";
+import { analyzeWebTranslationRuleCapability } from "./webRuleCapability";
+
+export type WebTranslationRuleMatch = {
+  rule: WebTranslationRule;
+  score: number;
+  reasons: readonly string[];
+};
 
 export function matchWebTranslationRule(
   url: string,
   doc: Document | undefined,
   rules: readonly WebTranslationRule[],
 ): WebTranslationRule | undefined {
-  return rules.find((rule) => hasSelectorConditions(rule) && matchesRule(url, doc, rule)) ??
-    rules.find((rule) => !hasSelectorConditions(rule) && matchesRule(url, doc, rule));
+  return matchWebTranslationRulesRanked(url, doc, rules)[0]?.rule;
+}
+
+export function matchWebTranslationRulesRanked(
+  url: string,
+  doc: Document | undefined,
+  rules: readonly WebTranslationRule[],
+): WebTranslationRuleMatch[] {
+  return rules
+    .map((rule, index) => ({ rule, index, match: matchRuleWithReasons(url, doc, rule) }))
+    .filter((entry) => entry.match.matched)
+    .map((entry) => ({
+      rule: entry.rule,
+      score: scoreRuleMatch(url, entry.rule, entry.match.reasons) - entry.index / 1000,
+      reasons: entry.match.reasons,
+    }))
+    .sort((left, right) => right.score - left.score);
 }
 
 export function selectWebTranslationRulesForContent(
   url: string,
   rules: readonly WebTranslationRule[],
 ): WebTranslationRule[] {
-  const selectorRules = rules.filter(hasSelectorConditions);
-  const matchedUrlRule = rules.find((rule) => !hasSelectorConditions(rule) && matchesUrlOnly(url, rule));
-  return matchedUrlRule ? [...selectorRules, matchedUrlRule] : selectorRules;
+  return rules.filter((rule) => mayWebTranslationRuleMatchUrl(url, rule));
 }
 
 export function selectPotentialWebTranslationRulesForUrl(
@@ -38,21 +58,39 @@ export function mayWebTranslationRuleMatchUrl(url: string, rule: WebTranslationR
   const excludeMatches = listValue(rule.excludeMatches);
   if (matches.length && !matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
   if (excludeMatches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  return Boolean(matches.length || hasSelectorConditions(rule));
+  return Boolean(matches.length || isGlobalSelectorRule(rule));
 }
 
 function matchesRule(url: string, doc: Document | undefined, rule: WebTranslationRule): boolean {
+  return matchRuleWithReasons(url, doc, rule).matched;
+}
+
+function matchRuleWithReasons(
+  url: string,
+  doc: Document | undefined,
+  rule: WebTranslationRule,
+): { matched: boolean; reasons: string[] } {
+  const reasons: string[] = [];
   const matches = listValue(rule.matches);
   const excludeMatches = listValue(rule.excludeMatches);
   const selectorMatches = listValue(rule.selectorMatches);
   const excludeSelectorMatches = listValue(rule.excludeSelectorMatches);
-  if (matches.length && !matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (excludeMatches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (selectorMatches.length && (!doc || !selectorMatches.some((selector) => hasSelector(doc, selector)))) {
-    return false;
+  if (!matches.length && hasSelectorConditions(rule) && !isGlobalSelectorRule(rule)) {
+    return { matched: false, reasons: ["selector-only-without-global-scope"] };
   }
-  if (doc && excludeSelectorMatches.some((selector) => hasSelector(doc, selector))) return false;
-  return true;
+  if (matches.length) {
+    if (!matches.some((pattern) => matchesUrlPattern(url, pattern))) return { matched: false, reasons: ["url-miss"] };
+    reasons.push("url");
+  }
+  if (excludeMatches.some((pattern) => matchesUrlPattern(url, pattern))) return { matched: false, reasons: ["url-excluded"] };
+  if (selectorMatches.length && (!doc || !selectorMatches.some((selector) => hasSelector(doc, selector)))) {
+    return { matched: false, reasons: ["selector-miss"] };
+  }
+  if (selectorMatches.length) reasons.push("selector");
+  if (doc && excludeSelectorMatches.some((selector) => hasSelector(doc, selector))) {
+    return { matched: false, reasons: ["selector-excluded"] };
+  }
+  return { matched: true, reasons };
 }
 
 function matchesUrlOnly(url: string, rule: WebTranslationRule): boolean {
@@ -64,6 +102,69 @@ function matchesUrlOnly(url: string, rule: WebTranslationRule): boolean {
 
 function hasSelectorConditions(rule: WebTranslationRule): boolean {
   return Boolean(listValue(rule.selectorMatches).length || listValue(rule.excludeSelectorMatches).length);
+}
+
+function isGlobalSelectorRule(rule: WebTranslationRule): boolean {
+  return Boolean(rule.globalSelectorRule || (rule as WebTranslationRule & { globalShapeRule?: boolean }).globalShapeRule);
+}
+
+function scoreRuleMatch(url: string, rule: WebTranslationRule, reasons: readonly string[]): number {
+  const sourceScore = sourcePriority(rule);
+  const urlScore = urlSpecificityScore(url, rule);
+  const selectorScore = reasons.includes("selector") || hasSelectorConditions(rule) ? 18 : 0;
+  const capabilityScore = capabilityPriority(rule);
+  const globalSelectorPenalty = !listValue(rule.matches).length && isGlobalSelectorRule(rule) ? -28 : 0;
+  return sourceScore + urlScore + selectorScore + capabilityScore + globalSelectorPenalty;
+}
+
+function sourcePriority(rule: WebTranslationRule): number {
+  switch (rule.ruleSource) {
+    case "core":
+    case "core+imported":
+      return 400;
+    case "imported-stable":
+      return 240;
+    case "imported-experimental":
+      return 80;
+    default:
+      return 320;
+  }
+}
+
+function capabilityPriority(rule: WebTranslationRule): number {
+  const capability = analyzeWebTranslationRuleCapability(rule).capability;
+  switch (capability) {
+    case "content-ready":
+      return 70;
+    case "scope-ready":
+      return 50;
+    case "structure-only":
+      return 35;
+    case "modifier-only":
+      return 25;
+    case "match-only":
+      return 5;
+    case "unsafe":
+      return -100;
+  }
+}
+
+function urlSpecificityScore(url: string, rule: WebTranslationRule): number {
+  const matches = listValue(rule.matches);
+  if (!matches.length) return 0;
+  const matchingPatterns = matches.filter((pattern) => matchesUrlPattern(url, pattern));
+  if (!matchingPatterns.length) return 0;
+  return Math.max(...matchingPatterns.map(patternSpecificityScore));
+}
+
+function patternSpecificityScore(pattern: string): number {
+  const normalized = pattern.trim().toLowerCase();
+  let score = 20;
+  if (normalized.includes("://")) score += 12;
+  if (normalized.includes("/")) score += 12;
+  if (!normalized.includes("*")) score += 10;
+  score += Math.min(24, normalized.replace(/\*/g, "").length / 3);
+  return score;
 }
 
 function matchesUrlPattern(url: string, pattern: string): boolean {
