@@ -4,7 +4,9 @@
 
 - `npm.cmd run typecheck`: PASS
 - `npm.cmd run build`: PASS
-- Core test suite: PASS, 45 test files and 282 tests
+- `npm.cmd test`: PASS, 46 test files and 290 tests
+- `npm.cmd run audit:web-rules`: PASS, 830 imported rules audited
+- `npm.cmd run test:real-sites:smoke`: PASS, MetaTFT Augments smoke regression
 
 ## Covered Flows
 
@@ -16,10 +18,12 @@
 - Translation cache reuses successful translations and does not cache failed results.
 - Background provider protocol supports fake, Microsoft, and OpenAI-compatible providers with stable id mapping.
 - Imported Immersive Translate web rules are URL-lazy loaded, runtime capability filtered, and merged as same-site deltas on top of stable core rules.
+- Imported rules are classified as `content-ready`, `modifier-only`, `structure-only`, or `match-only`.
+- Non-content-ready imported rules use conservative page-type fallback extractors instead of pretending to be complete site adaptations.
 
 ## Browser Manual Check
 
-- Loading `.output/chrome-mv3` into Chrome or Edge was not run in this Codex sandbox because it requires an interactive browser extension page.
+- Automated real-site smoke regression loaded the built extension and passed on MetaTFT Augments.
 - Build output exists and is ready for manual loading from `.output/chrome-mv3`.
 
 ## Manual Test Steps For Browser

@@ -1,6 +1,7 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import { compileFilterRule, type CompiledFilterRule } from "./compiledFilterRule";
 import type { DynamicMode } from "../shared/config";
+import { analyzeWebTranslationRuleCapability } from "../shared/webRuleCapability";
 import { filterMatchingWebTranslationRules, matchWebTranslationRule } from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
 import type {
@@ -8,7 +9,9 @@ import type {
   RuleContentSelector,
   RuleRecordValue,
   WebTranslationBodyRule,
+  WebTranslationFallbackProfile,
   WebTranslationRule,
+  WebTranslationRuleCapability,
   WebTranslationRuleSource,
 } from "../shared/webRuleTypes";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
@@ -85,6 +88,8 @@ const DEFAULT_SITE_POLICY = {
   siteKey: "",
   ruleId: "general",
   ruleSource: "core" as WebTranslationRuleSource,
+  ruleCapability: "match-only" as WebTranslationRuleCapability,
+  fallbackProfile: "generic" as WebTranslationFallbackProfile,
   mergedRuleIds: ["general"],
   dynamicModeSource: "global" as DynamicModeSource,
   isHighDynamic: false,
@@ -713,6 +718,9 @@ export function compileRulePolicy(
 ): SitePolicy {
   const normalizedHostname = normalizeHostname(hostname);
   const preset = DYNAMIC_PRESETS[rule.dynamicPreset ?? "normal"];
+  const capability = analyzeWebTranslationRuleCapability(rule);
+  const fallbackScanRootSelectors = fallbackScanRootSelectorsForRule(rule, capability);
+  const fallbackContentSelectors = fallbackContentSelectorsForRule(rule, capability);
   const base = {
     ...DEFAULT_SITE_POLICY,
     ...preset,
@@ -720,6 +728,8 @@ export function compileRulePolicy(
     siteKey: rule.siteKey || normalizedHostname,
     ruleId: rule.ruleId,
     ruleSource: rule.ruleSource,
+    ruleCapability: capability.capability,
+    fallbackProfile: capability.fallbackProfile,
     mergedRuleIds: rule.mergedRuleIds,
     isHighDynamic: Boolean(rule.isHighDynamic),
     attributeNames: rule.attributeNames,
@@ -729,9 +739,9 @@ export function compileRulePolicy(
     ...(rule.bodyRule ? { bodyRule: rule.bodyRule } : {}),
     buildContainerSelectors: rule.buildContainerSelectors,
     skipBuildContainerSelectors: rule.skipBuildContainerSelectors,
-    preferredScanRootSelectors: rule.selectors,
+    preferredScanRootSelectors: unique([...rule.selectors, ...fallbackScanRootSelectors]),
     excludeSelectors: rule.excludeSelectors,
-    contentSelectors: rule.contentSelectors,
+    contentSelectors: unique([...rule.contentSelectors, ...fallbackContentSelectors], contentSelectorKey),
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
     excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
     injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
@@ -776,6 +786,117 @@ export function compileRulePolicy(
     ...base,
     dynamicModeSource: base.isHighDynamic ? "site-default" : "global",
   };
+}
+
+const FALLBACK_SCAN_ROOT_SELECTORS: Readonly<Record<WebTranslationFallbackProfile, readonly string[]>> = {
+  none: [],
+  article: [
+    "article h1",
+    "article h2",
+    "article p",
+    "main h1",
+    "main h2",
+    "main p",
+    "[role='article'] h1",
+    "[role='article'] p",
+    ".article h1",
+    ".article p",
+    ".post-content p",
+  ],
+  video: [
+    "h1",
+    "h2",
+    "h3",
+    "span.title",
+    "a.title",
+    ".title-container h1",
+    "#videoTitle",
+    ".video-title",
+    ".videoTitle",
+    "[class*='video-title']",
+    "[class*='VideoTitle']",
+  ],
+  social: [
+    "[data-testid='tweetText']",
+    "[slot='text-body']",
+    "[slot='comment']",
+    "[slot='title']",
+    "[data-ad-preview='message']",
+    ".comment",
+    ".message",
+  ],
+  forum: [
+    "[slot='comment']",
+    "[slot='text-body']",
+    ".RichTextJSON-root",
+    ".comment",
+    ".post",
+    ".md",
+    ".Post",
+  ],
+  commerce: [
+    "h1",
+    "[class*='product-title']",
+    "[class*='ProductTitle']",
+    "[class*='item-title']",
+    "[class*='description']",
+    "[itemprop='description']",
+  ],
+  generic: ["h1", "h2", "h3", "p", "li", "blockquote", "figcaption"],
+};
+
+const FALLBACK_CONTENT_SELECTORS: Readonly<Record<WebTranslationFallbackProfile, readonly RuleContentSelector[]>> = {
+  none: [],
+  article: [
+    { selector: "article h1, main h1, [role='article'] h1, .article h1", category: "heading" },
+    { selector: "article p, main p, [role='article'] p, .article p, .post-content p", category: "content-block" },
+  ],
+  video: [
+    { selector: "h1, .title-container h1, #videoTitle", category: "heading" },
+    { selector: "span.title, a.title, .video-title, .videoTitle", category: "card-text" },
+  ],
+  social: [
+    { selector: "[data-testid='tweetText'], [slot='text-body'], [data-ad-preview='message']", category: "comment" },
+    { selector: "[slot='title']", category: "heading" },
+  ],
+  forum: [
+    { selector: "[slot='comment'], [slot='text-body'], .RichTextJSON-root, .comment, .post, .md", category: "comment" },
+  ],
+  commerce: [
+    { selector: "h1, [class*='product-title'], [class*='ProductTitle'], [class*='item-title']", category: "heading" },
+    { selector: "[class*='description'], [itemprop='description']", category: "content-block" },
+  ],
+  generic: [
+    { selector: "h1, h2, h3", category: "heading" },
+    { selector: "p, blockquote, figcaption", category: "content-block" },
+    { selector: "li", category: "list-item" },
+  ],
+};
+
+function fallbackScanRootSelectorsForRule(
+  rule: ResolvedWebTranslationRule,
+  capability: { capability: WebTranslationRuleCapability; fallbackProfile: WebTranslationFallbackProfile },
+): readonly string[] {
+  if (!shouldApplyFallbackExtractor(rule, capability)) return [];
+  return FALLBACK_SCAN_ROOT_SELECTORS[capability.fallbackProfile];
+}
+
+function fallbackContentSelectorsForRule(
+  rule: ResolvedWebTranslationRule,
+  capability: { capability: WebTranslationRuleCapability; fallbackProfile: WebTranslationFallbackProfile },
+): readonly RuleContentSelector[] {
+  if (!shouldApplyFallbackExtractor(rule, capability)) return [];
+  return FALLBACK_CONTENT_SELECTORS[capability.fallbackProfile];
+}
+
+function shouldApplyFallbackExtractor(
+  rule: ResolvedWebTranslationRule,
+  capability: { capability: WebTranslationRuleCapability; fallbackProfile: WebTranslationFallbackProfile },
+): boolean {
+  if (rule.ruleId === "general") return false;
+  if (capability.capability === "content-ready" || capability.fallbackProfile === "none") return false;
+  if (capability.capability === "match-only" && capability.fallbackProfile === "generic") return false;
+  return true;
 }
 
 export function resolveWebTranslationPolicy(

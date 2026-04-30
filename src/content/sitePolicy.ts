@@ -1,5 +1,10 @@
 import type { DynamicMode } from "../shared/config";
-import type { WebTranslationBodyRule, WebTranslationRuleSource } from "../shared/webRuleTypes";
+import type {
+  WebTranslationBodyRule,
+  WebTranslationFallbackProfile,
+  WebTranslationRuleCapability,
+  WebTranslationRuleSource,
+} from "../shared/webRuleTypes";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
 import type { CompiledFilterRule } from "./compiledFilterRule";
@@ -23,6 +28,8 @@ export type SitePolicy = {
   siteKey: string;
   ruleId: string;
   ruleSource: WebTranslationRuleSource;
+  ruleCapability: WebTranslationRuleCapability;
+  fallbackProfile: WebTranslationFallbackProfile;
   mergedRuleIds: readonly string[];
   dynamicModeSource: DynamicModeSource;
   isHighDynamic: boolean;

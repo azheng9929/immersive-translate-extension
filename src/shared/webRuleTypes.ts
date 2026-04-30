@@ -18,6 +18,8 @@ export type RuleContentSelector = {
 };
 
 export type WebTranslationRuleSource = "core" | "core+imported" | "imported-stable" | "imported-experimental";
+export type WebTranslationRuleCapability = "content-ready" | "modifier-only" | "structure-only" | "match-only" | "unsafe";
+export type WebTranslationFallbackProfile = "none" | "article" | "video" | "social" | "forum" | "commerce" | "generic";
 
 export type WebTranslationBodyRule = {
   enable?: boolean;
@@ -31,6 +33,8 @@ export type WebTranslationBodyRule = {
 export type WebTranslationRule = {
   id: string;
   ruleSource?: WebTranslationRuleSource;
+  ruleCapability?: WebTranslationRuleCapability;
+  fallbackProfile?: WebTranslationFallbackProfile;
   siteKey?: string;
   matches?: readonly string[];
   excludeMatches?: readonly string[];

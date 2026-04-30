@@ -232,6 +232,8 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
       siteKey: sitePolicy.siteKey,
       ruleId: sitePolicy.ruleId,
       ruleSource: sitePolicy.ruleSource,
+      ruleCapability: sitePolicy.ruleCapability,
+      fallbackProfile: sitePolicy.fallbackProfile,
       mergedRuleIds: sitePolicy.mergedRuleIds,
       dynamicMode: sitePolicy.dynamicMode,
       dynamicModeSource: sitePolicy.dynamicModeSource,

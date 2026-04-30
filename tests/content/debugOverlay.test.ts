@@ -24,6 +24,8 @@ describe("DebugOverlay", () => {
     expect(root).not.toBeNull();
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("x.com");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("core+imported");
+    expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("content-ready");
+    expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("social");
     expect(root?.querySelector("[data-testid='debug-overlay-segments']")?.textContent).toContain("7");
     expect(root?.querySelector("[data-testid='debug-overlay-queue']")?.textContent).toContain("2");
     expect(root?.querySelector("[data-testid='debug-overlay-cache']")?.textContent).toContain("3 / 4");
@@ -52,6 +54,8 @@ function createStatus(): PageTranslationStatus {
       siteKey: "x.com",
       ruleId: "x",
       ruleSource: "core+imported",
+      ruleCapability: "content-ready",
+      fallbackProfile: "social",
       mergedRuleIds: ["x", "twitter"],
       dynamicMode: "conservative",
       dynamicModeSource: "site-default",

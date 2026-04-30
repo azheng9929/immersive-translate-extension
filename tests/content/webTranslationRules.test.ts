@@ -418,6 +418,56 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain(".imported-youtube-snippet");
   });
 
+  it("uses a page-type fallback extractor for imported modifier-only video rules", () => {
+    const policy = resolveWebTranslationPolicy("https://video.example.com/watch/123", "normal", {
+      rules: [
+        {
+          id: "video-example",
+          siteKey: "video.example.com",
+          matches: ["video.example.com"],
+          ruleSource: "imported-stable",
+          ruleCapability: "modifier-only",
+          fallbackProfile: "video",
+          globalStyles: {
+            ".title": "-webkit-line-clamp: unset;",
+          },
+        } as WebTranslationRule,
+      ],
+    });
+
+    expect(policy).toMatchObject({
+      ruleId: "video-example",
+      ruleSource: "imported-stable",
+      ruleCapability: "modifier-only",
+      fallbackProfile: "video",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("h1");
+    expect(policy.preferredScanRootSelectors).toContain("span.title");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "h1, .title-container h1, #videoTitle",
+      category: "heading",
+    });
+  });
+
+  it("does not add fallback selectors to content-ready imported rules", () => {
+    const policy = resolveWebTranslationPolicy("https://docs.example.com/guide", "normal", {
+      rules: [
+        {
+          id: "docs",
+          siteKey: "docs.example.com",
+          matches: ["docs.example.com"],
+          ruleSource: "imported-stable",
+          ruleCapability: "content-ready",
+          fallbackProfile: "article",
+          selectors: ["article p"],
+        } as WebTranslationRule,
+      ],
+    });
+
+    expect(policy.preferredScanRootSelectors).toEqual(["article p"]);
+    expect(policy.fallbackProfile).toBe("article");
+  });
+
   it("maps imported always-on advanceMergeConfig rules to chat-style scheduling", () => {
     const chatRules: WebTranslationRule[] = [
       {

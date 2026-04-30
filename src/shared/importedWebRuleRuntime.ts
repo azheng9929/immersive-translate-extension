@@ -1,8 +1,11 @@
 import type { WebTranslationRule, WebTranslationRuleSource } from "./webRuleTypes";
+import { analyzeWebTranslationRuleCapability } from "./webRuleCapability";
 
 const SUPPORTED_RULE_KEYS = new Set([
   "id",
   "ruleSource",
+  "ruleCapability",
+  "fallbackProfile",
   "siteKey",
   "matches",
   "excludeMatches",
@@ -101,9 +104,12 @@ export function prepareImportedWebTranslationRules(rules: readonly WebTranslatio
   for (const rule of rules) {
     const supported = pickSupportedRuleFields(rule);
     if (!isRuntimeWebPageRule(supported)) continue;
+    const capability = analyzeWebTranslationRuleCapability(supported);
     prepared.push({
       ...supported,
       ruleSource: importedRuleSource(supported),
+      ruleCapability: capability.capability,
+      fallbackProfile: capability.fallbackProfile,
     });
   }
 

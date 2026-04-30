@@ -116,8 +116,9 @@ function ruleLabel(status: PageTranslationStatus): string {
   const site = status.site;
   if (!site) return "generic";
   const dynamic = site.isHighDynamic ? `${site.dynamicMode}, high` : site.dynamicMode;
+  const capability = `${site.ruleCapability}/${site.fallbackProfile}`;
   const merged = site.mergedRuleIds.length > 1 ? `, ${site.mergedRuleIds.join("+")}` : "";
-  return `${site.siteKey} (${dynamic}, ${site.ruleSource}${merged})`;
+  return `${site.siteKey} (${dynamic}, ${site.ruleSource}, ${capability}${merged})`;
 }
 
 function scanLabel(status: PageTranslationStatus): string {
