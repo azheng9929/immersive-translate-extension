@@ -410,6 +410,40 @@ describe("PageTranslationSession", () => {
     expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "observing" });
   });
 
+  it("lets a SPA URL change handler replace policy before the fallback rescan", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><p>Initial article text.</p></main>`;
+    const requestedTexts: string[] = [];
+    const handledChanges: Array<{ previousUrl: string; currentUrl: string }> = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      observeUrlChange: true,
+      urlChangeDelay: 20,
+      onUrlChange: async (change) => {
+        handledChanges.push(change);
+        return true;
+      },
+    });
+
+    await session.translatePage();
+    const previousUrl = window.location.href;
+    history.pushState({}, "", "/policy-next-page");
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    await Promise.resolve();
+
+    expect(handledChanges).toEqual([{ previousUrl, currentUrl: window.location.href }]);
+    expect(requestedTexts).toEqual(["Initial article text."]);
+  });
+
   it("suspends dynamic translation after a burst of page changes", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;

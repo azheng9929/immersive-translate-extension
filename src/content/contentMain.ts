@@ -16,7 +16,13 @@ import {
   type PageTranslationRuleDiagnostics,
   type PageTranslationRuleVisualizationGroup,
   type PageTranslationRuleVisualizationSelector,
+  type PageTranslationUrlChange,
+  type PageTranslationUrlChangeHandler,
 } from "./pageTranslationSession";
+import {
+  areSitePolicySignaturesEqual,
+  createSitePolicySignature,
+} from "./spaPolicy";
 import { shouldHandleContentMessage } from "./contentMessagePolicy";
 import {
   providerChainId,
@@ -45,14 +51,14 @@ export async function runContentMain(): Promise<void> {
     await waitForDocumentBody();
     let config = await loadConfig();
     let pageRules = await loadWebRules(window.location.href);
-    const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+    let sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+    let sitePolicySignature = createSitePolicySignature(sitePolicy);
     injectSitePolicyCss(sitePolicy);
     let cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
-    let pageSession = createPageSession(config, pageRules);
-    let selectionTranslator = createSelectionTranslator(config);
-    let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
-    let debugOverlay = createDebugOverlay(config, pageSession);
+    let pageSession: PageTranslationSession;
+    let debugOverlay: DebugOverlay | undefined;
     let cancelPersistedTranslate: (() => void) | undefined;
+    let spaPolicyResolveInFlight: Promise<boolean> | undefined;
     const translateCurrentPage = () => {
       markPersistedPageTranslationActive();
       return pageSession.translatePage();
@@ -63,6 +69,47 @@ export async function runContentMain(): Promise<void> {
       clearPersistedPageTranslation();
       pageSession.restorePage();
     };
+    const resolveSpaPolicyChange = async ({ currentUrl }: PageTranslationUrlChange): Promise<boolean> => {
+      const nextRules = await loadWebRules(currentUrl);
+      const nextSitePolicy = resolveSitePolicy(currentUrl, config.dynamicMode, { document, rules: nextRules });
+      const nextSignature = createSitePolicySignature(nextSitePolicy);
+      pageRules = nextRules;
+      if (areSitePolicySignaturesEqual(sitePolicySignature, nextSignature)) {
+        sitePolicy = nextSitePolicy;
+        sitePolicySignature = nextSignature;
+        cleanupSitePolicyAttributes();
+        cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
+        return false;
+      }
+
+      floatingControl.hide();
+      debugOverlay?.unmount();
+      pageSession.restorePage();
+      pageSession.dispose();
+      cleanupSitePolicyAttributes();
+
+      sitePolicy = nextSitePolicy;
+      sitePolicySignature = nextSignature;
+      injectSitePolicyCss(sitePolicy);
+      cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
+      pageSession = createPageSession(config, sitePolicy, handleSpaUrlChange);
+      debugOverlay = createDebugOverlay(config, pageSession);
+      debugOverlay?.mount();
+      if (config.showFloatingBall) floatingControl.mount();
+      await translateCurrentPage();
+      return true;
+    };
+    const handleSpaUrlChange: PageTranslationUrlChangeHandler = (change) => {
+      if (spaPolicyResolveInFlight) return spaPolicyResolveInFlight;
+      spaPolicyResolveInFlight = resolveSpaPolicyChange(change).finally(() => {
+        spaPolicyResolveInFlight = undefined;
+      });
+      return spaPolicyResolveInFlight;
+    };
+    pageSession = createPageSession(config, sitePolicy, handleSpaUrlChange);
+    let selectionTranslator = createSelectionTranslator(config);
+    let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
+    debugOverlay = createDebugOverlay(config, pageSession);
     let cancelAutoTranslate = scheduleAutoTranslate(config, translateCurrentPage);
     cancelPersistedTranslate = cancelAutoTranslate ? undefined : schedulePersistedPageTranslationResume(translateCurrentPage);
     const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
@@ -124,10 +171,11 @@ export async function runContentMain(): Promise<void> {
           cleanupSitePolicyAttributes();
           config = nextConfig;
           pageRules = await loadWebRules(window.location.href);
-          const nextSitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
-          injectSitePolicyCss(nextSitePolicy);
-          cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(nextSitePolicy);
-          pageSession = createPageSession(config, pageRules);
+          sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+          sitePolicySignature = createSitePolicySignature(sitePolicy);
+          injectSitePolicyCss(sitePolicy);
+          cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
+          pageSession = createPageSession(config, sitePolicy, handleSpaUrlChange);
           debugOverlay = createDebugOverlay(config, pageSession);
           cancelAutoTranslate = scheduleAutoTranslate(config, translateCurrentPage);
           cancelPersistedTranslate = cancelAutoTranslate ? undefined : schedulePersistedPageTranslationResume(translateCurrentPage);
@@ -236,8 +284,11 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
   return new PageController(config.useCache ? { ...options, cache: new BackgroundTranslationCache() } : options);
 }
 
-function createPageSession(config: ExtensionConfig, pageRules: readonly WebTranslationRule[]): PageTranslationSession {
-  const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+function createPageSession(
+  config: ExtensionConfig,
+  sitePolicy: SitePolicy,
+  onUrlChange?: PageTranslationUrlChangeHandler,
+): PageTranslationSession {
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,
@@ -262,6 +313,7 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
     mutationWindowMs: sitePolicy.mutationWindowMs,
     observeUrlChange: sitePolicy.observeUrlChange,
     urlChangeDelay: sitePolicy.urlChangeDelay,
+    ...(onUrlChange ? { onUrlChange } : {}),
     tooltipDebounceMs: 120,
     renderState: displayModeToPageRenderState(config.displayMode),
     site: {

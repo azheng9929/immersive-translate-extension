@@ -112,9 +112,19 @@ type PageTranslationSessionOptions = {
   tooltipDebounceMs?: number;
   renderState?: PageRenderState;
   site?: PageTranslationSiteStatus;
+  onUrlChange?: PageTranslationUrlChangeHandler;
 };
 
 type StatusListener = (status: PageTranslationStatus) => void;
+
+export type PageTranslationUrlChange = {
+  previousUrl: string;
+  currentUrl: string;
+};
+
+export type PageTranslationUrlChangeHandler = (
+  change: PageTranslationUrlChange,
+) => boolean | Promise<boolean>;
 
 const EMPTY_SUMMARY: TranslationPageSummary = {
   total: 0,
@@ -421,12 +431,20 @@ export class PageTranslationSession {
     if (!this.options.observeUrlChange || !this.canHandleDynamicMutations()) return;
     const currentUrl = globalThis.location?.href ?? "";
     if (!currentUrl || currentUrl === this.lastObservedUrl) return;
+    const previousUrl = this.lastObservedUrl;
     this.lastObservedUrl = currentUrl;
 
     if (this.urlChangeTimer) clearTimeout(this.urlChangeTimer);
     this.urlChangeTimer = setTimeout(() => {
+      void this.handleUrlChangeAfterDelay(previousUrl, currentUrl);
+    }, Math.max(0, this.options.urlChangeDelay ?? 250));
+  }
+
+  private async handleUrlChangeAfterDelay(previousUrl: string, currentUrl: string): Promise<void> {
+    try {
       this.urlChangeTimer = undefined;
       if (!this.canHandleDynamicMutations()) return;
+      if (await this.options.onUrlChange?.({ previousUrl, currentUrl })) return;
       const root = this.options.observeRoot ?? document.body;
       if (root instanceof HTMLElement && root.isConnected) {
         this.controller.restorePage();
@@ -434,7 +452,13 @@ export class PageTranslationSession {
         this.addPendingRoot(root, false, { allowTranslatedRoot: true });
         this.scheduleFlush(0);
       }
-    }, Math.max(0, this.options.urlChangeDelay ?? 250));
+    } catch (error) {
+      this.setStatus({
+        ...this.status,
+        observation: this.activateDynamicObserver(this.status.phase),
+        lastError: errorMessage(error),
+      });
+    }
   }
 
   private handleViewportScroll(): void {
