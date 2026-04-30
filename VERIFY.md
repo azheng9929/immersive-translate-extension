@@ -4,9 +4,11 @@
 
 - `npm.cmd run typecheck`: PASS
 - `npm.cmd run build`: PASS
-- `npm.cmd test`: PASS, 46 test files and 290 tests
+- `npm.cmd test`: PASS, 52 test files and 361 tests
 - `npm.cmd run audit:web-rules`: PASS, 830 imported rules audited
+- `npm.cmd run audit:rule-semantics -- --sample=12`: PASS, imported rule field semantics audited
 - `npm.cmd run test:real-sites:smoke`: PASS, MetaTFT Augments smoke regression
+- `npm.cmd run test:real-sites:long-tail`: PASS for accessible sites; Old Reddit may be skipped when blocked by network security
 
 ## Covered Flows
 
@@ -20,6 +22,8 @@
 - Imported Immersive Translate web rules are URL-lazy loaded, runtime capability filtered, and merged as same-site deltas on top of stable core rules.
 - Imported rules are classified as `content-ready`, `modifier-only`, `structure-only`, or `match-only`.
 - Non-content-ready imported rules use conservative page-type fallback extractors instead of pretending to be complete site adaptations.
+- Rule diagnostics explain matched rules, selector-level counts, and clicked-element translation/exclusion status.
+- Background request governance includes provider permits, paragraph cache, and in-flight dedupe for duplicate cache keys.
 
 ## Browser Manual Check
 

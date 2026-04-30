@@ -2,6 +2,8 @@
 
 The extension treats Immersive Translate rules as a large candidate library, not as always-on core logic.
 
+For the current project status, read [AI_HANDOFF.md](./AI_HANDOFF.md). For field-by-field support status, read [rule-system-semantics.md](./rule-system-semantics.md).
+
 ## Flow
 
 1. `scripts/import-immersive-web-rules.mjs` reads `default_config.json` from the unpacked Immersive Translate extension.
