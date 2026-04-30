@@ -6,7 +6,12 @@ import { InputTranslator } from "./inputTranslator";
 import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
 import { OriginalTextTooltip } from "./originalTextTooltip";
 import { PageController } from "./pageController";
-import { PageTranslationSession, type PageTranslationRuleDiagnostics } from "./pageTranslationSession";
+import {
+  PageTranslationSession,
+  type PageTranslationRuleDiagnostics,
+  type PageTranslationRuleVisualizationGroup,
+  type PageTranslationRuleVisualizationSelector,
+} from "./pageTranslationSession";
 import { shouldHandleContentMessage } from "./contentMessagePolicy";
 import {
   providerChainId,
@@ -271,7 +276,30 @@ function createRuleDiagnostics(sitePolicy: SitePolicy): PageTranslationRuleDiagn
     mutationWindowMs: sitePolicy.mutationWindowMs,
     viewportSupplement: sitePolicy.viewportSupplement,
     viewportSupplementMaxRoots: sitePolicy.viewportSupplementMaxRoots,
+    visualizationSelectors: createRuleVisualizationSelectors(sitePolicy),
   };
+}
+
+function createRuleVisualizationSelectors(sitePolicy: SitePolicy): PageTranslationRuleVisualizationSelector[] {
+  return [
+    ...visualizationSelectorGroup("scan-root", sitePolicy.preferredScanRootSelectors),
+    ...sitePolicy.contentSelectors.map((entry) => ({
+      group: "content" as const,
+      selector: entry.selector,
+      label: entry.category,
+    })),
+    ...visualizationSelectorGroup("exclude", sitePolicy.excludeSelectors),
+    ...visualizationSelectorGroup("build-container", sitePolicy.buildContainerSelectors),
+    ...visualizationSelectorGroup("skip-build-container", sitePolicy.skipBuildContainerSelectors),
+    ...visualizationSelectorGroup("dynamic-exclude", sitePolicy.excludedDynamicSelectors),
+  ];
+}
+
+function visualizationSelectorGroup(
+  group: PageTranslationRuleVisualizationGroup,
+  selectors: readonly string[],
+): PageTranslationRuleVisualizationSelector[] {
+  return selectors.map((selector) => ({ group, selector }));
 }
 
 function createDebugOverlay(config: ExtensionConfig, pageSession: PageTranslationSession): DebugOverlay | undefined {

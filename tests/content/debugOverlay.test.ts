@@ -47,6 +47,43 @@ describe("DebugOverlay", () => {
     overlay.unmount();
     expect(document.querySelector("[data-imt-debug-overlay='true']")).toBeNull();
   });
+
+  it("toggles rule visualization for matched page elements", () => {
+    document.body.innerHTML = `
+      <main>
+        <article class="tweet">
+          <p class="body-text">Hello world</p>
+          <button class="action">Reply</button>
+        </article>
+        <section class="build-root">
+          <p>Secondary content</p>
+        </section>
+      </main>
+    `;
+    const status = createStatus();
+    const overlay = new DebugOverlay({
+      getStatus: () => status,
+      subscribeStatus: () => () => undefined,
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")).not.toBeNull();
+    expect(document.querySelector(".tweet")?.getAttribute("data-imt-rule-visualization")).toContain("scan-root");
+    expect(document.querySelector(".body-text")?.getAttribute("data-imt-rule-visualization")).toContain("content");
+    expect(document.querySelector(".action")?.getAttribute("data-imt-rule-visualization")).toContain("exclude");
+    expect(document.querySelector(".build-root")?.getAttribute("data-imt-rule-visualization")).toContain("build-container");
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("content 1");
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("exclude 1");
+
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")).toBeNull();
+    expect(document.querySelector(".body-text")?.hasAttribute("data-imt-rule-visualization")).toBe(false);
+
+    overlay.unmount();
+  });
 });
 
 function createStatus(): PageTranslationStatus {
@@ -92,6 +129,14 @@ function createStatus(): PageTranslationStatus {
         mutationWindowMs: 5000,
         viewportSupplement: true,
         viewportSupplementMaxRoots: 20,
+        visualizationSelectors: [
+          { group: "scan-root", selector: ".tweet" },
+          { group: "content", selector: ".body-text", label: "comment" },
+          { group: "exclude", selector: ".action" },
+          { group: "build-container", selector: ".build-root" },
+          { group: "skip-build-container", selector: ".skip-root" },
+          { group: "dynamic-exclude", selector: ".dynamic-ignore" },
+        ],
       },
     },
     diagnostics: {

@@ -47,7 +47,22 @@ export type PageTranslationRuleDiagnostics = {
   mutationWindowMs: number;
   viewportSupplement: boolean;
   viewportSupplementMaxRoots: number;
+  visualizationSelectors: readonly PageTranslationRuleVisualizationSelector[];
 };
+
+export type PageTranslationRuleVisualizationSelector = {
+  group: PageTranslationRuleVisualizationGroup;
+  selector: string;
+  label?: string;
+};
+
+export type PageTranslationRuleVisualizationGroup =
+  | "scan-root"
+  | "content"
+  | "exclude"
+  | "build-container"
+  | "skip-build-container"
+  | "dynamic-exclude";
 
 export type PageTranslationStatus = TranslationPageSummary & {
   phase: PageTranslationPhase;

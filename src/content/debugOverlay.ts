@@ -1,5 +1,9 @@
 import type { ExtensionConfig } from "../shared/config";
-import type { PageTranslationSiteStatus, PageTranslationStatus } from "./pageTranslationSession";
+import type {
+  PageTranslationRuleVisualizationGroup,
+  PageTranslationSiteStatus,
+  PageTranslationStatus,
+} from "./pageTranslationSession";
 
 type DebugOverlayOptions = {
   getStatus: () => PageTranslationStatus;
@@ -17,6 +21,8 @@ export type ContentDebugApi = {
 export class DebugOverlay {
   private root: HTMLElement | undefined;
   private unsubscribe: (() => void) | undefined;
+  private readonly ruleVisualizer = new RuleVisualizer();
+  private ruleVisualizationActive = false;
 
   constructor(private readonly options: DebugOverlayOptions) {}
 
@@ -50,6 +56,8 @@ export class DebugOverlay {
   unmount(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.ruleVisualizer.hide();
+    this.ruleVisualizationActive = false;
     this.root?.remove();
     this.root = undefined;
   }
@@ -58,6 +66,7 @@ export class DebugOverlay {
     if (!this.root) return;
     this.root.replaceChildren(
       createTitle(),
+      createRuleVisualizationButton(this.ruleVisualizationActive, () => this.toggleRuleVisualization()),
       createRow("规则", ruleLabel(status), "debug-overlay-rule"),
       createRow("字段", ruleShapeLabel(status), "debug-overlay-rule-shape"),
       createRow("过滤", ruleFiltersLabel(status), "debug-overlay-rule-filters"),
@@ -71,6 +80,14 @@ export class DebugOverlay {
       createRow("服务", providerLabel(status), "debug-overlay-provider"),
       createRow("动态", `${status.dynamicRuns} runs`, "debug-overlay-dynamic"),
     );
+    if (this.ruleVisualizationActive) this.ruleVisualizer.show(status);
+  }
+
+  private toggleRuleVisualization(): void {
+    this.ruleVisualizationActive = !this.ruleVisualizationActive;
+    const status = this.options.getStatus();
+    if (!this.ruleVisualizationActive) this.ruleVisualizer.hide();
+    this.render(status);
   }
 }
 
@@ -86,6 +103,32 @@ function createTitle(): HTMLElement {
     fontWeight: "700",
   });
   return title;
+}
+
+function createRuleVisualizationButton(active: boolean, onClick: () => void): HTMLElement {
+  const row = document.createElement("div");
+  Object.assign(row.style, {
+    display: "flex",
+    justifyContent: "flex-end",
+    margin: "0 0 6px",
+  });
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.testid = "debug-overlay-visualize-rules";
+  button.textContent = active ? "隐藏规则" : "显示规则";
+  Object.assign(button.style, {
+    border: "1px solid rgba(15, 23, 42, 0.16)",
+    borderRadius: "6px",
+    background: active ? "#0f172a" : "#fff",
+    color: active ? "#fff" : "#0f172a",
+    cursor: "pointer",
+    font: "12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    padding: "5px 8px",
+  });
+  button.addEventListener("click", onClick);
+  row.append(button);
+  return row;
 }
 
 function createRow(label: string, value: string, testId: string): HTMLElement {
@@ -205,6 +248,157 @@ function topReasonsLabel(counts: Partial<Record<string, number>> | undefined): s
     .map(([reason, count]) => `${reason} ${count}`)
     .join(", ");
 }
+
+type RuleVisualizationSummary = {
+  group: PageTranslationRuleVisualizationGroup;
+  selectorCount: number;
+  elementCount: number;
+};
+
+class RuleVisualizer {
+  private readonly markedElements = new Set<Element>();
+  private styleElement: HTMLStyleElement | undefined;
+  private legendElement: HTMLElement | undefined;
+
+  show(status: PageTranslationStatus): void {
+    this.hide();
+    const selectors = status.site?.ruleDiagnostics?.visualizationSelectors ?? [];
+    this.ensureStyle();
+
+    const summaries = new Map<PageTranslationRuleVisualizationGroup, RuleVisualizationSummary>();
+    for (const entry of selectors) {
+      const summary = summaries.get(entry.group) ?? {
+        group: entry.group,
+        selectorCount: 0,
+        elementCount: 0,
+      };
+      summary.selectorCount += 1;
+      const matchedElements = queryRuleElements(entry.selector);
+      for (const element of matchedElements) {
+        if (isExtensionElement(element)) continue;
+        markElement(element, entry.group);
+        this.markedElements.add(element);
+        summary.elementCount += 1;
+      }
+      summaries.set(entry.group, summary);
+    }
+
+    this.legendElement = createRuleVisualizerLegend([...summaries.values()]);
+    document.documentElement.append(this.legendElement);
+  }
+
+  hide(): void {
+    for (const element of this.markedElements) {
+      element.removeAttribute("data-imt-rule-visualization");
+    }
+    this.markedElements.clear();
+    this.legendElement?.remove();
+    this.legendElement = undefined;
+    this.styleElement?.remove();
+    this.styleElement = undefined;
+  }
+
+  private ensureStyle(): void {
+    if (this.styleElement) return;
+    const style = document.createElement("style");
+    style.dataset.imtManaged = "true";
+    style.dataset.imtRuleVisualizerStyle = "true";
+    style.textContent = `
+[data-imt-rule-visualization~="scan-root"] { outline: 2px solid rgba(59, 130, 246, 0.88) !important; outline-offset: 2px !important; }
+[data-imt-rule-visualization~="content"] { outline: 2px solid rgba(16, 185, 129, 0.92) !important; outline-offset: 2px !important; }
+[data-imt-rule-visualization~="build-container"] { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.92) !important; }
+[data-imt-rule-visualization~="skip-build-container"] { box-shadow: inset 0 0 0 2px rgba(100, 116, 139, 0.72) !important; }
+[data-imt-rule-visualization~="dynamic-exclude"] { box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.72) !important; }
+[data-imt-rule-visualization~="exclude"] { outline: 2px solid rgba(239, 68, 68, 0.92) !important; outline-offset: 2px !important; }
+`;
+    (document.head || document.documentElement).append(style);
+    this.styleElement = style;
+  }
+}
+
+function queryRuleElements(selector: string): Element[] {
+  try {
+    return Array.from(document.querySelectorAll(selector));
+  } catch {
+    return [];
+  }
+}
+
+function isExtensionElement(element: Element): boolean {
+  return Boolean(element.closest('[data-imt-managed="true"]'));
+}
+
+function markElement(element: Element, group: PageTranslationRuleVisualizationGroup): void {
+  const groups = new Set((element.getAttribute("data-imt-rule-visualization") ?? "").split(/\s+/).filter(Boolean));
+  groups.add(group);
+  element.setAttribute("data-imt-rule-visualization", [...groups].join(" "));
+}
+
+function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTMLElement {
+  const legend = document.createElement("section");
+  legend.dataset.imtManaged = "true";
+  legend.dataset.imtRuleVisualizer = "true";
+  Object.assign(legend.style, {
+    position: "fixed",
+    left: "12px",
+    bottom: "12px",
+    zIndex: "2147483645",
+    width: "300px",
+    maxWidth: "calc(100vw - 24px)",
+    boxSizing: "border-box",
+    padding: "10px",
+    border: "1px solid rgba(15, 23, 42, 0.16)",
+    borderRadius: "8px",
+    background: "rgba(255, 255, 255, 0.96)",
+    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
+    color: "#0f172a",
+    font: "12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    letterSpacing: "0",
+  });
+
+  const title = document.createElement("div");
+  title.textContent = "规则可视化";
+  Object.assign(title.style, {
+    fontWeight: "700",
+    marginBottom: "6px",
+  });
+  legend.append(title);
+
+  const orderedSummaries = RULE_VISUALIZATION_GROUPS.map((group) =>
+    summaries.find((summary) => summary.group === group) ?? { group, selectorCount: 0, elementCount: 0 },
+  );
+  for (const summary of orderedSummaries) {
+    const row = document.createElement("div");
+    row.textContent = `${summary.group} ${summary.elementCount} 元素 / ${summary.selectorCount} selector`;
+    Object.assign(row.style, {
+      display: "flex",
+      gap: "6px",
+      padding: "2px 0",
+      color: RULE_VISUALIZATION_COLORS[summary.group],
+    });
+    legend.append(row);
+  }
+
+  return legend;
+}
+
+const RULE_VISUALIZATION_GROUPS: readonly PageTranslationRuleVisualizationGroup[] = [
+  "scan-root",
+  "content",
+  "exclude",
+  "build-container",
+  "skip-build-container",
+  "dynamic-exclude",
+];
+
+const RULE_VISUALIZATION_COLORS: Record<PageTranslationRuleVisualizationGroup, string> = {
+  "scan-root": "#2563eb",
+  content: "#059669",
+  exclude: "#dc2626",
+  "build-container": "#d97706",
+  "skip-build-container": "#64748b",
+  "dynamic-exclude": "#9333ea",
+};
 
 declare global {
   interface Window {
