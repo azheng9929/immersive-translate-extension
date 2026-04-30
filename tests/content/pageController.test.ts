@@ -864,6 +864,43 @@ describe("PageController", () => {
     expect(document.querySelector(".recommendations")?.textContent).toBe("Recommended stories and sidebar links.");
   });
 
+  it("prefers a high-confidence article root over generic navigation on unknown sites", async () => {
+    document.body.innerHTML = `
+      <header>
+        <a href="/home">Home</a>
+        <a href="/pricing">Pricing</a>
+        <button>Sign in</button>
+      </header>
+      <main>
+        <article>
+          <h1>Translation quality on complex websites</h1>
+          <p>
+            This article explains why a translator should identify the primary reading area before
+            sending text to a provider. It has enough body copy to be treated as the page root.
+          </p>
+        </article>
+      </main>
+      <aside><p>Related stories and sidebar links.</p></aside>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Translation quality on complex websites",
+      "This article explains why a translator should identify the primary reading area before sending text to a provider. It has enough body copy to be treated as the page root.",
+    ]);
+    expect(document.querySelector("header .imt-translation-block")).toBeNull();
+    expect(document.querySelector("aside .imt-translation-block")).toBeNull();
+  });
+
   it("lets rule-driven exclude selectors win over content selectors", async () => {
     document.body.innerHTML = `
       <main>

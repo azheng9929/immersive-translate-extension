@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { scoreTranslationRoot, selectHighConfidenceTranslationRoots } from "@/content/rootScoring";
+
+describe("rootScoring", () => {
+  it("scores article-like roots above navigation-heavy roots", () => {
+    document.body.innerHTML = `
+      <nav>
+        <a href="/a">Home</a>
+        <a href="/b">Pricing</a>
+        <button>Menu</button>
+      </nav>
+      <article>
+        <h1>How translation engines keep complex pages readable</h1>
+        <p>
+          A good webpage translator should identify the main reading area, avoid navigation chrome,
+          and preserve the surrounding layout while translating useful paragraphs first.
+        </p>
+      </article>
+    `;
+
+    const nav = document.querySelector<HTMLElement>("nav")!;
+    const article = document.querySelector<HTMLElement>("article")!;
+
+    expect(scoreTranslationRoot(article).score).toBeGreaterThan(scoreTranslationRoot(nav).score);
+  });
+
+  it("selects the highest-confidence content root from a generic document", () => {
+    document.body.innerHTML = `
+      <header><a href="/home">Home</a><a href="/docs">Docs</a><button>Sign in</button></header>
+      <main>
+        <article>
+          <h1>Readable article title</h1>
+          <p>
+            This article has enough natural language content to be treated as the primary page
+            root. It should be selected before sidebars, menus, toolbars, or recommendation cards.
+          </p>
+        </article>
+      </main>
+      <aside><a href="/related">Related link</a><button>Share</button></aside>
+    `;
+
+    expect(selectHighConfidenceTranslationRoots(document.body)).toEqual([document.querySelector("main")]);
+  });
+});

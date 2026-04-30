@@ -1,6 +1,7 @@
 import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
 import { removeTranslationLoading, renderTranslation, renderTranslationLoading } from "./renderEngine";
 import { restoreAll, restoreRecords } from "./restoreEngine";
+import { selectHighConfidenceTranslationRoots } from "./rootScoring";
 import { buildTranslationUnits } from "./unitBuilder";
 import { decideRenderMode } from "./renderDecider";
 import { displayModeToPageRenderState, type DisplayMode, type PageRenderState } from "../shared/config";
@@ -599,7 +600,8 @@ function collectScanRoots(root: ParentNode, options: ScanRootOptions): ParentNod
   const mainFrameRoots = collectMainFrameRoots(root, options.mainFrameSelector)
     .filter((mainFrameRoot) => passesMainFrameThreshold(mainFrameRoot, options));
   const containerRoots = mainFrameRoots.flatMap((mainFrameRoot) => collectBuildContainerRoots(mainFrameRoot, options));
-  return containerRoots.flatMap((containerRoot) =>
+  const scoringRoots = containerRoots.flatMap((containerRoot) => applyGenericRootScoring(containerRoot, options));
+  return scoringRoots.flatMap((containerRoot) =>
     collectPreferredScanRoots(containerRoot, options.preferredScanRootSelectors),
   );
 }
@@ -677,6 +679,18 @@ function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions):
     }
   }
   return roots;
+}
+
+function applyGenericRootScoring(root: ParentNode, options: ScanRootOptions): ParentNode[] {
+  if (!shouldUseGenericRootScoring(options)) return [root];
+  const highConfidenceRoots = selectHighConfidenceTranslationRoots(root);
+  return highConfidenceRoots.length > 0 ? highConfidenceRoots : [root];
+}
+
+function shouldUseGenericRootScoring(options: ScanRootOptions): boolean {
+  return !options.mainFrameSelector &&
+    !options.preferredScanRootSelectors?.length &&
+    !options.buildContainerSelectors?.length;
 }
 
 function isGenericBodyFallbackDisabled(root: ParentNode, options: ScanRootOptions): boolean {
