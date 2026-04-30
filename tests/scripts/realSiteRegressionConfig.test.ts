@@ -194,6 +194,28 @@ describe("real-site regression selection", () => {
     }
   });
 
+  it("caps hover tooltip regressions so they sample representative targets only", () => {
+    const hoverSites = realSiteFixtureGroups["hover-tooltip"] ?? [];
+
+    expect(hoverSites.map((site) => site.name)).toEqual([
+      "Tactics Tools Hover",
+      "U.GG Champions",
+      "OP.GG Champions",
+    ]);
+    expect(hoverSites.filter((site) => !site.hoverTooltipOptional).map((site) => site.name)).toEqual([
+      "Tactics Tools Hover",
+    ]);
+    expect(hoverSites.filter((site) => site.hoverTooltipOptional).map((site) => site.name)).toEqual([
+      "U.GG Champions",
+      "OP.GG Champions",
+    ]);
+    for (const site of hoverSites) {
+      expect(site.hoverTooltip).toBe(true);
+      expect(site.hoverMaxAttempts, site.name).toBeLessThanOrEqual(8);
+      expect(site.hoverAttemptTimeoutMs, site.name).toBeLessThanOrEqual(2500);
+    }
+  });
+
   it("keeps the fixture matrix deduplicated and selectable", () => {
     const fixtureUrls = Object.values(realSiteFixtureGroups)
       .flat()
@@ -212,5 +234,30 @@ describe("real-site regression selection", () => {
 
     expect(selection.dynamicModes).toEqual(["normal"]);
     expect(selection.selectedSites.map((site) => site.url).sort()).toEqual([...fixtureUrls].sort());
+  });
+
+  it("selects fixture sites by kind from cli or environment", () => {
+    const cliSelection = resolveRegressionSelection({
+      argv: ["--profile=fixture-matrix", "--fixture-kind=article,docs-code"],
+      env: {},
+    });
+    expect(cliSelection.fixtureKinds).toEqual(["article", "docs-code"]);
+    expect(cliSelection.selectedSites.map((site) => site.name)).toEqual([
+      "Wikipedia Article",
+      "Nature Article",
+      "GitHub Blog",
+      "OpenAI Docs",
+      "MDN JavaScript Guide",
+      "React Reference",
+    ]);
+
+    const envSelection = resolveRegressionSelection({
+      argv: ["--profile=fixture-matrix"],
+      env: {
+        IMT_REGRESSION_FIXTURE_KIND: "video-list",
+      },
+    });
+    expect(envSelection.fixtureKinds).toEqual(["video-list"]);
+    expect(envSelection.selectedSites.map((site) => site.name)).toEqual(["YouTube", "Vimeo Watch", "Dailymotion"]);
   });
 });

@@ -499,6 +499,28 @@ describe("webTranslationRules", () => {
     expect(reddit.injectedCss.join("\n")).toContain(".RichTextJSON-root");
   });
 
+  it("uses a dedicated GitHub rule for issue lists and markdown content", () => {
+    const policy = resolveWebTranslationPolicy("https://github.com/vercel/next.js/issues", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "github.com",
+      ruleId: "github",
+      ruleCapability: "content-ready",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("[data-testid='issue-pr-title-link']");
+    expect(policy.preferredScanRootSelectors).toContain(
+      "[data-listview-item-title-container='true'] [data-testid='issue-pr-title-link']",
+    );
+    expect(policy.preferredScanRootSelectors).toContain(".markdown-body");
+    expect(policy.contentSelectors).toContainEqual({
+      selector:
+        "[data-testid='issue-pr-title-link'], [data-listview-item-title-container='true'] [data-testid='issue-pr-title-link']",
+      category: "card-text",
+    });
+    expect(policy.excludeSelectors).toContain(".author,.assignee");
+    expect(policy.filterRule.stayOriginalTags).toContain("CODE");
+  });
+
   it("uses a dedicated Pornhub rule so short video titles are preferred scan roots", () => {
     const policy = resolveWebTranslationPolicy("https://www.pornhub.com/view_video.php?viewkey=test", "normal");
 
@@ -883,6 +905,28 @@ describe("webTranslationRules", () => {
       selector: "h1, .title-container h1, #videoTitle",
       category: "heading",
     });
+  });
+
+  it("lets generic structure-only rules use text-driven root scoring instead of fixed fallback selectors", () => {
+    const policy = resolveWebTranslationPolicy("https://dashboard.example/cards", "normal", {
+      rules: [
+        {
+          id: "dashboard-shape",
+          siteKey: "dashboard.example",
+          matches: ["dashboard.example"],
+          ruleSource: "imported-stable",
+          dynamicPreset: "normal",
+        } as WebTranslationRule,
+      ],
+    });
+
+    expect(policy).toMatchObject({
+      ruleId: "dashboard-shape",
+      ruleCapability: "structure-only",
+      fallbackProfile: "generic",
+    });
+    expect(policy.preferredScanRootSelectors).toEqual([]);
+    expect(policy.contentSelectors).toContainEqual({ selector: "h1, h2, h3", category: "heading" });
   });
 
   it("does not add fallback selectors to content-ready imported rules", () => {

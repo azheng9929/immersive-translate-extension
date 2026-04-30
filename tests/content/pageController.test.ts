@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { compileFilterRule } from "@/content/compiledFilterRule";
 import { PageController } from "@/content/pageController";
 import { resolveWebTranslationPolicy } from "@/content/webTranslationRules";
 import type { TranslationCache, TranslationCacheLookup, TranslationCacheWrite } from "@/shared/translationCache";
@@ -465,6 +466,45 @@ describe("PageController", () => {
     expect(document.body.textContent).not.toContain("[zh-Hans] 23 comments");
     expect(document.body.textContent).not.toContain("[zh-Hans] share");
     expect(document.body.textContent).not.toContain("[zh-Hans] my subreddits");
+  });
+
+  it("lets explicit content selectors survive broad hovercard link exclusions", async () => {
+    document.body.innerHTML = `
+      <main>
+        <a id="issue-title" data-testid="issue-pr-title-link" data-hovercard-type="issue">
+          Pages Router hydration causes an extra client render on issue pages.
+        </a>
+        <a id="author" data-hovercard-type="user">alice</a>
+      </main>
+    `;
+    const contentSelectors = [
+      { selector: "[data-testid='issue-pr-title-link']", category: "card-text" as const },
+    ];
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: ["[data-testid='issue-pr-title-link']"],
+      excludeSelectors: ["a[data-hovercard-type]"],
+      contentSelectors,
+      filterRule: compileFilterRule({
+        selectors: ["[data-testid='issue-pr-title-link']"],
+        excludeSelectors: ["a[data-hovercard-type]"],
+        contentSelectors,
+      }),
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Pages Router hydration causes an extra client render on issue pages."]);
+    expect(document.querySelector("#issue-title")?.textContent).toContain(
+      "[zh-Hans] Pages Router hydration causes an extra client render on issue pages.",
+    );
+    expect(document.body.textContent).toContain("alice");
+    expect(document.body.textContent).not.toContain("[zh-Hans] alice");
   });
 
   it("keys cached translations by page title context", async () => {
@@ -1155,6 +1195,60 @@ describe("PageController", () => {
     });
     expect(document.body.textContent).toContain("Pricing");
     expect(document.body.textContent).not.toContain("[zh-Hans] Pricing");
+  });
+
+  it("uses text-driven roots for generic structure-only dashboards with card div text", async () => {
+    document.body.innerHTML = `
+      <header>
+        <a href="/comps">Comps</a>
+        <a href="/stats">Stats</a>
+      </header>
+      <main>
+        <div class="comp-card">
+          <div class="comp-title">Fateweaver Twisted Fate</div>
+          <div class="comp-summary">A flexible magic damage composition that uses early item tempo.</div>
+          <div class="metric">4.11 Avg Place</div>
+        </div>
+        <div class="comp-card">
+          <div class="comp-title">Dark Star Karma</div>
+          <div class="comp-summary">Strong board for players who can preserve health through stage three.</div>
+          <div class="metric">56.2% Top 4 Rate</div>
+        </div>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://dashboard.example/cards", "normal", {
+      rules: [
+        {
+          id: "dashboard-shape",
+          siteKey: "dashboard.example",
+          matches: ["dashboard.example"],
+          ruleSource: "imported-stable",
+          dynamicPreset: "normal",
+        },
+      ],
+    });
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      weakCandidateSelectors: policy.weakCandidateSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      fallbackProfile: policy.fallbackProfile,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts.some((text) => text.includes("Fateweaver Twisted Fate"))).toBe(true);
+    expect(requestedTexts.some((text) => text.includes("Dark Star Karma"))).toBe(true);
+    expect(document.body.textContent).toContain("Comps");
+    expect(document.body.textContent).not.toContain("[zh-Hans] Comps");
   });
 
   it("uses containerMinTextCount to drop tiny configured scan roots", async () => {

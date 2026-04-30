@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleBackgroundMessage, toggleActiveTabTranslation } from "@/background/messageRouter";
+import { handleBackgroundMessage, sendToActiveTab, toggleActiveTabTranslation } from "@/background/messageRouter";
 import { resetParagraphCacheForTests, setParagraphCache } from "@/background/paragraphCache";
 import { createTranslationCacheLookup } from "@/shared/translationCache";
 import { stubImportedRulesResource } from "../helpers/importedRulesResource";
@@ -148,6 +148,31 @@ describe("handleBackgroundMessage", () => {
     expect(response).toMatchObject({ ok: true, status: { phase: "translated" } });
     expect(sendMessage).toHaveBeenCalledWith(12, { type: "IMT_GET_PAGE_STATUS" });
     vi.unstubAllGlobals();
+  });
+
+  it("retries active tab messages while the content script is still loading", async () => {
+    vi.useFakeTimers();
+    const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error("Could not establish connection. Receiving end does not exist."))
+      .mockResolvedValueOnce({ ok: true });
+    vi.stubGlobal("chrome", {
+      tabs: {
+        query: tabsQuery,
+        sendMessage,
+      },
+    });
+
+    const responsePromise = sendToActiveTab({ type: "IMT_TRANSLATE_PAGE" });
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(responsePromise).resolves.toEqual({ ok: true });
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage).toHaveBeenNthCalledWith(1, 12, { type: "IMT_TRANSLATE_PAGE" });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, 12, { type: "IMT_TRANSLATE_PAGE" });
+
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("forwards active tab render-state requests from popup", async () => {

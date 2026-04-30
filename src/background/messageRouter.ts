@@ -23,13 +23,51 @@ const providers: Record<ProviderRequest["provider"], TranslationProvider> = {
   openrouter: openrouterProvider,
 };
 
+const CONTENT_SCRIPT_RETRY_DELAYS_MS = [250, 500, 1000] as const;
+
 export async function sendToActiveTab(message: ContentMessage): Promise<MessageResponse> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tabId = tabs[0]?.id;
   if (!tabId) return { ok: false, error: "No active tab" };
 
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= CONTENT_SCRIPT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return (await chrome.tabs.sendMessage(tabId, message)) as MessageResponse;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientContentScriptMessageError(error) || attempt >= CONTENT_SCRIPT_RETRY_DELAYS_MS.length) break;
+      const retryDelayMs = CONTENT_SCRIPT_RETRY_DELAYS_MS[attempt];
+      if (retryDelayMs === undefined) break;
+      await delay(retryDelayMs);
+    }
+  }
+
+  return { ok: false, error: lastError instanceof Error ? lastError.message : String(lastError) };
+}
+
+function isTransientContentScriptMessageError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /receiving end does not exist|could not establish connection|no receiver/i.test(message);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function notifyActiveTab(message: ContentMessage): Promise<void> {
+  await sendToActiveTab(message);
+}
+
+async function translateBatch(request: ProviderRequest): Promise<MessageResponse> {
+  const provider = providers[request.provider];
+  if (!provider) return { ok: false, error: `Unsupported translation provider: ${request.provider}` };
+
   try {
-    return (await chrome.tabs.sendMessage(tabId, message)) as MessageResponse;
+    const items = await runProviderRequestWithInflightDedupe(request, (dedupedRequest) =>
+      withTranslationPermit(request.provider, request.maxConcurrentRequests, () => provider.translate(dedupedRequest)),
+    );
+    return { ok: true, items: reconcileProviderItems(request.items, items) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -95,24 +133,6 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
 
 function isTranslatedPhase(phase: string): boolean {
   return phase === "translated" || phase === "partial" || phase === "updating";
-}
-
-async function notifyActiveTab(message: ContentMessage): Promise<void> {
-  await sendToActiveTab(message);
-}
-
-async function translateBatch(request: ProviderRequest): Promise<MessageResponse> {
-  const provider = providers[request.provider];
-  if (!provider) return { ok: false, error: `Unsupported translation provider: ${request.provider}` };
-
-  try {
-    const items = await runProviderRequestWithInflightDedupe(request, (dedupedRequest) =>
-      withTranslationPermit(request.provider, request.maxConcurrentRequests, () => provider.translate(dedupedRequest)),
-    );
-    return { ok: true, items: reconcileProviderItems(request.items, items) };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
 }
 
 function reconcileProviderItems(requestItems: ProviderRequest["items"], responseItems: ProviderResponseItem[]): ProviderResponseItem[] {

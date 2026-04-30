@@ -139,7 +139,7 @@ export class PageController {
       if (!candidate.isConnected) continue;
       if (!isNearViewport(candidate, margin)) continue;
       if (isSkippableElement(candidate, { ...(this.options.allowTooltip ? { allowTooltip: true } : {}) })) continue;
-      if (matchesClosestSelector(candidate, this.options.excludeSelectors)) continue;
+      if (isExcludedByRuleSelector(candidate, this.options.excludeSelectors, this.options.contentSelectors)) continue;
       const text = normalizeVisibleText(candidate.textContent ?? "");
       if (!isMeaningfulText(text, classifyViewportCandidate(candidate))) continue;
       addRoot(roots, candidate);
@@ -927,15 +927,33 @@ function classifyViewportCandidate(element: HTMLElement): UnitCategory {
 }
 
 function matchesClosestSelector(element: HTMLElement, selectors: readonly string[] | undefined): boolean {
-  if (!selectors?.length) return false;
+  return Boolean(closestMatchingElement(element, selectors));
+}
+
+function closestMatchingElement(element: HTMLElement, selectors: readonly string[] | undefined): HTMLElement | null {
+  if (!selectors?.length) return null;
   for (const selector of selectors) {
     try {
-      if (element.closest(selector)) return true;
+      const match = element.closest<HTMLElement>(selector);
+      if (match) return match;
     } catch {
       continue;
     }
   }
-  return false;
+  return null;
+}
+
+function isExcludedByRuleSelector(
+  element: HTMLElement,
+  excludeSelectors: readonly string[] | undefined,
+  contentSelectors: readonly SiteContentSelector[] | undefined,
+): boolean {
+  const excludedRoot = closestMatchingElement(element, excludeSelectors);
+  if (!excludedRoot) return false;
+
+  const contentRoot = closestMatchingElement(element, contentSelectors?.map((rule) => rule.selector));
+  if (contentRoot && (excludedRoot === contentRoot || !contentRoot.contains(excludedRoot))) return false;
+  return true;
 }
 
 function dedupeElements(elements: HTMLElement[]): HTMLElement[] {

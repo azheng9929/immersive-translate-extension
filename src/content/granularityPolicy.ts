@@ -504,17 +504,20 @@ export function resolveTextGranularity(
   if (matchesAnyPattern(text, GLOBAL_SKIP_TEXT_PATTERNS)) return { skip: true, reason: "global-text" };
   if (shouldSkipForTargetLanguage(text, options.targetLang)) return { skip: true, reason: "target-language" };
 
-  if (options.excludeSelectors?.length && matchesClosest(element, options.excludeSelectors)) {
-    return { skip: true, reason: "rule-selector" };
-  }
-
   const configuredContentRule = findContentRule(element, options.contentSelectors ?? []);
   if (configuredContentRule) {
-    return {
-      skip: false,
-      root: configuredContentRule.root,
-      category: configuredContentRule.category,
-    };
+    const excludedRoot = closestMatchingElementForSelectors(element, options.excludeSelectors ?? []);
+    if (!excludedRoot || excludedRoot === configuredContentRule.root || !configuredContentRule.root.contains(excludedRoot)) {
+      return {
+        skip: false,
+        root: configuredContentRule.root,
+        category: configuredContentRule.category,
+      };
+    }
+  }
+
+  if (options.excludeSelectors?.length && matchesClosest(element, options.excludeSelectors)) {
+    return { skip: true, reason: "rule-selector" };
   }
 
   const policy = resolvePolicy(options.hostname);
@@ -561,6 +564,14 @@ function findContentRule(
 
 function matchesClosest(element: HTMLElement, selectors: readonly string[]): boolean {
   return selectors.some((selector) => Boolean(closestMatchingElement(element, selector)));
+}
+
+function closestMatchingElementForSelectors(element: HTMLElement, selectors: readonly string[]): HTMLElement | null {
+  for (const selector of selectors) {
+    const match = closestMatchingElement(element, selector);
+    if (match) return match;
+  }
+  return null;
 }
 
 function closestMatchingElement(element: HTMLElement, selector: string): HTMLElement | null {

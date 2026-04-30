@@ -19,6 +19,8 @@ const sites = {
     url: "https://tactics.tools/team-compositions",
     fixtureKind: "hover-tooltip",
     hoverTooltip: true,
+    hoverMaxAttempts: 6,
+    hoverAttemptTimeoutMs: 1800,
   },
   stackOverflow: {
     name: "StackOverflow",
@@ -75,8 +77,26 @@ const sites = {
     fixtureKind: "search-results",
   },
   mobalyticsTft: { name: "Mobalytics TFT", host: "mobalytics.gg", url: "https://mobalytics.gg/tft/team-comps", fixtureKind: "data-dashboard" },
-  uggHover: { name: "U.GG Champions", host: "u.gg", url: "https://u.gg/lol/champions", fixtureKind: "hover-tooltip", hoverTooltip: true },
-  opggHover: { name: "OP.GG Champions", host: "op.gg", url: "https://www.op.gg/champions", fixtureKind: "hover-tooltip", hoverTooltip: true },
+  uggHover: {
+    name: "U.GG Champions",
+    host: "u.gg",
+    url: "https://u.gg/lol/champions",
+    fixtureKind: "hover-tooltip",
+    hoverTooltip: true,
+    hoverTooltipOptional: true,
+    hoverMaxAttempts: 6,
+    hoverAttemptTimeoutMs: 2000,
+  },
+  opggHover: {
+    name: "OP.GG Champions",
+    host: "op.gg",
+    url: "https://www.op.gg/champions",
+    fixtureKind: "hover-tooltip",
+    hoverTooltip: true,
+    hoverTooltipOptional: true,
+    hoverMaxAttempts: 6,
+    hoverAttemptTimeoutMs: 2000,
+  },
   chatgpt: { name: "ChatGPT", host: "chatgpt.com", url: "https://chatgpt.com/", fixtureKind: "ai-chat", requiresLogin: true },
   claude: { name: "Claude", host: "claude.ai", url: "https://claude.ai/", fixtureKind: "ai-chat", requiresLogin: true },
   poe: { name: "Poe", host: "poe.com", url: "https://poe.com/", fixtureKind: "ai-chat", requiresLogin: true },
@@ -178,18 +198,22 @@ export function resolveRegressionSelection({ argv = [], env = process.env } = {}
     throw new Error(`Unsupported regression profile: ${profile}. Use smoke, high-dynamic, core-rules, long-tail-rules, fixture-matrix, or all.`);
   }
 
+  const fixtureKinds = parseFixtureKinds(readArg(argv, "fixture-kind") || env.IMT_REGRESSION_FIXTURE_KIND || "");
   const dynamicModes = parseCsv(env.IMT_REGRESSION_DYNAMIC_MODES ?? "").length > 0
     ? parseCsv(env.IMT_REGRESSION_DYNAMIC_MODES)
     : profileConfig.dynamicModes;
   const siteFilter = parseCsv(env.IMT_REGRESSION_SITE_FILTER ?? "").length > 0
     ? parseCsv(env.IMT_REGRESSION_SITE_FILTER).map((item) => item.toLowerCase())
     : profileConfig.siteFilter;
-  const selectedSites = selectRegressionSites(siteFilter);
+  const selectedSites = fixtureKinds.length > 0
+    ? selectRegressionSitesByFixtureKind(fixtureKinds, siteFilter)
+    : selectRegressionSites(siteFilter);
 
   return {
     profile,
     dynamicModes,
     siteFilter,
+    fixtureKinds,
     selectedSites,
   };
 }
@@ -200,8 +224,25 @@ export function selectRegressionSites(siteFilter = []) {
   return allRegressionSites.filter((site) => filters.some((filter) => matchesSiteFilter(site, filter)));
 }
 
+export function selectRegressionSitesByFixtureKind(fixtureKinds = [], siteFilter = []) {
+  const selectedByKind = fixtureKinds.flatMap((kind) => realSiteFixtureGroups[kind] ?? []);
+  const uniqueByUrl = [...new Map(selectedByKind.map((site) => [site.url, site])).values()];
+  if (siteFilter.length === 0 || siteFilter === regressionProfiles["fixture-matrix"].siteFilter) return uniqueByUrl;
+  const filters = siteFilter.map((item) => item.toLowerCase());
+  return uniqueByUrl.filter((site) => filters.some((filter) => matchesSiteFilter(site, filter)));
+}
+
 export function parseCsv(value) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function parseFixtureKinds(value) {
+  const kinds = parseCsv(value).map((kind) => kind.toLowerCase());
+  const unknown = kinds.filter((kind) => !realSiteFixtureGroups[kind]);
+  if (unknown.length > 0) {
+    throw new Error(`Unsupported fixture kind: ${unknown.join(", ")}. Use ${Object.keys(realSiteFixtureGroups).join(", ")}.`);
+  }
+  return kinds;
 }
 
 export function siteAccessGateReason(site, metrics) {

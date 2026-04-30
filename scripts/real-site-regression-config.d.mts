@@ -4,6 +4,9 @@ export type RegressionSite = {
   url: string;
   fixtureKind?: string;
   hoverTooltip?: boolean;
+  hoverTooltipOptional?: boolean;
+  hoverMaxAttempts?: number;
+  hoverAttemptTimeoutMs?: number;
   requiresLogin?: boolean;
 };
 
@@ -11,6 +14,7 @@ export type RegressionSelection = {
   profile: "smoke" | "high-dynamic" | "core-rules" | "long-tail-rules" | "fixture-matrix" | "all";
   dynamicModes: string[];
   siteFilter: string[];
+  fixtureKinds: string[];
   selectedSites: RegressionSite[];
 };
 
@@ -23,5 +27,7 @@ export function resolveRegressionSelection(input?: {
 }): RegressionSelection;
 
 export function selectRegressionSites(siteFilter?: string[]): RegressionSite[];
+
+export function selectRegressionSitesByFixtureKind(fixtureKinds?: string[], siteFilter?: string[]): RegressionSite[];
 
 export function parseCsv(value: string): string[];

@@ -87,6 +87,11 @@ export function classifyElementForTranslation(element: Element, rule: CompiledFi
   const root = element instanceof HTMLElement ? element : element.parentElement;
   if (!root) return { kind: "excluded", root: document.body };
 
+  const configuredContentRoot = findConfiguredContentRoot(root, rule);
+  if (configuredContentRoot && !hasBlockingRuleInsideContentRoot(root, configuredContentRoot, rule)) {
+    return { kind: "block", root: configuredContentRoot };
+  }
+
   if (matchesExcludedElement(root, rule)) return { kind: "excluded", root };
   if (isStayOriginalElement(root, rule)) return { kind: "stay-original", root };
 
@@ -153,6 +158,23 @@ function isInlineByStyle(element: HTMLElement): boolean {
 
 function matchesExcludedElement(element: HTMLElement, rule: CompiledFilterRule): boolean {
   return matchesClosestSelector(element, rule.excludeSelectors) || matchesTagInAncestry(element, rule.excludeTags);
+}
+
+function hasBlockingRuleInsideContentRoot(
+  element: HTMLElement,
+  contentRoot: HTMLElement,
+  rule: CompiledFilterRule,
+): boolean {
+  const excludedElement = closestMatchingElement(element, rule.excludeSelectors);
+  if (excludedElement && excludedElement !== contentRoot && contentRoot.contains(excludedElement)) return true;
+
+  for (let current: HTMLElement | null = element; current && current !== contentRoot; current = current.parentElement) {
+    if (rule.excludeTags.includes(current.tagName)) return true;
+    if (rule.stayOriginalTags.includes(current.tagName)) return true;
+    if (closestMatchingElement(current, rule.stayOriginalSelectors) === current) return true;
+  }
+
+  return false;
 }
 
 function matchesTagInAncestry(element: HTMLElement, tags: readonly string[]): boolean {

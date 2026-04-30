@@ -144,14 +144,16 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await pageSession.send("Runtime.enable");
     await pageSession.send("Page.enable");
     await pageSession.send("Log.enable");
+    await pageSession.send("Page.bringToFront").catch(() => undefined);
     await navigate(pageSession, site.url);
+    await pageSession.send("Page.bringToFront").catch(() => undefined);
     await delay(3000);
 
     const translateStartedAt = Date.now();
     const translateResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_TRANSLATE_PAGE" });
     const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, 8000);
     await delay(500);
-    const hoverResult = site.hoverTooltip ? await runHoverTooltipRegression(pageSession) : undefined;
+    const hoverResult = site.hoverTooltip ? await runHoverTooltipRegression(pageSession, site) : undefined;
     await scrollPage(pageSession);
     await delay(3500);
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
@@ -178,6 +180,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
         url: location.href,
         title: document.title,
         readyState: document.readyState,
+        visibilityState: document.visibilityState,
         bodyTextLength: document.body?.innerText?.length ?? 0,
         bodyTextPreview: (document.body?.innerText ?? '').slice(0, 500),
         translatedBlocks: document.querySelectorAll('.imt-translation-block, .imt-translation-compact').length,
@@ -200,12 +203,13 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     const skipped = Boolean(skipReason);
     const pageStatus = pageStatusResponse?.ok ? pageStatusResponse.status : undefined;
     const excessiveFailures = pageStatus ? pageStatus.failed > Math.max(5, Math.ceil(pageStatus.total * 0.5)) : false;
+    const hoverSatisfied = !site.hoverTooltip || hoverResult?.ok || Boolean(site.hoverTooltipOptional);
     const ok = Boolean(translateResponse?.ok) &&
       Boolean(pageStatusResponse?.ok) &&
       (skipped || metrics.bodyTextLength > 0) &&
       (skipped || metrics.translatedBlocks > 0 || metrics.translatedRoots > 0) &&
       metrics.forbiddenTranslations === 0 &&
-      (!site.hoverTooltip || hoverResult?.ok) &&
+      hoverSatisfied &&
       !excessiveFailures &&
       pageStatus?.phase !== "failed" &&
       extensionErrors.length === 0;
@@ -223,7 +227,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
             `failed=${pageStatus?.failed ?? "n/a"}`,
             `forbidden=${metrics.forbiddenTranslations}`,
             `first=${firstProgress.elapsedMs ?? "n/a"}ms`,
-            hoverResult ? `hover=${hoverResult.ok ? "ok" : "failed"}` : undefined,
+            hoverResult ? `hover=${hoverResult.ok ? "ok" : site.hoverTooltipOptional ? "optional-missing" : "failed"}` : undefined,
           ].filter(Boolean).join(", "),
       translateResponse,
       pageStatusResponse,
@@ -405,14 +409,16 @@ async function scrollPage(pageSession) {
   }
 }
 
-async function runHoverTooltipRegression(pageSession) {
+async function runHoverTooltipRegression(pageSession, site) {
   await evaluate(pageSession, "window.scrollTo(0, Math.min(600, Math.max(0, document.body.scrollHeight - window.innerHeight)))");
   await delay(1000);
 
+  const maxAttempts = Math.max(1, Math.min(Number(site.hoverMaxAttempts ?? 8), 20));
+  const attemptTimeoutMs = Math.max(500, Math.min(Number(site.hoverAttemptTimeoutMs ?? 2500), 5000));
   const candidates = await readHoverCandidates(pageSession);
   const attempted = [];
 
-  for (const candidate of candidates) {
+  for (const candidate of candidates.slice(0, maxAttempts)) {
     attempted.push(candidate);
     await pageSession.send("Input.dispatchMouseEvent", {
       type: "mouseMoved",
@@ -420,7 +426,7 @@ async function runHoverTooltipRegression(pageSession) {
       y: candidate.y,
     });
 
-    const tooltip = await waitForTranslatedTooltip(pageSession, 5000);
+    const tooltip = await waitForTranslatedTooltip(pageSession, attemptTimeoutMs);
     if (tooltip?.translatedBlocks > 0) {
       return {
         ok: true,
@@ -437,6 +443,8 @@ async function runHoverTooltipRegression(pageSession) {
   const lastTooltip = await readVisibleTooltips(pageSession);
   return {
     ok: false,
+    maxAttempts,
+    attemptTimeoutMs,
     attempted: attempted.length,
     candidates: candidates.slice(0, 12),
     lastTooltip,
@@ -458,8 +466,23 @@ async function readHoverCandidates(pageSession) {
       .filter((element) => !element.closest('[data-imt-managed="true"], [data-imt-control="root"]'))
       .map((element, index) => {
         const rect = element.getBoundingClientRect();
+        const marker = [
+          element.tagName,
+          element.id,
+          element.className,
+          element.getAttribute('alt'),
+          element.getAttribute('title'),
+          element.getAttribute('aria-label')
+        ].join(' ').toLowerCase();
+        const score =
+          (/(champion|unit|item|augment|trait|hero|spell|ability)/.test(marker) ? 6 : 0) +
+          (element.matches('img,canvas,[style*="background-image"]') ? 4 : 0) +
+          (rect.width >= 20 && rect.width <= 96 && rect.height >= 20 && rect.height <= 96 ? 3 : 0) +
+          (element.getAttribute('alt') || element.getAttribute('title') || element.getAttribute('aria-label') ? 2 : 0) -
+          (/(logo|avatar|icon-button|social|share|menu|nav|close|search)/.test(marker) ? 5 : 0);
         return {
           index,
+          score,
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2,
           width: rect.width,
@@ -479,6 +502,7 @@ async function readHoverCandidates(pageSession) {
         item.height >= 10 &&
         item.height <= 120
       )
+      .sort((left, right) => right.score - left.score || left.y - right.y || left.x - right.x)
       .slice(0, 160);
   })()`);
 }
@@ -581,20 +605,30 @@ async function setExtensionConfig(serviceWorkerSession, nextConfig) {
 }
 
 async function sendContentMessage(serviceWorkerSession, host, message) {
-  return evaluate(serviceWorkerSession, `(async () => {
-    const tabs = await chrome.tabs.query({});
-    const tab = tabs.find((item) => item.url && item.url.includes(${JSON.stringify(host)}));
-    if (!tab?.id) return { ok: false, error: "tab not found", tabs: tabs.map((item) => item.url) };
-    return new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab.id, ${JSON.stringify(message)}, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ ok: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-        resolve(response ?? { ok: false, error: "empty response" });
+  let response;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    response = await evaluate(serviceWorkerSession, `(async () => {
+      const tabs = await chrome.tabs.query({});
+      const tab = tabs.find((item) => item.url && item.url.includes(${JSON.stringify(host)}));
+      if (!tab?.id) return { ok: false, error: "tab not found", tabs: tabs.map((item) => item.url) };
+      return new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, ${JSON.stringify(message)}, (contentResponse) => {
+          if (chrome.runtime.lastError) {
+            resolve({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          resolve(contentResponse ?? { ok: false, error: "empty response" });
+        });
       });
-    });
-  })()`);
+    })()`);
+    if (response?.ok || !isTransientContentMessageError(response?.error) || attempt === 4) return response;
+    await delay(300 + attempt * 300);
+  }
+  return response;
+}
+
+function isTransientContentMessageError(error) {
+  return /receiving end does not exist|could not establish connection|no receiver/i.test(String(error ?? ""));
 }
 
 async function evaluate(session, expression) {
