@@ -322,6 +322,8 @@ export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
       "#video-title",
       "#description-inline-expander",
       "#description",
+      "yt-formatted-string#description-text",
+      "yt-formatted-string.metadata-snippet-text",
       "#content-text",
       "ytd-comment-view-model #content-text",
       "ytd-transcript-segment-renderer",
@@ -331,6 +333,10 @@ export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
       { selector: "h1.title, ytd-watch-metadata h1, h1 yt-formatted-string", category: "heading" },
       { selector: "yt-formatted-string#content-text", category: "comment" },
       { selector: "#description, #description-inline-expander, ytd-text-inline-expander", category: "content-block" },
+      {
+        selector: "yt-formatted-string#description-text, yt-formatted-string.metadata-snippet-text",
+        category: "card-text",
+      },
       {
         selector:
           "#video-title, a#video-title, yt-formatted-string.ytd-compact-video-renderer, yt-formatted-string.ytd-grid-video-renderer",
@@ -383,6 +389,8 @@ export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
 #video-title,
 #description,
 #description-inline-expander,
+#description-text,
+.metadata-snippet-text,
 #content-text,
 ytd-watch-metadata h1,
 ytd-transcript-segment-renderer {
@@ -406,6 +414,9 @@ ytd-transcript-segment-renderer {
       "shreddit-comment",
       "[data-testid='post-content']",
       "[data-test-id='comment']",
+      "#right-sidebar-container .i18n-translatable-text",
+      "#right-sidebar-container h2.i18n-translatable-text",
+      '#right-sidebar-container [data-testid="community-status-text"] p',
     ],
     contentSelectors: [
       { selector: '[data-testid="post-title"], a[data-testid="post-title"], [slot="title"]', category: "card-text" },
@@ -415,6 +426,9 @@ ytd-transcript-segment-renderer {
         category: "content-block",
       },
       { selector: '[data-testid="comment"] p, shreddit-comment p', category: "comment" },
+      { selector: "#right-sidebar-container .i18n-translatable-text", category: "card-text" },
+      { selector: "#right-sidebar-container h2.i18n-translatable-text", category: "card-text" },
+      { selector: '#right-sidebar-container [data-testid="community-status-text"] p', category: "content-block" },
     ],
     excludeSelectors: [
       "faceplate-timeago",
@@ -425,7 +439,6 @@ ytd-transcript-segment-renderer {
       "shreddit-join-button",
       "faceplate-hovercard",
       "faceplate-tooltip",
-      "faceplate-tracker",
       "faceplate-number",
       "shreddit-post-flair",
       "shreddit-distinguished-post-tags",
@@ -466,7 +479,9 @@ shreddit-post [slot="title"],
 shreddit-post [slot="text-body"],
 shreddit-comment,
 [data-testid="post-content"],
-[data-test-id="comment"] {
+[data-test-id="comment"],
+#right-sidebar-container .i18n-translatable-text,
+#right-sidebar-container [data-testid="community-status-text"] p {
   -webkit-line-clamp: unset !important;
   line-clamp: unset !important;
   max-height: none !important;

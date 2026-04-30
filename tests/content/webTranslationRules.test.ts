@@ -228,6 +228,33 @@ describe("webTranslationRules", () => {
     });
   });
 
+  it("keeps YouTube search result descriptions and Reddit side rail labels in site selectors", () => {
+    const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
+    const reddit = resolveWebTranslationPolicy(
+      "https://www.reddit.com/r/XiaomiGlobal/comments/1sxkzhf/xiaomi_mimo_orbit_program/",
+      "normal",
+    );
+
+    expect(youtube.preferredScanRootSelectors).toContain("yt-formatted-string.metadata-snippet-text");
+    expect(youtube.contentSelectors).toContainEqual({
+      selector: "yt-formatted-string#description-text, yt-formatted-string.metadata-snippet-text",
+      category: "card-text",
+    });
+
+    expect(reddit.preferredScanRootSelectors).toContain("#right-sidebar-container .i18n-translatable-text");
+    expect(reddit.preferredScanRootSelectors).toContain("#right-sidebar-container h2.i18n-translatable-text");
+    expect(reddit.contentSelectors).toContainEqual({
+      selector: "#right-sidebar-container .i18n-translatable-text",
+      category: "card-text",
+    });
+    expect(reddit.contentSelectors).toContainEqual({
+      selector: "#right-sidebar-container h2.i18n-translatable-text",
+      category: "card-text",
+    });
+    expect(reddit.excludeSelectors).not.toContain("faceplate-tracker");
+    expect(reddit.excludedDynamicSelectors).toContain("faceplate-tracker");
+  });
+
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

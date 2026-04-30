@@ -104,6 +104,10 @@ const YOUTUBE_POLICY: SiteGranularityPolicy = {
     { selector: "yt-formatted-string#content-text", category: "comment" },
     { selector: "#description, #description-inline-expander, ytd-text-inline-expander", category: "content-block" },
     {
+      selector: "yt-formatted-string#description-text, yt-formatted-string.metadata-snippet-text",
+      category: "card-text",
+    },
+    {
       selector:
         "#video-title, a#video-title, yt-formatted-string.ytd-compact-video-renderer, yt-formatted-string.ytd-grid-video-renderer",
       category: "card-text",
@@ -191,6 +195,9 @@ const REDDIT_POLICY: SiteGranularityPolicy = {
       category: "content-block",
     },
     { selector: '[data-testid="comment"] p, shreddit-comment p', category: "comment" },
+    { selector: "#right-sidebar-container .i18n-translatable-text", category: "card-text" },
+    { selector: "#right-sidebar-container h2.i18n-translatable-text", category: "card-text" },
+    { selector: '#right-sidebar-container [data-testid="community-status-text"] p', category: "content-block" },
   ],
   skipSelectors: [
     "faceplate-timeago",

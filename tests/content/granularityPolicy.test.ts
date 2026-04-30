@@ -8,12 +8,16 @@ describe("resolveTextGranularity", () => {
       <div id="masthead-container"><span>Search</span></div>
       <h1 class="title"><span>How large language models actually work</span></h1>
       <yt-formatted-string id="content-text">This explanation finally made the idea click for me.</yt-formatted-string>
+      <yt-formatted-string id="description-text" class="metadata-snippet-text">
+        <span>This video explains what changed in OpenAI's latest release and why it matters.</span>
+      </yt-formatted-string>
       <div id="metadata-line"><span>1.2M views</span></div>
       <div id="top-level-buttons-computed"><button><span>Share</span></button></div>
     `);
 
     const title = document.querySelector<HTMLElement>("h1 span")!;
     const comment = document.querySelector<HTMLElement>("yt-formatted-string#content-text")!;
+    const resultDescription = document.querySelector<HTMLElement>("#description-text span")!;
     const masthead = document.querySelector<HTMLElement>("#masthead-container span")!;
     const metadata = document.querySelector<HTMLElement>("#metadata-line span")!;
     const share = document.querySelector<HTMLElement>("button span")!;
@@ -27,6 +31,13 @@ describe("resolveTextGranularity", () => {
       skip: false,
       category: "comment",
       root: comment,
+    });
+    expect(
+      resolveTextGranularity(resultDescription, resultDescription.textContent ?? "", { hostname: "www.youtube.com" }),
+    ).toMatchObject({
+      skip: false,
+      category: "card-text",
+      root: resultDescription.closest("#description-text"),
     });
     expect(resolveTextGranularity(masthead, masthead.textContent ?? "", { hostname: "www.youtube.com" }).skip).toBe(
       true,
@@ -46,6 +57,16 @@ describe("resolveTextGranularity", () => {
         <button data-click-id="share">Share</button>
         <div data-testid="comment"><p>This comment adds useful context for readers.</p></div>
       </shreddit-post>
+      <div id="right-sidebar-container">
+        <faceplate-tracker>
+          <summary>
+            <h2 class="i18n-translatable-text">No piracy and Content Quality</h2>
+          </summary>
+        </faceplate-tracker>
+        <div data-testid="community-status-text">
+          <p>Xiaomi Community Official</p>
+        </div>
+      </div>
     `);
 
     const author = document.querySelector<HTMLElement>("[data-testid='post_author_link']")!;
@@ -53,6 +74,8 @@ describe("resolveTextGranularity", () => {
     const votes = document.querySelector<HTMLElement>("[data-click-id='upvote']")!;
     const share = document.querySelector<HTMLElement>("[data-click-id='share']")!;
     const comment = document.querySelector<HTMLElement>("[data-testid='comment'] p")!;
+    const sidebarRule = document.querySelector<HTMLElement>("#right-sidebar-container h2")!;
+    const sidebarAbout = document.querySelector<HTMLElement>("[data-testid='community-status-text'] p")!;
 
     expect(resolveTextGranularity(title, title.textContent ?? "", { hostname: "www.reddit.com" })).toMatchObject({
       skip: false,
@@ -63,6 +86,16 @@ describe("resolveTextGranularity", () => {
       skip: false,
       category: "comment",
       root: comment,
+    });
+    expect(resolveTextGranularity(sidebarRule, sidebarRule.textContent ?? "", { hostname: "www.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "card-text",
+      root: sidebarRule,
+    });
+    expect(resolveTextGranularity(sidebarAbout, sidebarAbout.textContent ?? "", { hostname: "www.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "content-block",
+      root: sidebarAbout,
     });
     expect(resolveTextGranularity(author, author.textContent ?? "", { hostname: "www.reddit.com" }).skip).toBe(true);
     expect(resolveTextGranularity(votes, votes.textContent ?? "", { hostname: "www.reddit.com" }).skip).toBe(true);
