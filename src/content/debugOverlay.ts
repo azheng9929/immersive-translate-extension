@@ -271,11 +271,20 @@ class RuleVisualizer {
   private readonly markedElements = new Set<Element>();
   private styleElement: HTMLStyleElement | undefined;
   private legendElement: HTMLElement | undefined;
+  private inspectorElement: HTMLElement | undefined;
+  private readonly handleInspectClick = (event: MouseEvent): void => {
+    const element = visualizedElementFromEvent(event);
+    if (!element || isExtensionElement(element)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.showInspector(element, event.clientX, event.clientY);
+  };
 
   show(status: PageTranslationStatus, textCandidates: readonly HTMLElement[] = []): void {
     this.hide();
     const selectors = status.site?.ruleDiagnostics?.visualizationSelectors ?? [];
     this.ensureStyle();
+    document.addEventListener("click", this.handleInspectClick, true);
 
     const summaries = new Map<PageTranslationRuleVisualizationGroup, RuleVisualizationSummary>();
     for (const entry of selectors) {
@@ -288,7 +297,7 @@ class RuleVisualizer {
       const matchedElements = queryRuleElements(entry.selector);
       for (const element of matchedElements) {
         if (isExtensionElement(element)) continue;
-        markElement(element, entry.group);
+        markElement(element, entry.group, ruleReasonLabel(entry.group, entry.selector, entry.label));
         this.markedElements.add(element);
         summary.elementCount += 1;
       }
@@ -301,7 +310,7 @@ class RuleVisualizer {
     };
     for (const element of textCandidates) {
       if (isExtensionElement(element)) continue;
-      markElement(element, "text-candidate");
+      markElement(element, "text-candidate", "text-candidate: actual translated root");
       this.markedElements.add(element);
       textSummary.elementCount += 1;
     }
@@ -312,6 +321,7 @@ class RuleVisualizer {
   }
 
   hide(): void {
+    document.removeEventListener("click", this.handleInspectClick, true);
     for (const element of this.markedElements) {
       element.removeAttribute("data-imt-rule-visualization");
       element.removeAttribute("data-imt-rule-visualization-reason");
@@ -319,8 +329,40 @@ class RuleVisualizer {
     this.markedElements.clear();
     this.legendElement?.remove();
     this.legendElement = undefined;
+    this.inspectorElement?.remove();
+    this.inspectorElement = undefined;
     this.styleElement?.remove();
     this.styleElement = undefined;
+  }
+
+  private showInspector(element: Element, clientX: number, clientY: number): void {
+    this.inspectorElement?.remove();
+    const inspector = document.createElement("aside");
+    inspector.dataset.imtManaged = "true";
+    inspector.dataset.imtRuleVisualizerInspector = "true";
+    inspector.textContent = element.getAttribute("data-imt-rule-visualization-reason") ?? "No rule reason";
+    const left = Math.min(Math.max(clientX + 12, 12), Math.max(window.innerWidth - 320, 12));
+    const top = Math.min(Math.max(clientY + 12, 12), Math.max(window.innerHeight - 120, 12));
+    Object.assign(inspector.style, {
+      position: "fixed",
+      left: `${left}px`,
+      top: `${top}px`,
+      zIndex: "2147483647",
+      maxWidth: "300px",
+      boxSizing: "border-box",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      border: "1px solid rgba(20, 33, 61, 0.16)",
+      background: "rgba(255, 255, 255, 0.98)",
+      color: "#14213d",
+      boxShadow: "0 12px 32px rgba(20, 33, 61, 0.2)",
+      font: "12px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      overflowWrap: "anywhere",
+      pointerEvents: "none",
+      whiteSpace: "normal",
+    });
+    document.documentElement.append(inspector);
+    this.inspectorElement = inspector;
   }
 
   private ensureStyle(): void {
@@ -382,11 +424,27 @@ function isExtensionElement(element: Element): boolean {
   return Boolean(element.closest('[data-imt-managed="true"]'));
 }
 
-function markElement(element: Element, group: PageTranslationRuleVisualizationGroup): void {
+function markElement(element: Element, group: PageTranslationRuleVisualizationGroup, reason: string): void {
   const groups = new Set((element.getAttribute("data-imt-rule-visualization") ?? "").split(/\s+/).filter(Boolean));
+  const reasons = new Set((element.getAttribute("data-imt-rule-visualization-reason") ?? "").split(" | ").filter(Boolean));
   groups.add(group);
+  reasons.add(reason);
   element.setAttribute("data-imt-rule-visualization", [...groups].join(" "));
-  element.setAttribute("data-imt-rule-visualization-reason", [...groups].join(", "));
+  element.setAttribute("data-imt-rule-visualization-reason", [...reasons].join(" | "));
+}
+
+function ruleReasonLabel(group: PageTranslationRuleVisualizationGroup, selector: string, label: string | undefined): string {
+  const labelSuffix = label ? `:${label}` : "";
+  return `${group}${labelSuffix}: ${selector}`;
+}
+
+function visualizedElementFromEvent(event: MouseEvent): Element | undefined {
+  for (const item of event.composedPath()) {
+    if (item instanceof Element && item.hasAttribute("data-imt-rule-visualization")) return item;
+  }
+  const target = event.target;
+  if (!(target instanceof Element)) return undefined;
+  return target.closest("[data-imt-rule-visualization]") ?? undefined;
 }
 
 function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTMLElement {

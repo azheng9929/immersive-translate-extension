@@ -22,6 +22,8 @@ describe("DebugOverlay", () => {
 
     const root = document.querySelector<HTMLElement>("[data-imt-debug-overlay='true']");
     expect(root).not.toBeNull();
+    expect(root?.textContent).toContain("翻译调试");
+    expect(root?.querySelector("[data-testid='debug-overlay-visualize-rules']")?.textContent).toBe("显示规则");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("x.com");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("core+imported");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("content-ready");
@@ -78,9 +80,15 @@ describe("DebugOverlay", () => {
     expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("content 1");
     expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("exclude 1");
 
+    document.querySelector<HTMLButtonElement>(".action")?.click();
+
+    expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent).toContain("exclude");
+    expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent).toContain(".action");
+
     document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
 
     expect(document.querySelector("[data-imt-rule-visualizer='true']")).toBeNull();
+    expect(document.querySelector("[data-imt-rule-visualizer-inspector='true']")).toBeNull();
     expect(document.querySelector(".body-text")?.hasAttribute("data-imt-rule-visualization")).toBe(false);
 
     overlay.unmount();
