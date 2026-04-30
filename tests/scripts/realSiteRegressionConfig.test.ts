@@ -51,6 +51,38 @@ describe("real-site regression selection", () => {
     ]);
   });
 
+  it("uses a core rules profile for curated imported-rule promotions", () => {
+    const selection = resolveRegressionSelection({
+      argv: ["--profile=core-rules"],
+      env: {},
+    });
+
+    expect(selection.profile).toBe("core-rules");
+    expect(selection.dynamicModes).toEqual(["normal"]);
+    expect(selection.selectedSites.map((site) => site.name)).toEqual([
+      "StackOverflow",
+      "GitHub Blog",
+      "OpenAI Docs",
+      "Nature Article",
+      "Product Hunt",
+      "Amazon Product",
+    ]);
+  });
+
+  it("treats Amazon robot checks as an access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "amazon.com" },
+        {
+          title: "Amazon.com",
+          url: "https://www.amazon.com/dp/B08N5WRWNW",
+          bodyTextLength: 120,
+          bodyTextPreview: "Enter the characters you see below Sorry, we just need to make sure you're not a robot.",
+        },
+      ),
+    ).toBe("robot check");
+  });
+
   it("lets explicit env filters override profile site selection", () => {
     const selection = resolveRegressionSelection({
       argv: ["--profile=all"],

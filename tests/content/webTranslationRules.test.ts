@@ -20,6 +20,27 @@ describe("webTranslationRules", () => {
     blockMinTextCount: 24,
   };
 
+  function ruleArrayValues(value: unknown): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    if (typeof value === "string") return [value];
+    if (typeof value !== "object") return [];
+    const operation = value as { replace?: unknown; add?: unknown };
+    return [...ruleArrayValues(operation.replace), ...ruleArrayValues(operation.add)];
+  }
+
+  function ruleRecordValues(value: unknown): Record<string, unknown> {
+    if (!value || Array.isArray(value) || typeof value !== "object") return {};
+    const operation = value as { replace?: unknown; add?: unknown } & Record<string, unknown>;
+    if ("replace" in operation || "add" in operation) {
+      return {
+        ...ruleRecordValues(operation.replace),
+        ...ruleRecordValues(operation.add),
+      };
+    }
+    return operation;
+  }
+
   it("matches URL rules with exclude URL protection", () => {
     const rules: WebTranslationRule[] = [
       {
@@ -33,6 +54,42 @@ describe("webTranslationRules", () => {
 
     expect(matchWebTranslationRule("https://mobile.x.com/home", undefined, rules)?.id).toBe("x");
     expect(matchWebTranslationRule("https://x.com/settings/profile", undefined, rules)).toBeUndefined();
+  });
+
+  it("keeps core rule CSS selectors parseable", () => {
+    const selectorFields = [
+      "selectors",
+      "excludeSelectors",
+      "mutationExcludeSelectors",
+      "extraBlockSelectors",
+      "extraInlineSelectors",
+      "atomicBlockSelectors",
+      "buildContainerSelectors",
+      "skipBuildContainerSelectors",
+      "stayOriginalSelectors",
+    ] as const;
+    const invalid: string[] = [];
+
+    for (const rule of BUILTIN_WEB_TRANSLATION_RULES) {
+      for (const field of selectorFields) {
+        for (const selector of ruleArrayValues(rule[field])) {
+          try {
+            document.querySelector(selector);
+          } catch {
+            invalid.push(`${rule.id}.${field}: ${selector}`);
+          }
+        }
+      }
+      for (const selector of Object.keys(ruleRecordValues(rule.globalStyles))) {
+        try {
+          document.querySelector(selector);
+        } catch {
+          invalid.push(`${rule.id}.globalStyles: ${selector}`);
+        }
+      }
+    }
+
+    expect(invalid).toEqual([]);
   });
 
   it("matches imported host wildcard and host path patterns", () => {
