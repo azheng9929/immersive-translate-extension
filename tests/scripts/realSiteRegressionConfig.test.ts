@@ -67,6 +67,13 @@ describe("real-site regression selection", () => {
       "Product Hunt",
       "Amazon Product",
     ]);
+    expect(selection.selectedSites.find((site) => site.name === "OpenAI Docs")).toMatchObject({
+      host: "developers.openai.com",
+      url: "https://developers.openai.com/api/docs/guides/text",
+    });
+    expect(selection.selectedSites.find((site) => site.name === "Amazon Product")?.url).toBe(
+      "https://www.amazon.com/s?k=kindle",
+    );
   });
 
   it("treats Amazon robot checks as an access gate", () => {
@@ -81,6 +88,20 @@ describe("real-site regression selection", () => {
         },
       ),
     ).toBe("robot check");
+  });
+
+  it("treats unavailable Amazon pages as an external access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "amazon.com" },
+        {
+          title: "Page Not Found",
+          url: "https://www.amazon.com/dp/B08N5WRWNW",
+          bodyTextLength: 0,
+          bodyTextPreview: "",
+        },
+      ),
+    ).toBe("unavailable page");
   });
 
   it("lets explicit env filters override profile site selection", () => {

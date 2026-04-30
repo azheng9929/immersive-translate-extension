@@ -15,10 +15,10 @@ export const allRegressionSites = [
   },
   { name: "StackOverflow", host: "stackoverflow.com", url: "https://stackoverflow.com/questions/tagged/javascript" },
   { name: "GitHub Blog", host: "github.blog", url: "https://github.blog/changelog/" },
-  { name: "OpenAI Docs", host: "platform.openai.com", url: "https://platform.openai.com/docs/guides/text" },
+  { name: "OpenAI Docs", host: "developers.openai.com", url: "https://developers.openai.com/api/docs/guides/text" },
   { name: "Nature Article", host: "nature.com", url: "https://www.nature.com/articles/s41586-020-2649-2" },
   { name: "Product Hunt", host: "producthunt.com", url: "https://www.producthunt.com/" },
-  { name: "Amazon Product", host: "amazon.com", url: "https://www.amazon.com/dp/B08N5WRWNW" },
+  { name: "Amazon Product", host: "amazon.com", url: "https://www.amazon.com/s?k=kindle" },
 ];
 
 const regressionProfiles = {
@@ -78,6 +78,7 @@ export function siteAccessGateReason(site, metrics) {
   if (isRedditHumanityCheck(site, metrics)) return "humanity check";
   if (isRedditNetworkSecurityBlock(site, metrics)) return "network security block";
   if (isAmazonRobotCheck(site, metrics)) return "robot check";
+  if (isAmazonUnavailablePage(site, metrics)) return "unavailable page";
   return undefined;
 }
 
@@ -120,6 +121,13 @@ function isRedditNetworkSecurityBlock(site, metrics) {
 
 function isAmazonRobotCheck(site, metrics) {
   return isAmazonSite(site) && /enter the characters you see below|not a robot|robot check/i.test(metrics.bodyTextPreview ?? "");
+}
+
+function isAmazonUnavailablePage(site, metrics) {
+  return isAmazonSite(site) && (
+    /page not found|sorry! something went wrong/i.test(metrics.title ?? "") ||
+    (metrics.bodyTextLength === 0 && /\/dp\/|\/gp\/product\//i.test(metrics.url ?? ""))
+  );
 }
 
 function isRedditSite(site) {

@@ -512,7 +512,7 @@ describe("webTranslationRules", () => {
         excludes: ["header", "footer"],
       },
       {
-        url: "https://platform.openai.com/docs/guides/text",
+        url: "https://developers.openai.com/api/docs/guides/text",
         ruleId: "openai-docs",
         selectors: ["main h1", "main p", "main li"],
         excludes: [".pheader", "pre"],
@@ -538,7 +538,7 @@ describe("webTranslationRules", () => {
       {
         url: "https://www.producthunt.com/products/example",
         ruleId: "producthunt",
-        selectors: ["h1", "h5 + p", "[data-test='post-name']"],
+        selectors: ["h1", "h5 + p", "[data-test='post-name']", "main a[href^='/posts/']"],
         excludes: [".styles_buttons__kKy_S", ".styles_count___6_8F"],
       },
       {
@@ -619,6 +619,33 @@ describe("webTranslationRules", () => {
     expect(policy.excludeSelectors).toContain("pre");
     expect(policy.excludeSelectors).toContain("code");
     expect(policy.bodyRule).toEqual({ enable: false });
+  });
+
+  it("treats Product Hunt as a dynamic product feed with card anchors as scan roots", () => {
+    document.body.innerHTML = `
+      <main>
+        <a href="/posts/quarkdown">
+          <div>6. Quarkdown</div>
+          <div>Markdown with LaTeX in a modern typesetting system</div>
+        </a>
+        <button>106</button>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.producthunt.com/", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "producthunt.com",
+      ruleId: "producthunt",
+      isHighDynamic: true,
+      dynamicMode: "conservative",
+      viewportSupplement: true,
+    });
+    expect(policy.preferredScanRootSelectors).toContain("main a[href^='/posts/']");
+    expect(policy.preferredScanRootSelectors).toContain("main a[href^='/products/']");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "main a[href^='/posts/'], main a[href^='/products/']",
+      category: "card-text",
+    });
   });
 
   it("keeps Xvideos core capability when imported style-only rule is merged", () => {

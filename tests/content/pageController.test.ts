@@ -956,6 +956,40 @@ describe("PageController", () => {
     expect(requestedTexts.join("\n")).not.toContain("curl https://api.inworld.ai");
   });
 
+  it("translates Product Hunt feed card anchors without translating vote controls", async () => {
+    document.body.innerHTML = `
+      <main>
+        <a href="/posts/quarkdown">
+          <div>6. Quarkdown</div>
+          <div>Markdown with LaTeX in a modern typesetting system</div>
+        </a>
+        <button>106</button>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.producthunt.com/", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["6. Quarkdown Markdown with LaTeX in a modern typesetting system"]);
+    expect(document.querySelector("a .imt-translation-compact")?.textContent).toBe(
+      "[zh-Hans] 6. Quarkdown Markdown with LaTeX in a modern typesetting system",
+    );
+    expect(document.querySelector("button")?.textContent).toBe("106");
+  });
+
   it("can disable generic body fallback when a rule opts out", async () => {
     document.body.innerHTML = `<main><p>Generic fallback paragraph should stay original.</p></main>`;
     const requestedTexts: string[] = [];

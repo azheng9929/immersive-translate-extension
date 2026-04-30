@@ -5,6 +5,11 @@ import { scheduleAutoTranslate } from "./autoTranslate";
 import { InputTranslator } from "./inputTranslator";
 import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
 import { OriginalTextTooltip } from "./originalTextTooltip";
+import {
+  clearPersistedPageTranslation,
+  markPersistedPageTranslationActive,
+  schedulePersistedPageTranslationResume,
+} from "./pageTranslationPersistence";
 import { PageController } from "./pageController";
 import {
   PageTranslationSession,
@@ -47,11 +52,23 @@ export async function runContentMain(): Promise<void> {
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
     let debugOverlay = createDebugOverlay(config, pageSession);
-    let cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
+    let cancelPersistedTranslate: (() => void) | undefined;
+    const translateCurrentPage = () => {
+      markPersistedPageTranslationActive();
+      return pageSession.translatePage();
+    };
+    const restoreCurrentPage = () => {
+      cancelPersistedTranslate?.();
+      cancelPersistedTranslate = undefined;
+      clearPersistedPageTranslation();
+      pageSession.restorePage();
+    };
+    let cancelAutoTranslate = scheduleAutoTranslate(config, translateCurrentPage);
+    cancelPersistedTranslate = cancelAutoTranslate ? undefined : schedulePersistedPageTranslationResume(translateCurrentPage);
     const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
     const floatingControl = new FloatingTranslationControl({
-      translatePage: () => pageSession.translatePage(),
-      restorePage: () => pageSession.restorePage(),
+      translatePage: translateCurrentPage,
+      restorePage: restoreCurrentPage,
       setRenderState: (renderState) => pageSession.setRenderState(renderState),
       getStatus: () => pageSession.getStatus(),
       subscribeStatus: (listener) => pageSession.subscribe(listener),
@@ -65,8 +82,8 @@ export async function runContentMain(): Promise<void> {
       getConfig: () => config,
       getStatus: () => pageSession.getStatus(),
       getRule: () => pageSession.getStatus().site,
-      restore: () => pageSession.restorePage(),
-      reAnalyze: () => pageSession.translatePage(),
+      restore: restoreCurrentPage,
+      reAnalyze: translateCurrentPage,
     });
 
     const isTopFrame = isCurrentTopFrame();
@@ -74,11 +91,11 @@ export async function runContentMain(): Promise<void> {
       if (!shouldHandleContentMessage(message, isTopFrame)) return undefined;
 
       if (message?.type === "IMT_TRANSLATE_PAGE") {
-        pageSession.translatePage().then(() => sendResponse({ ok: true }));
+        translateCurrentPage().then(() => sendResponse({ ok: true }));
         return true;
       }
       if (message?.type === "IMT_RESTORE_PAGE") {
-        pageSession.restorePage();
+        restoreCurrentPage();
         sendResponse({ ok: true });
       }
       if (message?.type === "IMT_SET_PAGE_RENDER_STATE") {
@@ -99,6 +116,7 @@ export async function runContentMain(): Promise<void> {
           }
 
           cancelAutoTranslate?.();
+          cancelPersistedTranslate?.();
           pageSession.restorePage();
           pageSession.dispose();
           debugOverlay?.unmount();
@@ -110,7 +128,8 @@ export async function runContentMain(): Promise<void> {
           cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(nextSitePolicy);
           pageSession = createPageSession(config, pageRules);
           debugOverlay = createDebugOverlay(config, pageSession);
-          cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
+          cancelAutoTranslate = scheduleAutoTranslate(config, translateCurrentPage);
+          cancelPersistedTranslate = cancelAutoTranslate ? undefined : schedulePersistedPageTranslationResume(translateCurrentPage);
           selectionTranslator.unmount();
           selectionTranslator = createSelectionTranslator(config);
           selectionTranslator.mount();
