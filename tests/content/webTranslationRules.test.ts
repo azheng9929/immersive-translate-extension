@@ -330,6 +330,20 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain(".thumb-under p.title");
   });
 
+  it("uses a landing-page rule for Inworld instead of generic single-root article scoring", () => {
+    const policy = resolveWebTranslationPolicy("https://inworld.ai/", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "inworld.ai",
+      ruleId: "inworld",
+      mainFrameSelector: "body > div.min-h-screen, main",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("section h2");
+    expect(policy.preferredScanRootSelectors).toContain("section div.bg-white.rounded-lg.p-6");
+    expect(policy.excludeSelectors).toContain("header");
+    expect(policy.excludeSelectors).toContain("footer");
+  });
+
   it("keeps Xvideos core capability when imported style-only rule is merged", () => {
     const policy = resolveWebTranslationPolicy("https://www.xvideos.com/", "normal", {
       rules: [

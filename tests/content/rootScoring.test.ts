@@ -41,4 +41,30 @@ describe("rootScoring", () => {
 
     expect(selectHighConfidenceTranslationRoots(document.body)).toEqual([document.querySelector("main")]);
   });
+
+  it("keeps independent marketing page sections instead of only the single highest score", () => {
+    document.body.innerHTML = `
+      <header><a href="/docs">Docs</a><button>Log in</button></header>
+      <section id="hero">
+        <h1>The most natural voice AI</h1>
+        <p>
+          Make every user feel understood with production-grade speech and language APIs
+          built for developers who care about latency, quality, and cost.
+        </p>
+      </section>
+      <section id="tts">
+        <h2>Keep every user engaged with realtime text to speech</h2>
+        <p>
+          Create voices with human-like expression and stream responses for natural
+          conversations across apps, games, assistants, and learning products.
+        </p>
+      </section>
+      <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+    `;
+
+    expect(selectHighConfidenceTranslationRoots(document.body)).toEqual([
+      document.querySelector("#hero"),
+      document.querySelector("#tts"),
+    ]);
+  });
 });

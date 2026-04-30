@@ -26,9 +26,10 @@ const CANDIDATE_ROOT_SELECTOR = [
 
 const MIN_CONFIDENT_TEXT_LENGTH = 80;
 const MIN_CONFIDENT_SCORE = 35;
+const MAX_CONFIDENT_ROOTS = 24;
 
 export function scoreTranslationRoot(element: HTMLElement): TranslationRootScore {
-  const text = normalizeVisibleText(element.innerText || element.textContent || "");
+  const text = translationRootText(element);
   const textLength = text.length;
   const wordCount = countWords(text);
   const linkDensity = textDensity(element, "a");
@@ -65,8 +66,14 @@ export function selectHighConfidenceTranslationRoots(root: ParentNode): HTMLElem
     .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH && candidate.score >= MIN_CONFIDENT_SCORE)
     .sort((left, right) => right.score - left.score);
 
-  const best = candidates[0];
-  return best ? [best.element] : [];
+  const selected: HTMLElement[] = [];
+  for (const candidate of candidates) {
+    if (selected.length >= MAX_CONFIDENT_ROOTS) break;
+    if (selected.some((element) => element.contains(candidate.element) || candidate.element.contains(element))) continue;
+    selected.push(candidate.element);
+  }
+
+  return selected.sort(compareDocumentOrder);
 }
 
 function collectCandidateRoots(root: ParentNode): HTMLElement[] {
@@ -89,7 +96,7 @@ function collectCandidateRoots(root: ParentNode): HTMLElement[] {
 }
 
 function textDensity(root: HTMLElement, selector: string): number {
-  const rootTextLength = normalizeVisibleText(root.innerText || root.textContent || "").length;
+  const rootTextLength = translationRootText(root).length;
   if (rootTextLength === 0) return 0;
 
   let matchedTextLength = 0;
@@ -101,6 +108,37 @@ function textDensity(root: HTMLElement, selector: string): number {
     return 0;
   }
   return Math.min(1, matchedTextLength / rootTextLength);
+}
+
+function translationRootText(root: HTMLElement): string {
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || isIgnoredScoringElement(parent)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let node = walker.nextNode();
+  while (node) {
+    parts.push(node.textContent ?? "");
+    node = walker.nextNode();
+  }
+
+  return normalizeVisibleText(parts.join(" "));
+}
+
+function isIgnoredScoringElement(element: Element): boolean {
+  return Boolean(element.closest("script,style,noscript,template,pre,code,kbd,samp,svg,canvas,nav,header,footer,aside,button,[role='button'],input,select,textarea,[data-imt-managed='true']"));
+}
+
+function compareDocumentOrder(left: HTMLElement, right: HTMLElement): number {
+  if (left === right) return 0;
+  const position = left.compareDocumentPosition(right);
+  if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+  if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+  return 0;
 }
 
 function repeatedDensity(text: string): number {

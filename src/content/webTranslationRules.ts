@@ -609,6 +609,67 @@ shreddit-comment,
     isHighDynamic: true,
   },
   {
+    id: "inworld",
+    siteKey: "inworld.ai",
+    matches: ["*://inworld.ai/*", "*://*.inworld.ai/*"],
+    mainFrameSelector: "body > div.min-h-screen, main",
+    selectors: [
+      "section h1",
+      "section h2",
+      "section h3",
+      "section p",
+      "section li",
+      "section div.prose",
+      "section div.bg-white.rounded-lg.p-6",
+    ],
+    contentSelectors: [
+      { selector: "section h1, section h2, section h3", category: "heading" },
+      { selector: "section p, section li", category: "content-block" },
+      { selector: "section div.prose", category: "content-block" },
+      { selector: "section div.bg-white.rounded-lg.p-6", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "header",
+      "nav",
+      "footer",
+      "menu",
+      "button",
+      '[role="button"]',
+      "input",
+      "textarea",
+      "select",
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+      "script",
+      "style",
+      "svg",
+      "canvas",
+      '[aria-hidden="true"]',
+    ],
+    mutationExcludeSelectors: ["header", "nav", "footer", "pre", "code", "script", "style", "svg", "canvas"],
+    injectedCss: [
+      `
+section h1,
+section h2,
+section h3,
+section p,
+section div.prose,
+section div.bg-white.rounded-lg.p-6 {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+  white-space: normal !important;
+}
+`,
+    ],
+    extraBlockSelectors: ["section div.prose", "section div.bg-white.rounded-lg.p-6"],
+    bodyRule: { enable: false },
+    detectParagraphLanguage: true,
+  },
+  {
     id: "xvideos",
     siteKey: "xvideos.com",
     matches: ["*://xvideos.com/*", "*://*.xvideos.com/*"],

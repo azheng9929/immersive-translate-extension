@@ -2,6 +2,7 @@ export const allRegressionSites = [
   { name: "X", host: "x.com", url: "https://x.com/explore" },
   { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
+  { name: "Inworld", host: "inworld.ai", url: "https://inworld.ai/" },
   { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
   { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
   {

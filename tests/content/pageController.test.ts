@@ -737,6 +737,58 @@ describe("PageController", () => {
     expect(document.querySelector("aside .imt-translation-block")).toBeNull();
   });
 
+  it("translates Inworld-style multi-section landing pages without nav or code blocks", async () => {
+    document.body.innerHTML = `
+      <div class="min-h-screen">
+        <header><a href="/products">Products</a><button>Log In</button></header>
+        <section>
+          <h1>The most natural voice AI</h1>
+          <p>Production-grade APIs built for developers.</p>
+        </section>
+        <section>
+          <h2>Reason in realtime</h2>
+          <p>Route to the best model and tools for every user and context.</p>
+          <code>curl https://api.inworld.ai/v1/chat/completions</code>
+        </section>
+        <section>
+          <div class="bg-white rounded-lg p-6">
+            <span>Provider agnostic</span>
+            <div>Route to the model that fits your latency, cost, or quality requirements.</div>
+          </div>
+        </section>
+        <footer><a href="/privacy">Privacy</a></footer>
+      </div>
+    `;
+    const requestedTexts: string[] = [];
+    const policy = resolveWebTranslationPolicy("https://inworld.ai/", "normal");
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: "inworld.ai",
+      ...(policy.mainFrameSelector ? { mainFrameSelector: policy.mainFrameSelector } : {}),
+      buildContainerSelectors: policy.buildContainerSelectors,
+      skipBuildContainerSelectors: policy.skipBuildContainerSelectors,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toContain("The most natural voice AI");
+    expect(requestedTexts).toContain("Production-grade APIs built for developers.");
+    expect(requestedTexts).toContain("Reason in realtime");
+    expect(requestedTexts).toContain("Route to the best model and tools for every user and context.");
+    expect(requestedTexts).toContain("Provider agnostic Route to the model that fits your latency, cost, or quality requirements.");
+    expect(requestedTexts).not.toContain("Products");
+    expect(requestedTexts).not.toContain("Log In");
+    expect(requestedTexts.join("\n")).not.toContain("curl https://api.inworld.ai");
+  });
+
   it("can disable generic body fallback when a rule opts out", async () => {
     document.body.innerHTML = `<main><p>Generic fallback paragraph should stay original.</p></main>`;
     const requestedTexts: string[] = [];

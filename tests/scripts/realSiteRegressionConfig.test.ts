@@ -53,6 +53,17 @@ describe("real-site regression selection", () => {
     expect(selection.selectedSites.map((site) => site.name)).toEqual(["Reddit", "Tactics Tools Hover"]);
   });
 
+  it("keeps Inworld available as a focused landing-page regression target", () => {
+    const selection = resolveRegressionSelection({
+      argv: ["--profile=all"],
+      env: {
+        IMT_REGRESSION_SITE_FILTER: "inworld",
+      },
+    });
+
+    expect(selection.selectedSites.map((site) => site.name)).toEqual(["Inworld"]);
+  });
+
   it("keeps all known sites available for the full profile", () => {
     const selection = resolveRegressionSelection({ argv: [], env: {} });
 
