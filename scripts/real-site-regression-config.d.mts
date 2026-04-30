@@ -2,16 +2,19 @@ export type RegressionSite = {
   name: string;
   host: string;
   url: string;
+  fixtureKind?: string;
   hoverTooltip?: boolean;
+  requiresLogin?: boolean;
 };
 
 export type RegressionSelection = {
-  profile: "smoke" | "high-dynamic" | "all";
+  profile: "smoke" | "high-dynamic" | "core-rules" | "long-tail-rules" | "fixture-matrix" | "all";
   dynamicModes: string[];
   siteFilter: string[];
   selectedSites: RegressionSite[];
 };
 
+export const realSiteFixtureGroups: Record<string, RegressionSite[]>;
 export const allRegressionSites: RegressionSite[];
 
 export function resolveRegressionSelection(input?: {

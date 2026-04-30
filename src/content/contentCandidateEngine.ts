@@ -155,7 +155,7 @@ export function classifyCandidateProfile(
   }
   if (stats.maxRepeatedChildSignatureCount >= 3 && linkDensity >= 0.25) return "card-list";
   if (/(docs|documentation|markdown|readme)/i.test(marker)) return "docs";
-  if (stats.paragraphCount >= 3 && stats.textLength >= 450 && linkDensity < 0.55) return "article";
+  if (stats.paragraphCount >= 3 && stats.textLength >= 260 && linkDensity < 0.55) return "article";
   if (stats.headingCount >= 1 || stats.weakCandidateHitCount > 0) return "landing";
   return "generic";
 }
@@ -305,9 +305,9 @@ function collectElementStats(element: HTMLElement): CandidateStats {
     linkTextLength: textLengthForSelector(element, "a"),
     buttonTextLength: textLengthForSelector(element, "button,[role='button']"),
     maxRepeatedChildSignatureCount: maxRepeatedChildSignatureCount(element),
-    priceLikeTextCount: text.match(PRICE_LIKE) ? 1 : 0,
-    timeLikeTextCount: text.match(TIME_LIKE) ? 1 : 0,
-    usernameLikeTextCount: text.match(USERNAME_LIKE) ? 1 : 0,
+    priceLikeTextCount: countPatternMatches(text, PRICE_LIKE),
+    timeLikeTextCount: countPatternMatches(text, TIME_LIKE),
+    usernameLikeTextCount: countUsernameLikeText(text),
     avgTextLength: text.length,
     uniqueTextRatio: 1,
     weakCandidateHitCount: 0,
@@ -461,6 +461,17 @@ function compareDocumentOrder(left: TextDrivenCandidate, right: TextDrivenCandid
 
 function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
+}
+
+function countPatternMatches(text: string, pattern: RegExp): number {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  return [...text.matchAll(new RegExp(pattern.source, flags))].length;
+}
+
+function countUsernameLikeText(text: string): number {
+  const handleMatches = text.match(/(?:^|\s)@[A-Za-z0-9_.-]{1,40}\b/g);
+  if (handleMatches?.length) return handleMatches.length;
+  return USERNAME_LIKE.test(text.trim()) ? 1 : 0;
 }
 
 const PRICE_LIKE = /(?:[$€£¥]\s?\d|\d+(?:\.\d+)?\s?(?:usd|eur|gbp|cny|rmb))/i;

@@ -3,6 +3,7 @@ import * as regressionConfig from "../../scripts/real-site-regression-config.mjs
 
 const {
   allRegressionSites,
+  realSiteFixtureGroups,
   parseCsv,
   resolveRegressionSelection,
 } = regressionConfig;
@@ -166,5 +167,50 @@ describe("real-site regression selection", () => {
     expect(selection.profile).toBe("all");
     expect(selection.dynamicModes).toEqual(["conservative", "normal"]);
     expect(selection.selectedSites).toHaveLength(allRegressionSites.length);
+  });
+
+  it("keeps two or three representative sites for every fixture kind", () => {
+    expect(Object.keys(realSiteFixtureGroups).sort()).toEqual([
+      "adult-video-list",
+      "ai-chat",
+      "article",
+      "card-list",
+      "commerce",
+      "data-dashboard",
+      "docs-code",
+      "forum",
+      "github",
+      "hover-tooltip",
+      "landing",
+      "search-results",
+      "social-feed",
+      "video-list",
+    ]);
+
+    for (const [kind, sites] of Object.entries(realSiteFixtureGroups)) {
+      expect(sites.length, kind).toBeGreaterThanOrEqual(2);
+      expect(sites.length, kind).toBeLessThanOrEqual(3);
+      expect(sites.every((site) => site.fixtureKind === kind), kind).toBe(true);
+    }
+  });
+
+  it("keeps the fixture matrix deduplicated and selectable", () => {
+    const fixtureUrls = Object.values(realSiteFixtureGroups)
+      .flat()
+      .map((site) => site.url);
+    expect(new Set(fixtureUrls).size).toBe(fixtureUrls.length);
+    expect(
+      allRegressionSites
+        .filter((site) => site.fixtureKind)
+        .every((site) => fixtureUrls.includes(site.url)),
+    ).toBe(true);
+
+    const selection = resolveRegressionSelection({
+      argv: ["--profile=fixture-matrix"],
+      env: {},
+    });
+
+    expect(selection.dynamicModes).toEqual(["normal"]);
+    expect(selection.selectedSites.map((site) => site.url).sort()).toEqual([...fixtureUrls].sort());
   });
 });
