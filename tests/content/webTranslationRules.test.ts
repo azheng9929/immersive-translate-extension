@@ -434,6 +434,78 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain(".thumb-under p.title");
   });
 
+  it("promotes high-value imported review candidates into explicit core webpage rules", () => {
+    const cases = [
+      {
+        url: "https://stackoverflow.com/questions/1/how-to-test",
+        ruleId: "stackoverflow",
+        selectors: [".js-post-body", "span.comment-copy", ".s-post-summary--content-excerpt"],
+        excludes: [".votecell", "#left-sidebar"],
+      },
+      {
+        url: "https://example.substack.com/p/story",
+        ruleId: "substack",
+        selectors: [".reader2-post-title", ".available-content", ".comment-body"],
+        excludes: [".publication-footer", "[data-testid='navbar']"],
+      },
+      {
+        url: "https://github.blog/changelog/example/",
+        ruleId: "github-blog",
+        selectors: ["article h1", "article p", "article li"],
+        excludes: ["header", "footer"],
+      },
+      {
+        url: "https://platform.openai.com/docs/guides/text",
+        ruleId: "openai-docs",
+        selectors: ["main h1", "main p", "main li"],
+        excludes: [".pheader", "pre"],
+      },
+      {
+        url: "https://www.nature.com/articles/example",
+        ruleId: "nature",
+        selectors: [".c-article-title", ".c-article-body p", ".c-article-section__content"],
+        excludes: [".c-header", ".c-article-author-list"],
+      },
+      {
+        url: "https://apnews.com/article/example",
+        ruleId: "apnews",
+        selectors: ["article h1", "article p", "[data-key='article'] p"],
+        excludes: ["nav", "footer"],
+      },
+      {
+        url: "https://www.foxnews.com/world/example",
+        ruleId: "foxnews",
+        selectors: ["article h1", ".article-body p", ".article-content p"],
+        excludes: [".site-footer", "nav"],
+      },
+      {
+        url: "https://www.producthunt.com/products/example",
+        ruleId: "producthunt",
+        selectors: ["h1", "h5 + p", "[data-test='post-name']"],
+        excludes: [".styles_buttons__kKy_S", ".styles_count___6_8F"],
+      },
+      {
+        url: "https://www.amazon.com/dp/example",
+        ruleId: "amazon",
+        selectors: ["#productTitle", "#feature-bullets li", "#productDescription p"],
+        excludes: ["#navFooter", ".a-price"],
+      },
+      {
+        url: "https://www.tiktok.com/@openai/video/123",
+        ruleId: "tiktok",
+        selectors: ["[data-e2e='browse-video-desc']", "[data-e2e='video-desc']", "[data-e2e='comment-level-1']"],
+        excludes: ["[data-e2e*='-count']", "[data-e2e='nav-foryou']"],
+      },
+    ];
+
+    for (const item of cases) {
+      const policy = resolveWebTranslationPolicy(item.url, "normal");
+      expect(policy.ruleId).toBe(item.ruleId);
+      for (const selector of item.selectors) expect(policy.preferredScanRootSelectors).toContain(selector);
+      for (const selector of item.excludes) expect(policy.excludeSelectors).toContain(selector);
+    }
+  });
+
   it("uses a landing-page rule for Inworld instead of generic single-root article scoring", () => {
     const policy = resolveWebTranslationPolicy("https://inworld.ai/", "normal");
 
@@ -563,7 +635,8 @@ describe("webTranslationRules", () => {
   });
 
   it("keeps imported rules out of content defaults but accepts page candidate rules", () => {
-    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeLessThan(20);
+    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeGreaterThan(20);
+    expect(BUILTIN_WEB_TRANSLATION_RULES.length).toBeLessThan(50);
 
     const mediumRule: WebTranslationRule = {
       id: "medium",
