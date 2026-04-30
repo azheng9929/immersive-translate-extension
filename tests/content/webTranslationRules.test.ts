@@ -432,6 +432,20 @@ describe("webTranslationRules", () => {
   });
 
   it("uses a landing-page rule for PromptOT instead of generic structure-only scanning", () => {
+    document.body.innerHTML = `
+      <nav>
+        <a>The shift</a>
+        <button>Start free</button>
+      </nav>
+      <section>
+        <h1>Version, Eval & Deploy Prompts done right.</h1>
+        <p>One platform for every production prompt.</p>
+        <ul><li>Six typed blocks compile into one deterministic prompt</li></ul>
+      </section>
+      <section>
+        <div class="prompt-card">editor-assistant.prompt</div>
+      </section>
+    `;
     const policy = resolveWebTranslationPolicy("https://www.promptot.com/", "normal");
 
     expect(policy).toMatchObject({
@@ -439,17 +453,21 @@ describe("webTranslationRules", () => {
       ruleId: "promptot",
       ruleCapability: "content-ready",
       fallbackProfile: "generic",
-      mainFrameSelector: "main",
     });
-    expect(policy.preferredScanRootSelectors).toContain("main h1");
-    expect(policy.preferredScanRootSelectors).toContain("main section p");
-    expect(policy.preferredScanRootSelectors).toContain("main section li");
+    expect(policy.mainFrameSelector).toBeUndefined();
+    expect(policy.preferredScanRootSelectors).toContain("section h1");
+    expect(policy.preferredScanRootSelectors).toContain("section p");
+    expect(policy.preferredScanRootSelectors).toContain("section li");
+    const matchedRoots = policy.preferredScanRootSelectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector)),
+    );
+    expect(matchedRoots.length).toBeGreaterThan(0);
     expect(policy.contentSelectors).toContainEqual({
-      selector: "main h1, main h2, main h3",
+      selector: "section h1, section h2, section h3",
       category: "heading",
     });
     expect(policy.contentSelectors).toContainEqual({
-      selector: "main section p, main section li",
+      selector: "section p, section li",
       category: "content-block",
     });
     expect(policy.excludeSelectors).toContain("pre");
