@@ -24,6 +24,29 @@ export type PageTranslationSiteStatus = {
   dynamicMode: DynamicTranslationMode;
   dynamicModeSource: DynamicModeSource;
   isHighDynamic: boolean;
+  ruleDiagnostics?: PageTranslationRuleDiagnostics;
+};
+
+export type PageTranslationRuleDiagnostics = {
+  scanRootSelectorCount: number;
+  contentSelectorCount: number;
+  excludeSelectorCount: number;
+  buildContainerSelectorCount: number;
+  skipBuildContainerSelectorCount: number;
+  injectedCssRuleCount: number;
+  globalAttributeRuleCount: number;
+  attributeNameCount: number;
+  translationClassCount: number;
+  allowTooltip: boolean;
+  observeUrlChange: boolean;
+  urlChangeDelay: number;
+  maxQueueSize: number;
+  maxRootsPerFlush: number;
+  maxObservedRoots: number;
+  maxMutationNodesPerWindow: number;
+  mutationWindowMs: number;
+  viewportSupplement: boolean;
+  viewportSupplementMaxRoots: number;
 };
 
 export type PageTranslationStatus = TranslationPageSummary & {

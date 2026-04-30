@@ -6,7 +6,7 @@ import { InputTranslator } from "./inputTranslator";
 import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
 import { OriginalTextTooltip } from "./originalTextTooltip";
 import { PageController } from "./pageController";
-import { PageTranslationSession } from "./pageTranslationSession";
+import { PageTranslationSession, type PageTranslationRuleDiagnostics } from "./pageTranslationSession";
 import { shouldHandleContentMessage } from "./contentMessagePolicy";
 import {
   providerChainId,
@@ -245,8 +245,33 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
       dynamicMode: sitePolicy.dynamicMode,
       dynamicModeSource: sitePolicy.dynamicModeSource,
       isHighDynamic: sitePolicy.isHighDynamic,
+      ruleDiagnostics: createRuleDiagnostics(sitePolicy),
     },
   });
+}
+
+function createRuleDiagnostics(sitePolicy: SitePolicy): PageTranslationRuleDiagnostics {
+  return {
+    scanRootSelectorCount: sitePolicy.preferredScanRootSelectors.length,
+    contentSelectorCount: sitePolicy.contentSelectors.length,
+    excludeSelectorCount: sitePolicy.excludeSelectors.length,
+    buildContainerSelectorCount: sitePolicy.buildContainerSelectors.length,
+    skipBuildContainerSelectorCount: sitePolicy.skipBuildContainerSelectors.length,
+    injectedCssRuleCount: sitePolicy.injectedCss.length,
+    globalAttributeRuleCount: Object.keys(sitePolicy.globalAttributes).length,
+    attributeNameCount: sitePolicy.attributeNames.length,
+    translationClassCount: sitePolicy.translationClasses.length,
+    allowTooltip: sitePolicy.allowTooltip,
+    observeUrlChange: sitePolicy.observeUrlChange,
+    urlChangeDelay: sitePolicy.urlChangeDelay,
+    maxQueueSize: sitePolicy.maxQueueSize,
+    maxRootsPerFlush: sitePolicy.maxRootsPerFlush,
+    maxObservedRoots: sitePolicy.maxObservedRoots,
+    maxMutationNodesPerWindow: sitePolicy.maxMutationNodesPerWindow,
+    mutationWindowMs: sitePolicy.mutationWindowMs,
+    viewportSupplement: sitePolicy.viewportSupplement,
+    viewportSupplementMaxRoots: sitePolicy.viewportSupplementMaxRoots,
+  };
 }
 
 function createDebugOverlay(config: ExtensionConfig, pageSession: PageTranslationSession): DebugOverlay | undefined {

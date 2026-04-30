@@ -30,7 +30,8 @@ export class DebugOverlay {
       right: "12px",
       bottom: "12px",
       zIndex: "2147483646",
-      width: "280px",
+      width: "360px",
+      maxWidth: "calc(100vw - 24px)",
       boxSizing: "border-box",
       padding: "10px",
       border: "1px solid rgba(15, 23, 42, 0.16)",
@@ -58,13 +59,17 @@ export class DebugOverlay {
     this.root.replaceChildren(
       createTitle(),
       createRow("规则", ruleLabel(status), "debug-overlay-rule"),
+      createRow("字段", ruleShapeLabel(status), "debug-overlay-rule-shape"),
+      createRow("过滤", ruleFiltersLabel(status), "debug-overlay-rule-filters"),
+      createRow("调度", ruleRuntimeLabel(status), "debug-overlay-rule-runtime"),
       createRow("阶段", `${status.phase} / ${status.observation}`, "debug-overlay-phase"),
-      createRow("Segments", `${status.translated}/${status.total} translated, failed ${status.failed}`, "debug-overlay-segments"),
-      createRow("Queue", `${status.pendingRoots} pending, ${status.observedRoots} lazy`, "debug-overlay-queue"),
-      createRow("Scan", scanLabel(status), "debug-overlay-scan"),
-      createRow("Cache", cacheLabel(status), "debug-overlay-cache"),
-      createRow("Provider", providerLabel(status), "debug-overlay-provider"),
-      createRow("Dynamic", `${status.dynamicRuns} runs`, "debug-overlay-dynamic"),
+      createRow("段落", `${status.translated}/${status.total} translated, failed ${status.failed}`, "debug-overlay-segments"),
+      createRow("队列", `${status.pendingRoots} pending, ${status.observedRoots} lazy`, "debug-overlay-queue"),
+      createRow("扫描", scanLabel(status), "debug-overlay-scan"),
+      createRow("单元", unitsLabel(status), "debug-overlay-units"),
+      createRow("缓存", cacheLabel(status), "debug-overlay-cache"),
+      createRow("服务", providerLabel(status), "debug-overlay-provider"),
+      createRow("动态", `${status.dynamicRuns} runs`, "debug-overlay-dynamic"),
     );
   }
 }
@@ -75,7 +80,7 @@ export function installContentDebugApi(api: ContentDebugApi): void {
 
 function createTitle(): HTMLElement {
   const title = document.createElement("div");
-  title.textContent = "Immersive Debug";
+  title.textContent = "翻译调试";
   Object.assign(title.style, {
     marginBottom: "6px",
     fontWeight: "700",
@@ -88,7 +93,7 @@ function createRow(label: string, value: string, testId: string): HTMLElement {
   row.dataset.testid = testId;
   Object.assign(row.style, {
     display: "grid",
-    gridTemplateColumns: "72px 1fr",
+    gridTemplateColumns: "76px minmax(0, 1fr)",
     gap: "8px",
     padding: "2px 0",
   });
@@ -104,8 +109,8 @@ function createRow(label: string, value: string, testId: string): HTMLElement {
   valueElement.textContent = value;
   Object.assign(valueElement.style, {
     overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal",
   });
 
   row.append(labelElement, valueElement);
@@ -121,10 +126,57 @@ function ruleLabel(status: PageTranslationStatus): string {
   return `${site.siteKey} (${dynamic}, ${site.ruleSource}, ${capability}${merged})`;
 }
 
+function ruleShapeLabel(status: PageTranslationStatus): string {
+  const diagnostics = status.site?.ruleDiagnostics;
+  if (!diagnostics) return "roots 0, content 0, exclude 0";
+  return [
+    `roots ${diagnostics.scanRootSelectorCount}`,
+    `content ${diagnostics.contentSelectorCount}`,
+    `exclude ${diagnostics.excludeSelectorCount}`,
+  ].join(", ");
+}
+
+function ruleFiltersLabel(status: PageTranslationStatus): string {
+  const diagnostics = status.site?.ruleDiagnostics;
+  if (!diagnostics) return "build 0, skip 0, css 0";
+  return [
+    `build ${diagnostics.buildContainerSelectorCount}`,
+    `skip ${diagnostics.skipBuildContainerSelectorCount}`,
+    `css ${diagnostics.injectedCssRuleCount}`,
+    `attrs ${diagnostics.globalAttributeRuleCount}`,
+    `page-attrs ${diagnostics.attributeNameCount}`,
+    `classes ${diagnostics.translationClassCount}`,
+  ].join(", ");
+}
+
+function ruleRuntimeLabel(status: PageTranslationStatus): string {
+  const diagnostics = status.site?.ruleDiagnostics;
+  if (!diagnostics) return "queue 0, flush 0, observed 0";
+  return [
+    `queue ${diagnostics.maxQueueSize}`,
+    `flush ${diagnostics.maxRootsPerFlush}`,
+    `observed ${diagnostics.maxObservedRoots}`,
+    `mutation ${diagnostics.maxMutationNodesPerWindow}/${diagnostics.mutationWindowMs}ms`,
+    `url ${diagnostics.observeUrlChange ? `${diagnostics.urlChangeDelay}ms` : "off"}`,
+    `tooltip ${diagnostics.allowTooltip ? "on" : "off"}`,
+    `viewport ${diagnostics.viewportSupplement ? diagnostics.viewportSupplementMaxRoots : "off"}`,
+  ].join(", ");
+}
+
 function scanLabel(status: PageTranslationStatus): string {
   const text = status.diagnostics?.scan.text;
+  const attributes = status.diagnostics?.scan.attributes;
   if (!text) return "0 / 0 / 0";
-  return `${text.seen} / ${text.accepted} / ${text.skipped}`;
+  const attributeLabel = attributes
+    ? `; attr ${attributes.seen} / ${attributes.accepted} / ${attributes.skipped}${reasonSuffix(attributes.skippedByReason)}`
+    : "";
+  return `${text.seen} / ${text.accepted} / ${text.skipped}${reasonSuffix(text.skippedByReason)}${attributeLabel}`;
+}
+
+function unitsLabel(status: PageTranslationStatus): string {
+  const units = status.diagnostics?.units;
+  if (!units) return "0 / 0";
+  return `${units.built} / ${units.dropped}${reasonSuffix(units.droppedByReason)}`;
 }
 
 function cacheLabel(status: PageTranslationStatus): string {
@@ -136,7 +188,22 @@ function cacheLabel(status: PageTranslationStatus): string {
 function providerLabel(status: PageTranslationStatus): string {
   const provider = status.diagnostics?.provider;
   if (!provider) return "0 / 0";
-  return `${provider.requested} / ${provider.failed}`;
+  return `${provider.requested} / ${provider.failed} / ${provider.skipped}`;
+}
+
+function reasonSuffix(counts: Partial<Record<string, number>> | undefined): string {
+  const label = topReasonsLabel(counts);
+  return label ? ` (${label})` : "";
+}
+
+function topReasonsLabel(counts: Partial<Record<string, number>> | undefined): string {
+  if (!counts) return "";
+  return Object.entries(counts)
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 3)
+    .map(([reason, count]) => `${reason} ${count}`)
+    .join(", ");
 }
 
 declare global {

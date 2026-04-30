@@ -26,11 +26,23 @@ describe("DebugOverlay", () => {
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("core+imported");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("content-ready");
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("social");
+    expect(rowText(root, "debug-overlay-rule-shape")).toContain("roots 9");
+    expect(rowText(root, "debug-overlay-rule-shape")).toContain("content 6");
+    expect(rowText(root, "debug-overlay-rule-shape")).toContain("exclude 11");
+    expect(rowText(root, "debug-overlay-rule-filters")).toContain("build 2");
+    expect(rowText(root, "debug-overlay-rule-filters")).toContain("skip 3");
+    expect(rowText(root, "debug-overlay-rule-filters")).toContain("css 4");
+    expect(rowText(root, "debug-overlay-rule-runtime")).toContain("queue 80");
+    expect(rowText(root, "debug-overlay-rule-runtime")).toContain("flush 12");
+    expect(rowText(root, "debug-overlay-rule-runtime")).toContain("url 350ms");
     expect(root?.querySelector("[data-testid='debug-overlay-segments']")?.textContent).toContain("7");
     expect(root?.querySelector("[data-testid='debug-overlay-queue']")?.textContent).toContain("2");
     expect(root?.querySelector("[data-testid='debug-overlay-cache']")?.textContent).toContain("3 / 4");
     expect(root?.querySelector("[data-testid='debug-overlay-provider']")?.textContent).toContain("5 / 1");
     expect(root?.querySelector("[data-testid='debug-overlay-scan']")?.textContent).toContain("10 / 8 / 2");
+    expect(rowText(root, "debug-overlay-scan")).toContain("hidden 2");
+    expect(rowText(root, "debug-overlay-units")).toContain("7 / 1");
+    expect(rowText(root, "debug-overlay-units")).toContain("target-language 1");
 
     overlay.unmount();
     expect(document.querySelector("[data-imt-debug-overlay='true']")).toBeNull();
@@ -60,6 +72,27 @@ function createStatus(): PageTranslationStatus {
       dynamicMode: "conservative",
       dynamicModeSource: "site-default",
       isHighDynamic: true,
+      ruleDiagnostics: {
+        scanRootSelectorCount: 9,
+        contentSelectorCount: 6,
+        excludeSelectorCount: 11,
+        buildContainerSelectorCount: 2,
+        skipBuildContainerSelectorCount: 3,
+        injectedCssRuleCount: 4,
+        globalAttributeRuleCount: 1,
+        attributeNameCount: 0,
+        translationClassCount: 2,
+        allowTooltip: false,
+        observeUrlChange: true,
+        urlChangeDelay: 350,
+        maxQueueSize: 80,
+        maxRootsPerFlush: 12,
+        maxObservedRoots: 160,
+        maxMutationNodesPerWindow: 240,
+        mutationWindowMs: 5000,
+        viewportSupplement: true,
+        viewportSupplementMaxRoots: 20,
+      },
     },
     diagnostics: {
       scan: {
@@ -92,4 +125,10 @@ function createStatus(): PageTranslationStatus {
       },
     },
   };
+}
+
+function rowText(root: Element | null, testId: string): string {
+  const row = root?.querySelector(`[data-testid='${testId}']`);
+  expect(row).not.toBeNull();
+  return row?.textContent ?? "";
 }
