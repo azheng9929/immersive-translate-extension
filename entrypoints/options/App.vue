@@ -978,14 +978,22 @@ function formatBytes(bytes: number): string {
 <style scoped>
 :global(body) {
   margin: 0;
-  background: #f6f8fb;
+  background: #eef2f6;
 }
 
 .options {
+  --imt-accent: #1769d1;
+  --imt-accent-strong: #1459b8;
+  --imt-success: #10a38f;
+  --imt-danger: #b43b3b;
+  --imt-ink: #14213d;
+  --imt-muted: #667085;
+  --imt-line: rgba(20, 33, 61, 0.12);
+  --imt-soft: #f6f8fb;
   min-height: 100vh;
   box-sizing: border-box;
   padding: 28px;
-  color: #102a5f;
+  color: var(--imt-ink);
   font: 14px "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
 }
@@ -1002,7 +1010,8 @@ function formatBytes(bytes: number): string {
 .page-icon {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(20, 33, 61, 0.12);
 }
 
 h1,
@@ -1028,12 +1037,12 @@ h3 {
 }
 
 p {
-  color: #66758c;
+  color: var(--imt-muted);
   line-height: 1.5;
 }
 
 .saved {
-  color: #128473;
+  color: #0f8d7d;
   font-size: 12px;
   font-weight: 650;
 }
@@ -1044,9 +1053,10 @@ p {
   max-width: 860px;
   margin: 0 auto 16px;
   padding: 20px;
-  border: 1px solid rgba(15, 42, 95, 0.1);
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--imt-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 28px rgba(20, 33, 61, 0.06);
 }
 
 .panel-heading {
@@ -1065,21 +1075,31 @@ p {
 .compact-button {
   min-height: 36px;
   padding: 0 14px;
-  border: 1px solid rgba(15, 42, 95, 0.14);
+  border: 1px solid var(--imt-line);
   border-radius: 8px;
-  color: #102a5f;
+  color: var(--imt-ink);
   background: #ffffff;
   cursor: pointer;
   font: inherit;
   font-weight: 650;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.compact-button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(23, 105, 209, 0.42);
+  outline-offset: 2px;
 }
 
 .compact-button:hover {
-  background: #f2f7fb;
+  background: var(--imt-soft);
+  border-color: rgba(23, 105, 209, 0.22);
 }
 
 .danger-button {
-  color: #9f2d2d;
+  color: var(--imt-danger);
 }
 
 .import-grid {
@@ -1112,9 +1132,9 @@ p {
   gap: 12px;
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid rgba(15, 42, 95, 0.1);
+  border: 1px solid var(--imt-line);
   border-radius: 8px;
-  background: #f9fbfd;
+  background: var(--imt-soft);
 }
 
 .site-rule-row strong,
@@ -1125,12 +1145,12 @@ p {
 .site-rule-row span,
 .empty-text,
 .error-text {
-  color: #66758c;
+  color: var(--imt-muted);
   font-size: 12px;
 }
 
 .error-text {
-  color: #a23b3b;
+  color: var(--imt-danger);
   font-weight: 650;
 }
 
@@ -1153,7 +1173,7 @@ p {
 }
 
 .toggle-row > span {
-  color: #52627a;
+  color: #526b7f;
   font-size: 13px;
   font-weight: 650;
 }
@@ -1165,14 +1185,14 @@ p {
   align-items: center;
   min-height: 52px;
   padding: 10px 12px;
-  border: 1px solid rgba(15, 42, 95, 0.1);
+  border: 1px solid var(--imt-line);
   border-radius: 8px;
-  background: #f9fbfd;
+  background: var(--imt-soft);
 }
 
 .cache-management strong {
   display: block;
-  color: #102a5f;
+  color: var(--imt-ink);
   font-size: 13px;
 }
 
@@ -1185,7 +1205,7 @@ p {
 }
 
 .field > span {
-  color: #52627a;
+  color: #526b7f;
   font-size: 12px;
   font-weight: 650;
 }
@@ -1195,11 +1215,12 @@ input,
 textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid rgba(15, 42, 95, 0.14);
-  border-radius: 9px;
-  color: #102a5f;
+  border: 1px solid var(--imt-line);
+  border-radius: 8px;
+  color: var(--imt-ink);
   background: #ffffff;
   font: inherit;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 select,
@@ -1209,9 +1230,37 @@ input {
 }
 
 input[type="checkbox"] {
+  position: relative;
   width: 38px;
   height: 22px;
-  accent-color: #14a896;
+  appearance: none;
+  border: 1px solid rgba(20, 33, 61, 0.16);
+  border-radius: 999px;
+  background: #dbe2eb;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(20, 33, 61, 0.18);
+  transition: transform 160ms ease;
+}
+
+input[type="checkbox"]:checked {
+  border-color: rgba(16, 163, 143, 0.5);
+  background: var(--imt-success);
+}
+
+input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
 }
 
 textarea {

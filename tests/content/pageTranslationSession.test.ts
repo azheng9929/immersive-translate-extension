@@ -781,9 +781,12 @@ describe("PageTranslationSession", () => {
 
     await vi.advanceTimersByTimeAsync(100);
     expect(fullDiscoveryCount).toBe(1);
-    expect(FakeIntersectionObserver.instances[0]?.observed.has(document.querySelector("#later")!)).toBe(true);
+    const lazyObserver = FakeIntersectionObserver.instances.find((instance) =>
+      instance.observed.has(document.querySelector("#later")!),
+    );
+    expect(lazyObserver).toBeDefined();
 
-    FakeIntersectionObserver.instances[0]?.trigger(document.querySelector("#later")!);
+    lazyObserver?.trigger(document.querySelector("#later")!);
     await waitFor(() => session!.getStatus().translated === 2);
     expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
   });

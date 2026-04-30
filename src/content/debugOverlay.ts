@@ -37,15 +37,16 @@ export class DebugOverlay {
       right: "12px",
       bottom: "12px",
       zIndex: "2147483646",
-      width: "360px",
+      width: "340px",
       maxWidth: "calc(100vw - 24px)",
       boxSizing: "border-box",
-      padding: "10px",
-      border: "1px solid rgba(15, 23, 42, 0.16)",
-      borderRadius: "8px",
-      color: "#0f172a",
-      background: "rgba(255, 255, 255, 0.96)",
-      boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
+      padding: "12px",
+      border: "1px solid rgba(20, 33, 61, 0.14)",
+      borderRadius: "10px",
+      color: "#14213d",
+      background: "rgba(255, 255, 255, 0.95)",
+      boxShadow: "0 18px 48px rgba(20, 33, 61, 0.18), 0 2px 8px rgba(20, 33, 61, 0.08)",
+      backdropFilter: "blur(16px) saturate(1.12)",
       font: "12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       letterSpacing: "0",
     });
@@ -104,8 +105,10 @@ function createTitle(): HTMLElement {
   const title = document.createElement("div");
   title.textContent = "翻译调试";
   Object.assign(title.style, {
-    marginBottom: "6px",
-    fontWeight: "700",
+    marginBottom: "8px",
+    color: "#14213d",
+    fontSize: "13px",
+    fontWeight: "750",
   });
   return title;
 }
@@ -115,7 +118,7 @@ function createRuleVisualizationButton(active: boolean, onClick: () => void): HT
   Object.assign(row.style, {
     display: "flex",
     justifyContent: "flex-end",
-    margin: "0 0 6px",
+    margin: "0 0 8px",
   });
 
   const button = document.createElement("button");
@@ -123,13 +126,13 @@ function createRuleVisualizationButton(active: boolean, onClick: () => void): HT
   button.dataset.testid = "debug-overlay-visualize-rules";
   button.textContent = active ? "隐藏规则" : "显示规则";
   Object.assign(button.style, {
-    border: "1px solid rgba(15, 23, 42, 0.16)",
-    borderRadius: "6px",
-    background: active ? "#0f172a" : "#fff",
-    color: active ? "#fff" : "#0f172a",
+    border: "1px solid rgba(20, 33, 61, 0.14)",
+    borderRadius: "8px",
+    background: active ? "#14213d" : "#fff",
+    color: active ? "#fff" : "#14213d",
     cursor: "pointer",
-    font: "12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    padding: "5px 8px",
+    font: "650 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    padding: "6px 9px",
   });
   button.addEventListener("click", onClick);
   row.append(button);
@@ -141,15 +144,16 @@ function createRow(label: string, value: string, testId: string): HTMLElement {
   row.dataset.testid = testId;
   Object.assign(row.style, {
     display: "grid",
-    gridTemplateColumns: "76px minmax(0, 1fr)",
+    gridTemplateColumns: "68px minmax(0, 1fr)",
     gap: "8px",
-    padding: "2px 0",
+    padding: "4px 0",
+    borderTop: "1px solid rgba(20, 33, 61, 0.06)",
   });
 
   const labelElement = document.createElement("span");
   labelElement.textContent = label;
   Object.assign(labelElement.style, {
-    color: "#64748b",
+    color: "#667085",
     fontWeight: "650",
   });
 
@@ -159,6 +163,7 @@ function createRow(label: string, value: string, testId: string): HTMLElement {
     overflow: "hidden",
     overflowWrap: "anywhere",
     whiteSpace: "normal",
+    color: "#24324b",
   });
 
   row.append(labelElement, valueElement);
@@ -364,12 +369,13 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
     width: "300px",
     maxWidth: "calc(100vw - 24px)",
     boxSizing: "border-box",
-    padding: "10px",
-    border: "1px solid rgba(15, 23, 42, 0.16)",
-    borderRadius: "8px",
-    background: "rgba(255, 255, 255, 0.96)",
-    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
-    color: "#0f172a",
+    padding: "12px",
+    border: "1px solid rgba(20, 33, 61, 0.14)",
+    borderRadius: "10px",
+    background: "rgba(255, 255, 255, 0.95)",
+    boxShadow: "0 18px 48px rgba(20, 33, 61, 0.18), 0 2px 8px rgba(20, 33, 61, 0.08)",
+    backdropFilter: "blur(16px) saturate(1.12)",
+    color: "#14213d",
     font: "12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     letterSpacing: "0",
   });
@@ -377,8 +383,8 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
   const title = document.createElement("div");
   title.textContent = "规则可视化";
   Object.assign(title.style, {
-    fontWeight: "700",
-    marginBottom: "6px",
+    fontWeight: "750",
+    marginBottom: "8px",
   });
   legend.append(title);
 

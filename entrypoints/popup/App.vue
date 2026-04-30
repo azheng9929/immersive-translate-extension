@@ -563,11 +563,24 @@ function endpointSummary(value: string): string {
 </template>
 
 <style scoped>
+:global(body) {
+  margin: 0;
+  background: #eef2f6;
+}
+
 .popup {
-  width: 312px;
+  --imt-accent: #1769d1;
+  --imt-accent-strong: #1459b8;
+  --imt-success: #10a38f;
+  --imt-ink: #14213d;
+  --imt-muted: #667085;
+  --imt-line: rgba(20, 33, 61, 0.12);
+  --imt-soft: #f6f8fb;
+  width: 326px;
+  box-sizing: border-box;
   padding: 14px;
-  color: #102a5f;
-  background: #f7fbfd;
+  color: var(--imt-ink);
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
   font: 14px "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
 }
@@ -580,9 +593,10 @@ function endpointSummary(value: string): string {
 }
 
 .popup-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(20, 33, 61, 0.12);
 }
 
 h1,
@@ -602,47 +616,58 @@ h2 {
 }
 
 p {
-  color: #66758c;
+  color: var(--imt-muted);
   font-size: 12px;
 }
 
 button {
   width: 100%;
-  min-height: 38px;
-  border-radius: 10px;
+  min-height: 36px;
+  border-radius: 8px;
   cursor: pointer;
   font: inherit;
   font-weight: 650;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(23, 105, 209, 0.42);
+  outline-offset: 2px;
 }
 
 .actions {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
 .primary-action {
   border: 0;
   color: #ffffff;
-  background: linear-gradient(135deg, #1758db 0%, #14a896 100%);
-  box-shadow: 0 10px 22px rgba(18, 94, 181, 0.18);
+  background: var(--imt-accent);
+  box-shadow: 0 10px 22px rgba(23, 105, 209, 0.2);
 }
 
 .primary-action:hover {
-  background: linear-gradient(135deg, #164fc3 0%, #129887 100%);
+  background: var(--imt-accent-strong);
+  transform: translateY(-1px);
 }
 
 .secondary-action,
 .settings-link,
 .debug-refresh {
-  border: 1px solid rgba(15, 42, 95, 0.14);
-  color: #102a5f;
+  border: 1px solid var(--imt-line);
+  color: var(--imt-ink);
   background: #ffffff;
 }
 
 .secondary-action:hover,
 .settings-link:hover,
 .debug-refresh:hover {
-  background: #f2f7fb;
+  background: var(--imt-soft);
+  border-color: rgba(23, 105, 209, 0.22);
 }
 
 .debug-panel,
@@ -652,7 +677,7 @@ button {
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid rgba(15, 42, 95, 0.1);
+  border-top: 1px solid var(--imt-line);
 }
 
 .debug-header {
@@ -674,7 +699,7 @@ button {
   display: grid;
   gap: 5px;
   padding: 8px;
-  border: 1px solid rgba(15, 42, 95, 0.1);
+  border: 1px solid var(--imt-line);
   border-radius: 8px;
   background: #ffffff;
 }
@@ -691,7 +716,7 @@ button {
 
 .field > span,
 .toggle-row > span {
-  color: #52627a;
+  color: #526b7f;
   font-size: 12px;
   font-weight: 650;
 }
@@ -699,10 +724,10 @@ button {
 select {
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(15, 42, 95, 0.14);
-  border-radius: 9px;
+  border: 1px solid var(--imt-line);
+  border-radius: 8px;
   padding: 0 9px;
-  color: #102a5f;
+  color: var(--imt-ink);
   background: #ffffff;
   font: inherit;
 }
@@ -711,10 +736,10 @@ select {
   width: 100%;
   min-height: 34px;
   box-sizing: border-box;
-  border: 1px solid rgba(15, 42, 95, 0.14);
-  border-radius: 9px;
+  border: 1px solid var(--imt-line);
+  border-radius: 8px;
   padding: 0 9px;
-  color: #102a5f;
+  color: var(--imt-ink);
   background: #ffffff;
   font: inherit;
 }
@@ -723,9 +748,10 @@ select {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid rgba(20, 168, 150, 0.18);
+  border: 1px solid rgba(16, 163, 143, 0.18);
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: 0 6px 18px rgba(20, 33, 61, 0.06);
 }
 
 .openai-quick-header {
@@ -738,7 +764,7 @@ select {
 .openai-endpoint {
   max-width: 118px;
   overflow: hidden;
-  color: #128473;
+  color: #0f8d7d;
   font-weight: 650;
   text-align: right;
   text-overflow: ellipsis;
@@ -757,23 +783,23 @@ select {
   gap: 4px;
   padding: 4px;
   border: 1px solid rgba(15, 42, 95, 0.12);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
 }
 
 .segmented button {
   min-height: 30px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
-  color: #52627a;
+  color: #526b7f;
   box-shadow: none;
   font-size: 12px;
 }
 
 .segmented button.active {
   color: #ffffff;
-  background: #1758db;
+  background: var(--imt-accent);
 }
 
 .toggle-row {
@@ -783,14 +809,42 @@ select {
 }
 
 input[type="checkbox"] {
-  width: 36px;
-  height: 20px;
-  accent-color: #14a896;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  appearance: none;
+  border: 1px solid rgba(20, 33, 61, 0.16);
+  border-radius: 999px;
+  background: #dbe2eb;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(20, 33, 61, 0.18);
+  transition: transform 160ms ease;
+}
+
+input[type="checkbox"]:checked {
+  border-color: rgba(16, 163, 143, 0.5);
+  background: var(--imt-success);
+}
+
+input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
 }
 
 .settings-link {
   min-height: 32px;
-  border-radius: 9px;
+  border-radius: 8px;
   box-shadow: none;
   font-size: 12px;
 }

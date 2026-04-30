@@ -16,12 +16,12 @@ type FloatingTranslationControlOptions = {
 
 const STYLE_TEXT = `
 .imt-floating-root {
-  --imt-accent: #1f7ae0;
-  --imt-accent-2: #18a999;
-  --imt-ink: #10243f;
-  --imt-muted: #62708a;
-  --imt-line: rgba(16, 36, 63, 0.12);
-  --imt-surface: rgba(255, 255, 255, 0.94);
+  --imt-accent: #1769d1;
+  --imt-accent-2: #10a38f;
+  --imt-ink: #14213d;
+  --imt-muted: #667085;
+  --imt-line: rgba(20, 33, 61, 0.12);
+  --imt-surface: rgba(255, 255, 255, 0.96);
   --imt-state: #8ca0bd;
   --imt-state-soft: rgba(140, 160, 189, 0.12);
   position: fixed;
@@ -31,11 +31,12 @@ const STYLE_TEXT = `
   z-index: 2147483646;
   display: grid;
   justify-items: end;
-  gap: 5px;
-  color: #0f2a5f;
+  gap: 4px;
+  color: var(--imt-ink);
   font-family: "Segoe UI", system-ui, sans-serif;
   letter-spacing: 0;
   pointer-events: none;
+  isolation: isolate;
 }
 .imt-floating-root,
 .imt-floating-root * {
@@ -70,20 +71,20 @@ const STYLE_TEXT = `
   position: relative;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 48px;
+  width: 40px;
+  height: 46px;
   margin-right: 0;
-  border: 1px solid rgba(16, 36, 63, 0.14);
+  border: 1px solid rgba(20, 33, 61, 0.14);
   border-right: 0;
-  border-radius: 18px 0 0 18px;
+  border-radius: 16px 0 0 16px;
   color: var(--imt-ink);
-  background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,248,252,0.9) 100%);
-  box-shadow: 0 16px 34px rgba(16, 36, 63, 0.14), 0 2px 8px rgba(16, 36, 63, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 249, 252, 0.9) 100%);
+  box-shadow: 0 12px 28px rgba(20, 33, 61, 0.14), 0 1px 4px rgba(20, 33, 61, 0.08);
   backdrop-filter: blur(16px) saturate(1.18);
   cursor: pointer;
   overflow: hidden;
   pointer-events: auto;
-  transition: transform 180ms ease, width 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+  transition: transform 160ms ease, width 160ms ease, opacity 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 .imt-floating-ball::before {
   content: "";
@@ -98,13 +99,16 @@ const STYLE_TEXT = `
 .imt-floating-logo {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 27px;
+  height: 27px;
   border-radius: 999px;
   color: #ffffff;
   background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 7px 16px rgba(31, 122, 224, 0.26);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 6px 14px rgba(23, 105, 209, 0.22);
   transition: transform 180ms ease, opacity 180ms ease;
+}
+.imt-floating-ball[data-imt-primary-action="restore"] .imt-floating-logo {
+  background: var(--imt-state);
 }
 .imt-floating-grip {
   position: absolute;
@@ -138,15 +142,24 @@ const STYLE_TEXT = `
   display: block;
 }
 .imt-floating-ball:hover {
-  transform: translateX(-4px);
-  box-shadow: 0 22px 48px rgba(16, 36, 63, 0.22), 0 4px 10px rgba(16, 36, 63, 0.13);
+  transform: translateX(-3px);
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(20, 33, 61, 0.2), 0 3px 8px rgba(20, 33, 61, 0.12);
+}
+.imt-floating-ball:focus-visible,
+.imt-floating-settings-dot:focus-visible,
+.imt-floating-button:focus-visible,
+.imt-floating-icon-button:focus-visible,
+.imt-floating-render-button:focus-visible {
+  outline: 2px solid rgba(23, 105, 209, 0.46);
+  outline-offset: 2px;
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-ball {
-  width: 20px;
-  height: 60px;
+  width: 18px;
+  height: 52px;
   margin-right: 0;
-  opacity: 0.7;
-  box-shadow: 0 10px 24px rgba(16, 36, 63, 0.14);
+  opacity: 0.62;
+  box-shadow: 0 8px 20px rgba(20, 33, 61, 0.12);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-logo {
   opacity: 0;
@@ -171,31 +184,32 @@ const STYLE_TEXT = `
   position: relative;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
-  border: 1px solid rgba(16, 36, 63, 0.16);
+  width: 16px;
+  height: 16px;
+  margin-right: 7px;
+  border: 1px solid rgba(20, 33, 61, 0.14);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 20px rgba(16, 36, 63, 0.13);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(20, 33, 61, 0.12);
   cursor: pointer;
   pointer-events: auto;
+  opacity: 0.72;
   transition: transform 160ms ease, opacity 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 .imt-floating-settings-dot::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: inherit;
   background: var(--imt-state);
-  box-shadow: 0 0 0 3px var(--imt-state-soft);
+  box-shadow: 0 0 0 2.5px var(--imt-state-soft);
 }
 .imt-floating-settings-dot:hover,
 .imt-floating-settings-dot[aria-expanded="true"] {
   opacity: 1;
-  transform: translateX(-4px);
+  transform: translateX(-3px);
   background: #ffffff;
-  box-shadow: 0 12px 26px rgba(16, 36, 63, 0.18);
+  box-shadow: 0 12px 24px rgba(20, 33, 61, 0.16);
 }
 .imt-floating-root[data-collapsed="true"] .imt-floating-settings-dot {
   opacity: 0.78;
@@ -203,26 +217,35 @@ const STYLE_TEXT = `
 .imt-floating-panel {
   position: absolute;
   top: 50%;
-  right: 58px;
+  right: 54px;
   transform: translateY(-50%);
-  width: 296px;
+  width: 304px;
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 0;
-  border: 1px solid rgba(16, 36, 63, 0.12);
-  border-radius: 16px;
+  border: 1px solid rgba(20, 33, 61, 0.12);
+  border-radius: 12px;
   background: var(--imt-surface);
-  box-shadow: 0 24px 62px rgba(16, 36, 63, 0.2), 0 6px 18px rgba(16, 36, 63, 0.12);
+  box-shadow: 0 22px 54px rgba(20, 33, 61, 0.18), 0 4px 14px rgba(20, 33, 61, 0.1);
   backdrop-filter: blur(18px) saturate(1.15);
   animation: imt-panel-in 160ms ease-out;
   pointer-events: auto;
+}
+.imt-floating-panel::-webkit-scrollbar {
+  width: 8px;
+}
+.imt-floating-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(102, 112, 133, 0.34);
+  background-clip: content-box;
 }
 .imt-floating-header {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 8px;
-  padding: 14px 14px 10px;
+  padding: 13px 13px 10px;
 }
 .imt-floating-brand {
   display: grid;
@@ -234,9 +257,9 @@ const STYLE_TEXT = `
 .imt-floating-panel-mark {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   color: #ffffff;
   background: linear-gradient(135deg, var(--imt-accent) 0%, var(--imt-accent-2) 100%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 8px 18px rgba(31, 122, 224, 0.22);
@@ -283,9 +306,9 @@ const STYLE_TEXT = `
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(16, 36, 63, 0.1);
+  border: 1px solid var(--imt-line);
   border-radius: 8px;
-  color: #52627a;
+  color: var(--imt-muted);
   background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
   font: inherit;
@@ -293,7 +316,7 @@ const STYLE_TEXT = `
 .imt-floating-icon-button:hover {
   color: var(--imt-ink);
   background: #f5f9ff;
-  border-color: rgba(31, 122, 224, 0.22);
+  border-color: rgba(23, 105, 209, 0.22);
 }
 .imt-floating-icon-button svg {
   width: 15px;
@@ -313,7 +336,7 @@ const STYLE_TEXT = `
   margin: 0 14px 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(16, 36, 63, 0.08);
+  background: rgba(20, 33, 61, 0.08);
 }
 .imt-floating-progress-bar {
   display: block;
@@ -331,8 +354,8 @@ const STYLE_TEXT = `
 .imt-floating-metric {
   min-width: 0;
   padding: 7px 8px;
-  border: 1px solid rgba(16, 36, 63, 0.08);
-  border-radius: 9px;
+  border: 1px solid rgba(20, 33, 61, 0.08);
+  border-radius: 8px;
   background: rgba(244, 248, 252, 0.72);
   color: var(--imt-muted);
   font-size: 11px;
@@ -347,7 +370,7 @@ const STYLE_TEXT = `
   font-weight: 760;
 }
 .imt-floating-diagnostics {
-  margin: 0 14px 12px;
+  margin: 0 13px 12px;
   padding: 8px;
   border-radius: 8px;
   color: var(--imt-muted);
@@ -359,18 +382,18 @@ const STYLE_TEXT = `
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  margin: 0 14px 12px;
+  margin: 0 13px 12px;
   padding: 4px;
-  border: 1px solid rgba(16, 36, 63, 0.1);
-  border-radius: 10px;
+  border: 1px solid var(--imt-line);
+  border-radius: 8px;
   background: #ffffff;
 }
 .imt-floating-render-button {
   min-width: 0;
   min-height: 30px;
   border: 0;
-  border-radius: 7px;
-  color: #52627a;
+  border-radius: 6px;
+  color: var(--imt-muted);
   background: transparent;
   cursor: pointer;
   font: inherit;
@@ -388,7 +411,7 @@ const STYLE_TEXT = `
 .imt-floating-details {
   display: grid;
   gap: 5px;
-  margin: 0 14px 12px;
+  margin: 0 13px 12px;
   padding: 8px;
   border: 1px solid rgba(16, 36, 63, 0.1);
   border-radius: 8px;
@@ -404,14 +427,14 @@ const STYLE_TEXT = `
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding: 12px 14px 14px;
+  padding: 12px 13px 13px;
   border-top: 1px solid rgba(16, 36, 63, 0.08);
   background: rgba(248, 251, 253, 0.8);
 }
 .imt-floating-button {
   min-height: 34px;
   border: 1px solid rgba(16, 36, 63, 0.12);
-  border-radius: 9px;
+  border-radius: 8px;
   background: #ffffff;
   color: var(--imt-ink);
   cursor: pointer;
