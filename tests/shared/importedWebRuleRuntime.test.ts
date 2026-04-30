@@ -49,4 +49,67 @@ describe("importedWebRuleRuntime", () => {
       { id: "marker-only", capability: "match-only", fallback: "generic" },
     ]);
   });
+
+  it("drops broad page-level imported styles while preserving site-specific layout repairs", () => {
+    const rules: WebTranslationRule[] = [
+      {
+        id: "reddit",
+        siteKey: "reddit.com",
+        matches: ["reddit.com"],
+        globalStyles: {
+          ".post-title": "-webkit-line-clamp: unset; max-height: unset; overflow: visible;",
+          ".mobile-promo": "display:none",
+          body: "overflow:hidden",
+        },
+        injectedCss: [
+          ".post-title { -webkit-line-clamp: unset !important; }",
+          ".immersive-translate-target-wrapper br { display: none; }",
+          "[class^='Original_section_title'] { overflow:hidden!important; }",
+          "body { display: none; }",
+        ],
+      },
+    ];
+
+    const prepared = prepareImportedWebTranslationRules(rules);
+
+    expect(prepared[0]?.globalStyles).toEqual({
+      ".post-title": "-webkit-line-clamp: unset; max-height: unset; overflow: visible;",
+      ".mobile-promo": "display:none",
+    });
+    expect(prepared[0]?.injectedCss).toEqual([
+      ".post-title { -webkit-line-clamp: unset !important; }",
+      ".immersive-translate-target-wrapper br { display: none; }",
+      "[class^='Original_section_title'] { overflow:hidden!important; }",
+    ]);
+  });
+
+  it("preserves imported global attribute repairs while dropping event handlers", () => {
+    const rules: WebTranslationRule[] = [
+      {
+        id: "site",
+        siteKey: "example.com",
+        matches: ["example.com"],
+        globalAttributes: {
+          ".expandable": {
+            class: "expanded",
+            "data-expanded": "true",
+            title: null,
+            onclick: "alert(1)",
+            style: "height:unset",
+          },
+        },
+      },
+    ];
+
+    const prepared = prepareImportedWebTranslationRules(rules);
+
+    expect(prepared[0]?.globalAttributes).toEqual({
+      ".expandable": {
+        class: "expanded",
+        "data-expanded": "true",
+        style: "height:unset",
+        title: null,
+      },
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import type { WebTranslationRule, WebTranslationRuleSource } from "./webRuleTypes";
+import type { WebTranslationGlobalAttributes, WebTranslationRule, WebTranslationRuleSource } from "./webRuleTypes";
 import { analyzeWebTranslationRuleCapability } from "./webRuleCapability";
 
 const SUPPORTED_RULE_KEYS = new Set([
@@ -98,6 +98,9 @@ const SUPPORTED_DELTA_FIELDS = [
 
 const NON_WEB_RULE_ID_PATTERN = /^(?:is)?ebook(?:builder)?$|pdf|subtitle|ocr|(?:^|[-_.])vtt(?:$|[-_.])|text-track|ebutt|notranslate/i;
 const NON_WEB_RULE_TEXT_PATTERN = /immersive-translate-(pdf|ebook|subtitle)|application\/pdf|download-subtitle|\.vtt\b/i;
+const BROAD_PAGE_STYLE_SELECTOR_PATTERN = /^\s*(?:html|body|\*|:root)\s*$/i;
+const PAGE_HIDING_STYLE_PATTERN = /(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0\b|position\s*:\s*fixed|pointer-events\s*:\s*none|z-index\s*:|overflow\s*:\s*hidden)/i;
+const UNSAFE_GLOBAL_ATTRIBUTE_PATTERN = /^on/i;
 
 const STABLE_RUNTIME_FIELDS = [
   "selectors",
@@ -112,6 +115,7 @@ const STABLE_RUNTIME_FIELDS = [
   "extraInlineSelectors",
   "atomicBlockSelectors",
   "inlineTags",
+  "preWhitespaceDetectedTags",
   "buildContainerSelectors",
   "skipBuildContainerSelectors",
   "stayOriginalSelectors",
@@ -119,12 +123,19 @@ const STABLE_RUNTIME_FIELDS = [
   "globalStyles",
   "globalAttributes",
   "translationClasses",
+  "wrapperPrefix",
+  "wrapperSuffix",
   "contentSelectors",
   "attributeNames",
   "mainFrameSelector",
+  "mainFrameMinTextCount",
+  "mainFrameMinWordCount",
   "bodyRule",
+  "containerMinTextCount",
+  "lineBreakMaxTextCount",
   "dynamicPreset",
   "isHighDynamic",
+  "aiRule",
   "advanceMergeConfig",
 ] as const satisfies readonly (keyof WebTranslationRule)[];
 
@@ -132,7 +143,7 @@ export function prepareImportedWebTranslationRules(rules: readonly WebTranslatio
   const prepared: WebTranslationRule[] = [];
 
   for (const rule of rules) {
-    const supported = pickSupportedRuleFields(rule);
+    const supported = sanitizeImportedRule(pickSupportedRuleFields(rule));
     if (!isRuntimeWebPageRule(supported)) continue;
     const capability = analyzeWebTranslationRuleCapability(supported);
     prepared.push({
@@ -156,6 +167,76 @@ function pickSupportedRuleFields(rule: WebTranslationRule): WebTranslationRule {
   }
 
   return output as WebTranslationRule;
+}
+
+function sanitizeImportedRule(rule: WebTranslationRule): WebTranslationRule {
+  const output: WebTranslationRule = { ...rule };
+
+  if (rule.globalStyles !== undefined) {
+    setOrDelete(output, "globalStyles", sanitizeGlobalStyles(plainRecordValue(rule.globalStyles)));
+  }
+  if (rule.injectedCss !== undefined) {
+    setOrDelete(output, "injectedCss", sanitizeInjectedCssList(arrayValue(rule.injectedCss)));
+  }
+  if (rule.additionalInjectedCss !== undefined) {
+    setOrDelete(output, "additionalInjectedCss", sanitizeInjectedCssList(arrayValue(rule.additionalInjectedCss)));
+  }
+  if (rule.globalAttributes !== undefined) {
+    setOrDelete(output, "globalAttributes", sanitizeGlobalAttributes(plainRecordValue(rule.globalAttributes)));
+  }
+
+  return output;
+}
+
+function setOrDelete<Key extends keyof WebTranslationRule>(
+  rule: WebTranslationRule,
+  key: Key,
+  value: WebTranslationRule[Key] | undefined,
+): void {
+  if (value === undefined || isEmptyRuntimeValue(value)) {
+    delete rule[key];
+    return;
+  }
+  rule[key] = value;
+}
+
+function sanitizeGlobalStyles(styles: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  const output: Record<string, string> = {};
+  for (const [selector, style] of Object.entries(styles)) {
+    if (!selector.trim() || BROAD_PAGE_STYLE_SELECTOR_PATTERN.test(selector)) continue;
+    output[selector] = style;
+  }
+  return output;
+}
+
+function sanitizeInjectedCssList(cssRules: readonly string[]): readonly string[] {
+  return cssRules
+    .map((css) => css.trim())
+    .filter((css) => css.length > 0 && !hasBroadPageStyleMutation(css));
+}
+
+function hasBroadPageStyleMutation(css: string): boolean {
+  return css.split("}").some((block) => {
+    const [selectorText, styleText] = block.split("{");
+    if (!selectorText || !styleText || !PAGE_HIDING_STYLE_PATTERN.test(styleText)) return false;
+    return selectorText.split(",").some((selector) => BROAD_PAGE_STYLE_SELECTOR_PATTERN.test(selector));
+  });
+}
+
+function sanitizeGlobalAttributes(attributes: WebTranslationGlobalAttributes): WebTranslationGlobalAttributes {
+  const output: Record<string, Record<string, string | null>> = {};
+
+  for (const [selector, selectorAttributes] of Object.entries(attributes)) {
+    if (!selector.trim()) continue;
+    const safeAttributes: Record<string, string | null> = {};
+    for (const [attribute, value] of Object.entries(selectorAttributes)) {
+      if (UNSAFE_GLOBAL_ATTRIBUTE_PATTERN.test(attribute)) continue;
+      safeAttributes[attribute] = value;
+    }
+    if (Object.keys(safeAttributes).length > 0) output[selector] = safeAttributes;
+  }
+
+  return output;
 }
 
 function isSupportedVersionedDeltaKey(key: string): boolean {
@@ -207,6 +288,20 @@ function isArrayOperation<T>(
   );
 }
 
+function plainRecordValue<T>(
+  value: Readonly<Record<string, T>> | { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> } | undefined,
+): Readonly<Record<string, T>> {
+  if (!value || Array.isArray(value) || typeof value !== "object") return {};
+  if (isRecordOperation(value)) return { ...(value.replace ?? {}), ...(value.add ?? {}) };
+  return { ...(value as Readonly<Record<string, T>>) };
+}
+
+function isRecordOperation<T>(
+  value: Readonly<Record<string, T>> | { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> },
+): value is { replace?: Readonly<Record<string, T>>; add?: Readonly<Record<string, T>> } {
+  return "replace" in value || "add" in value;
+}
+
 function importedRuleSource(rule: WebTranslationRule): WebTranslationRuleSource {
   return STABLE_RUNTIME_FIELDS.some((field) => hasRuntimeValue(rule[field]))
     ? "imported-stable"
@@ -218,4 +313,10 @@ function hasRuntimeValue(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0;
   if (typeof value === "object") return Object.keys(value).length > 0;
   return true;
+}
+
+function isEmptyRuntimeValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (value && typeof value === "object") return Object.keys(value).length === 0;
+  return false;
 }

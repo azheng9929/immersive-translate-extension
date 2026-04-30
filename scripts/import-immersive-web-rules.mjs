@@ -20,16 +20,20 @@ function normalizeRule(source) {
   const bodyRule = collectObject(source, "bodyRule");
   const selectors = collectArray(source, "selectors", ["additionalSelectors"]);
   const excludeSelectors = collectArray(source, "excludeSelectors", ["additionalExcludeSelectors"]);
+  const excludeTags = collectArray(source, "excludeTags", ["additionalExcludeTags"]).map((tag) => tag.toUpperCase());
   const mutationExcludeSelectors = collectArray(source, "mutationExcludeSelectors");
   const injectedCss = collectArray(source, "injectedCss");
   const extraBlockSelectors = collectArray(source, "extraBlockSelectors");
   const extraInlineSelectors = collectArray(source, "extraInlineSelectors", ["additionalInlineSelectors"]);
   const atomicBlockSelectors = collectArray(source, "atomicBlockSelectors");
+  const inlineTags = collectArray(source, "inlineTags").map((tag) => tag.toUpperCase());
+  const preWhitespaceDetectedTags = collectArray(source, "preWhitespaceDetectedTags").map((tag) => tag.toUpperCase());
   const buildContainerSelectors = collectArray(source, "buildContainerSelectors");
   const skipBuildContainerSelectors = collectArray(source, "skipBuildContainerSelectors");
   const stayOriginalSelectors = collectArray(source, "stayOriginalSelectors", ["additionalStayOriginalSelectors"]);
   const stayOriginalTags = collectArray(source, "stayOriginalTags").map((tag) => tag.toUpperCase());
   const globalStyles = collectRecord(source, "globalStyles");
+  const globalAttributes = collectNestedRecord(source, "globalAttributes");
 
   const rule = compact({
     id: String(source.id),
@@ -40,17 +44,26 @@ function normalizeRule(source) {
     excludeSelectorMatches: collectArray(source, "excludeSelectorMatches"),
     selectors,
     excludeSelectors,
+    excludeTags,
     mutationExcludeSelectors,
     injectedCss,
     extraBlockSelectors,
     extraInlineSelectors,
     atomicBlockSelectors,
+    inlineTags,
+    preWhitespaceDetectedTags,
     buildContainerSelectors,
     skipBuildContainerSelectors,
     stayOriginalSelectors,
     stayOriginalTags,
     globalStyles,
-    mainFrameSelector: source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector,
+    globalAttributes,
+    translationClasses: collectArray(source, "translationClasses"),
+    wrapperPrefix: source.wrapperPrefix,
+    wrapperSuffix: source.wrapperSuffix,
+    mainFrameSelector: selectorListValue(source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector),
+    mainFrameMinTextCount: source.mainFrameMinTextCount,
+    mainFrameMinWordCount: source.mainFrameMinWordCount,
     bodyRule,
     observeUrlChange: source.observeUrlChange,
     urlChangeDelay: source.urlChangeDelay,
@@ -59,6 +72,9 @@ function normalizeRule(source) {
     paragraphMinWordCount: source.paragraphMinWordCount,
     blockMinTextCount: source.blockMinTextCount,
     blockMinWordCount: source.blockMinWordCount,
+    containerMinTextCount: source.containerMinTextCount,
+    lineBreakMaxTextCount: source.lineBreakMaxTextCount,
+    aiRule: source.aiRule,
     advanceMergeConfig: normalizeAdvanceMergeConfig(source.advanceMergeConfig, source.id),
     ...dynamicHints(source),
   });
@@ -114,6 +130,21 @@ function collectObject(source, field) {
   return output;
 }
 
+function collectNestedRecord(source, field) {
+  const output = {};
+  assignNestedRecord(output, source[field]);
+  assignNestedRecord(output, source[`${field}.add`]);
+
+  for (const [sourceKey, value] of Object.entries(source)) {
+    if (sourceKey.startsWith(`${field}.add_v.`)) assignNestedRecord(output, value);
+    if (sourceKey === `${field}.remove` || sourceKey.startsWith(`${field}.remove_v.`)) {
+      for (const key of toArray(value)) delete output[key];
+    }
+  }
+
+  return output;
+}
+
 function assignRecord(target, value) {
   if (!value || Array.isArray(value) || typeof value !== "object") return;
   for (const [key, entry] of Object.entries(value)) {
@@ -125,6 +156,14 @@ function assignObject(target, value) {
   if (!value || Array.isArray(value) || typeof value !== "object") return;
   for (const [key, entry] of Object.entries(value)) {
     if (entry !== undefined) target[key] = entry;
+  }
+}
+
+function assignNestedRecord(target, value) {
+  if (!value || Array.isArray(value) || typeof value !== "object") return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (!entry || Array.isArray(entry) || typeof entry !== "object") continue;
+    target[key] = { ...entry };
   }
 }
 
@@ -142,17 +181,26 @@ function normalizeAdvanceConfig(source, id) {
   return compact({
     selectors: collectArray(source, "selectors", ["additionalSelectors"]),
     excludeSelectors: collectArray(source, "excludeSelectors", ["additionalExcludeSelectors"]),
+    excludeTags: collectArray(source, "excludeTags", ["additionalExcludeTags"]).map((tag) => tag.toUpperCase()),
     mutationExcludeSelectors: collectArray(source, "mutationExcludeSelectors"),
     injectedCss: collectArray(source, "injectedCss"),
     extraBlockSelectors: collectArray(source, "extraBlockSelectors"),
     extraInlineSelectors: collectArray(source, "extraInlineSelectors", ["additionalInlineSelectors"]),
     atomicBlockSelectors: collectArray(source, "atomicBlockSelectors"),
+    inlineTags: collectArray(source, "inlineTags").map((tag) => tag.toUpperCase()),
+    preWhitespaceDetectedTags: collectArray(source, "preWhitespaceDetectedTags").map((tag) => tag.toUpperCase()),
     buildContainerSelectors: collectArray(source, "buildContainerSelectors"),
     skipBuildContainerSelectors: collectArray(source, "skipBuildContainerSelectors"),
     stayOriginalSelectors: collectArray(source, "stayOriginalSelectors", ["additionalStayOriginalSelectors"]),
     stayOriginalTags: collectArray(source, "stayOriginalTags").map((tag) => tag.toUpperCase()),
     globalStyles: collectRecord(source, "globalStyles"),
-    mainFrameSelector: source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector,
+    globalAttributes: collectNestedRecord(source, "globalAttributes"),
+    translationClasses: collectArray(source, "translationClasses"),
+    wrapperPrefix: source.wrapperPrefix,
+    wrapperSuffix: source.wrapperSuffix,
+    mainFrameSelector: selectorListValue(source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector),
+    mainFrameMinTextCount: source.mainFrameMinTextCount,
+    mainFrameMinWordCount: source.mainFrameMinWordCount,
     bodyRule,
     observeUrlChange: source.observeUrlChange,
     urlChangeDelay: source.urlChangeDelay,
@@ -161,6 +209,9 @@ function normalizeAdvanceConfig(source, id) {
     paragraphMinWordCount: source.paragraphMinWordCount,
     blockMinTextCount: source.blockMinTextCount,
     blockMinWordCount: source.blockMinWordCount,
+    containerMinTextCount: source.containerMinTextCount,
+    lineBreakMaxTextCount: source.lineBreakMaxTextCount,
+    aiRule: source.aiRule,
     ...dynamicHints({ id, ...source }),
   });
 }
@@ -188,6 +239,11 @@ function inferSiteKey(source, matches) {
 function toArray(value) {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function selectorListValue(value) {
+  const selectors = toArray(value).map(String).map((selector) => selector.trim()).filter(Boolean);
+  return selectors.length > 0 ? selectors.join(", ") : undefined;
 }
 
 function compact(rule) {

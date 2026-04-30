@@ -69,6 +69,49 @@ describe("webRuleStore", () => {
     expect(artstationLearning?.selectors).toContain("footer.learning-course-description.ng-star-inserted > span");
   });
 
+  it("preserves site-specific imported style repairs instead of treating them as generic risk", async () => {
+    const redditRules = await getWebRulesForUrl("https://www.reddit.com/");
+    const reddit = redditRules.find((rule) => rule.id === "redditList");
+    expect(reddit?.globalStyles).toMatchObject({
+      "div.XPromoBottomBar": "display:none",
+      "[class*='line-clamp']": "-webkit-line-clamp: unset",
+    });
+
+    const youtubeRules = await getWebRulesForUrl("https://www.youtube.com/watch?v=test");
+    const youtube = youtubeRules.find((rule) => rule.id === "youtube");
+    expect(youtube?.injectedCss).toContain("#commentCanvas .cmt font br {display: none;}");
+
+    const learnOpenGlRules = await getWebRulesForUrl("https://learnopengl.com/Getting-started/OpenGL");
+    const learnOpenGl = learnOpenGlRules.find((rule) => rule.id === "learnopengl");
+    expect(learnOpenGl?.globalStyles).toMatchObject({
+      function: "position:relative;z-index:1000;",
+    });
+  });
+
+  it("keeps imported tuning fields that carry site-specific layout and parsing knowledge", async () => {
+    const youtubeRules = await getWebRulesForUrl("https://www.youtube.com/watch?v=test");
+    const youtube = youtubeRules.find((rule) => rule.id === "youtube");
+    expect(youtube).toMatchObject({
+      mainFrameMinTextCount: 0,
+      mainFrameMinWordCount: 0,
+      lineBreakMaxTextCount: 0,
+    });
+    expect(youtube?.wrapperSuffix).toBe("");
+
+    const facebookRules = await getWebRulesForUrl("https://www.facebook.com/");
+    const facebook = facebookRules.find((rule) => rule.id === "facebook");
+    expect(facebook?.translationClasses).toContain("immersive-translate-text");
+    expect(facebook?.preWhitespaceDetectedTags).toEqual(["DIV", "SPAN"]);
+
+    const bearblogRules = await getWebRulesForUrl("https://bearblog.dev/discover/");
+    const bearblog = bearblogRules.find((rule) => rule.id === "bearblog");
+    expect(bearblog?.excludeTags).toContain("SMALL");
+
+    const unityRules = await getWebRulesForUrl("https://docs.unity3d.com/Manual/example.html");
+    const unity = unityRules.find((rule) => rule.id === "docs.unity3d");
+    expect(unity?.mainFrameSelector).toBe(".tooltip > .tooltiptext, body");
+  });
+
   it("filters imported rules whose primary surface is outside webpage translation", async () => {
     const rules = await getWebRulesForUrl("https://arxiv.org/pdf/2501.00001");
 

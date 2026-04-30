@@ -11,6 +11,8 @@
     "selectorMatches": [
       "meta[name='immersive-translate-subtitle-builder'][content='true']"
     ],
+    "wrapperPrefix": "",
+    "wrapperSuffix": "",
     "bodyRule": {
       "enable": false
     },
@@ -43,6 +45,12 @@
       ".immersive-translate-target-inner div div {border:unset!important;padding:0!important;}",
       ".immersive-translate-target-wrapper[dir='rtl'] {text-align: right;display: inline-block!important;position:unset;}"
     ],
+    "globalAttributes": {
+      "[class='textLayer']": {
+        "translate": "no"
+      }
+    },
+    "wrapperPrefix": "",
     "mainFrameSelector": "#viewerContainer",
     "bodyRule": {
       "enable": true,
@@ -68,6 +76,7 @@
     "extraInlineSelectors": [
       "span.dropcaps"
     ],
+    "wrapperPrefix": "<br />",
     "bodyRule": {
       "enable": false
     },
@@ -75,7 +84,8 @@
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2,
     "blockMinTextCount": 1,
-    "blockMinWordCount": 1
+    "blockMinWordCount": 1,
+    "containerMinTextCount": 1
   },
   {
     "id": "isEbookBuilder",
@@ -105,6 +115,7 @@
     "injectedCss": [
       ".immersive-translate-target-translation-block-wrapper {display:block;}"
     ],
+    "wrapperPrefix": "<br />",
     "bodyRule": {
       "enable": false
     },
@@ -112,7 +123,8 @@
     "paragraphMinTextCount": 1,
     "paragraphMinWordCount": 1,
     "blockMinTextCount": 1,
-    "blockMinWordCount": 1
+    "blockMinWordCount": 1,
+    "containerMinTextCount": 1
   },
   {
     "id": "immersiveTranslateIosOnBoarding",
@@ -1189,6 +1201,13 @@
     "injectedCss": [
       "._4ik4._4ik5 {max-height:unset!important;}"
     ],
+    "preWhitespaceDetectedTags": [
+      "DIV",
+      "SPAN"
+    ],
+    "translationClasses": [
+      "immersive-translate-text"
+    ],
     "detectParagraphLanguage": true
   },
   {
@@ -1196,7 +1215,9 @@
     "siteKey": "www.facebook.com",
     "matches": [
       "www.facebook.com/v20.0/plugins/*"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "youtubeMobile",
@@ -1240,6 +1261,8 @@
     "atomicBlockSelectors": [
       ".comment-text"
     ],
+    "wrapperPrefix": "",
+    "wrapperSuffix": "",
     "observeUrlChange": true
   },
   {
@@ -1260,7 +1283,9 @@
     "siteKey": "www.youtube.com",
     "matches": [
       "https://www.youtube.com/embed*"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "youtube",
@@ -1326,6 +1351,10 @@
       "yt-formatted-string.ytd-transcript-segment-renderer",
       ".caption-visual-line"
     ],
+    "wrapperPrefix": "<br/>",
+    "wrapperSuffix": "",
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0,
     "bodyRule": {
       "enable": false
     },
@@ -1333,7 +1362,8 @@
     "urlChangeDelay": 2000,
     "detectParagraphLanguage": true,
     "blockMinTextCount": 0,
-    "blockMinWordCount": 0
+    "blockMinWordCount": 0,
+    "lineBreakMaxTextCount": 0
   },
   {
     "id": "youtubekids",
@@ -1349,17 +1379,22 @@
       ".details.ytk-compact-video-renderer": "height: unset;",
       ".primary-text.ytk-compact-video-renderer": "-webkit-line-clamp: unset;max-height: unset;"
     },
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0,
     "observeUrlChange": true,
     "detectParagraphLanguage": true,
     "blockMinTextCount": 0,
-    "blockMinWordCount": 0
+    "blockMinWordCount": 0,
+    "lineBreakMaxTextCount": 0
   },
   {
     "id": "tvYoutube",
     "siteKey": "tv.youtube.com",
     "matches": [
       "tv.youtube.com"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "youtube-subtitle",
@@ -1374,7 +1409,9 @@
     ],
     "extraBlockSelectors": [
       ".caption-visual-line"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "instagramMessage",
@@ -1384,7 +1421,8 @@
     ],
     "selectors": [
       "div[dir=auto].html-div"
-    ]
+    ],
+    "wrapperPrefix": "<br/>"
   },
   {
     "id": "instagramPost",
@@ -1406,6 +1444,7 @@
     "injectedCss": [
       "article ._aagw {position:unset !important;}"
     ],
+    "wrapperPrefix": "<br/>",
     "paragraphMinTextCount": 2,
     "blockMinTextCount": 1
   },
@@ -1429,6 +1468,7 @@
       ".x1fkh5qu.x1ddbhtg.x1dlrdel",
       "a[href*='explore/locations/']"
     ],
+    "wrapperSuffix": "",
     "paragraphMinTextCount": 2,
     "blockMinWordCount": 1
   },
@@ -1614,6 +1654,7 @@
     "atomicBlockSelectors": [
       "h3 a[data-clk]"
     ],
+    "wrapperPrefix": "\n",
     "detectParagraphLanguage": true
   },
   {
@@ -1746,6 +1787,8 @@
       "li[class^='card'] div[class^='message']",
       "[data-list-item-id^='forum-channel-list'] div[class^='headerText']"
     ],
+    "wrapperPrefix": "<br />",
+    "wrapperSuffix": "",
     "detectParagraphLanguage": true,
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2,
@@ -1993,6 +2036,7 @@
       ".MUFPAc",
       "[role=heading]"
     ],
+    "wrapperSuffix": "",
     "detectParagraphLanguage": true,
     "blockMinTextCount": 32,
     "blockMinWordCount": 3
@@ -2195,7 +2239,12 @@
       ".content",
       ".form-container",
       ".account__header__extra"
-    ]
+    ],
+    "globalAttributes": {
+      "[class='notranslate app-holder']": {
+        "class": "app-holder"
+      }
+    }
   },
   {
     "id": "cnbc",
@@ -2255,6 +2304,8 @@
       ".entry-header": "height:unset;",
       ".entry-title > a": "height:unset;-webkit-line-clamp:unset;"
     },
+    "wrapperPrefix": "<br/>",
+    "wrapperSuffix": "\n",
     "detectParagraphLanguage": true
   },
   {
@@ -2378,7 +2429,8 @@
     "matches": [
       "https://netflavns1.com",
       "https://embedrise.com"
-    ]
+    ],
+    "mainFrameMinTextCount": 0
   },
   {
     "id": "netflav",
@@ -2403,6 +2455,11 @@
     "globalStyles": {
       ".short-story": "height:unset;",
       ".short-title": "height:unset;"
+    },
+    "globalAttributes": {
+      "header": {
+        "translate": "unset;"
+      }
     }
   },
   {
@@ -2682,6 +2739,8 @@
       ".vjs-text-track-display"
     ],
     "mainFrameSelector": ".body-content",
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0,
     "bodyRule": {
       "bodySelector": "main article",
       "articleSelector": ".body-content"
@@ -2732,6 +2791,11 @@
       "span.display",
       "span.math"
     ],
+    "globalAttributes": {
+      "#abspara0010 br": {
+        "style": "display:none;"
+      }
+    },
     "mainFrameSelector": "article",
     "bodyRule": {
       "bodySelector": "article"
@@ -2821,6 +2885,11 @@
     "excludeSelectors": [
       "div.fAAi8",
       "div.wvu3V"
+    ],
+    "preWhitespaceDetectedTags": [
+      "DIV",
+      "SPAN",
+      "P"
     ]
   },
   {
@@ -2846,6 +2915,15 @@
       ".components-MessageActions-index__messageActionsWrapper",
       "span[data-openweb-allow-amp]",
       "div.spcv_typing-users"
+    ],
+    "excludeTags": [
+      "TEXT",
+      "IMG",
+      "SUB",
+      "SUP",
+      "CODE",
+      "TT",
+      "ASIDE"
     ]
   },
   {
@@ -2863,6 +2941,14 @@
     "siteKey": "opennet.ru",
     "matches": [
       "opennet.ru"
+    ],
+    "excludeTags": [
+      "LABEL",
+      "IMG",
+      "SUB",
+      "SUP",
+      "CODE",
+      "TT"
     ]
   },
   {
@@ -3056,6 +3142,14 @@
     ],
     "globalStyles": {
       "[class*='line-clamp']": "max-height:unset;-webkit-line-clamp:unset;height:unset;white-space:unset;"
+    },
+    "wrapperPrefix": "",
+    "aiRule": {
+      "streamingSelector": ".result-streaming.markdown",
+      "messageWrapperSelector": ".markdown",
+      "streamingChange": true,
+      "streamingDeepChild": true,
+      "streamingDelayTime": 1000
     }
   },
   {
@@ -3079,6 +3173,13 @@
     ],
     "globalStyles": {
       "[class^='BotListItem_botDescription']": "-webkit-line-clamp: unset;"
+    },
+    "aiRule": {
+      "streamingSelector": ".ChatStopMessageButton_stopButton__LWNj6",
+      "messageWrapperSelector": ".Markdown_markdownContainer__Tz3HQ",
+      "streamingChange": false,
+      "streamingDeepChild": true,
+      "streamingDelayTime": 1000
     }
   },
   {
@@ -3096,7 +3197,14 @@
     ],
     "excludeSelectors": [
       "[data-testid=virtuoso-scroller] .css-104fsj *"
-    ]
+    ],
+    "aiRule": {
+      "streamingSelector": "button[aria-label=Cancel]",
+      "messageWrapperSelector": "[data-testid=virtuoso-scroller] .css-104fsj",
+      "streamingChange": false,
+      "streamingDeepChild": true,
+      "streamingDelayTime": 2000
+    }
   },
   {
     "id": "glasp",
@@ -3206,6 +3314,15 @@
     "matches": [
       "www.rfc-editor.org",
       "docs.haproxy.org"
+    ],
+    "excludeTags": [
+      "IMG",
+      "SUB",
+      "SUP",
+      "CODE",
+      "TT",
+      "ASIDE",
+      "FOOTER"
     ]
   },
   {
@@ -3674,6 +3791,15 @@
     "siteKey": "www.spiedigitallibrary.org",
     "matches": [
       "www.spiedigitallibrary.org"
+    ],
+    "excludeTags": [
+      "IMG",
+      "SUB",
+      "SUP",
+      "CODE",
+      "TT",
+      "ASIDE",
+      "FOOTER"
     ]
   },
   {
@@ -3825,7 +3951,8 @@
       ".custom-content-footer"
     ],
     "paragraphMinTextCount": 2,
-    "paragraphMinWordCount": 1
+    "paragraphMinWordCount": 1,
+    "containerMinTextCount": 2
   },
   {
     "id": "urlChangeDelay",
@@ -3900,7 +4027,17 @@
     "siteKey": "lawhub.lsac.org",
     "matches": [
       "https://lawhub.lsac.org/question/*"
-    ]
+    ],
+    "globalAttributes": {
+      "#stimulus": {
+        "translate": "off",
+        "class": "stimulus"
+      },
+      "#stem": {
+        "translate": "off",
+        "class": "stem"
+      }
+    }
   },
   {
     "id": "yuque",
@@ -3917,6 +4054,9 @@
     "siteKey": "bearblog.dev",
     "matches": [
       "https://bearblog.dev/discover/*"
+    ],
+    "excludeTags": [
+      "SMALL"
     ]
   },
   {
@@ -4030,6 +4170,8 @@
     "extraInlineSelectors": [
       ".x1lliihq"
     ],
+    "wrapperPrefix": "\n",
+    "wrapperSuffix": "<br/>",
     "bodyRule": {
       "enable": false
     }
@@ -4182,7 +4324,12 @@
     "siteKey": "www.elektrotechnik.rwth-aachen.de",
     "matches": [
       "https://www.elektrotechnik.rwth-aachen.de/*"
-    ]
+    ],
+    "globalAttributes": {
+      "[class='notranslate']": {
+        "class": ""
+      }
+    }
   },
   {
     "id": "nytimes",
@@ -4264,6 +4411,11 @@
     "globalStyles": {
       "a > div": "display:block;",
       "[style*='358px;']": "width: 33.3333%; height: auto; padding: 0px; position: relative; margin: 0px;"
+    },
+    "globalAttributes": {
+      "#app": {
+        "class": ""
+      }
     }
   },
   {
@@ -4289,7 +4441,15 @@
     "injectedCss": [
       "[data-testid='chat-menu-trigger'] br {display:none;}",
       "[data-test-render-count] {overflow: scroll;}"
-    ]
+    ],
+    "aiRule": {
+      "messageWrapperSelector": ".contents",
+      "messageContainerSelector": ".ReactMarkdown",
+      "messageStreamEndSelector": ".contents > button",
+      "streamingChange": true,
+      "streamingDeepChild": false,
+      "streamingDelayTime": 1000
+    }
   },
   {
     "id": "feishu",
@@ -4333,6 +4493,10 @@
       ".sc-hagvSa.guBIfV",
       ".sc-jhZTHU.btgPPn",
       "#editor-sidebar-scroll-container"
+    ],
+    "excludeTags": [
+      "I",
+      "BUTTON"
     ],
     "injectedCss": [
       ".km-listitem--large {height:unset !important;}",
@@ -4519,6 +4683,14 @@
     "extraBlockSelectors": [
       ".mixed-citation"
     ],
+    "globalAttributes": {
+      "#Scholarscope_HighlightContent": {
+        "class": ""
+      },
+      "#Scholarscope_HighlightOrigin": {
+        "class": "Scholarscope_HighlightContents"
+      }
+    },
     "urlChangeDelay": 0
   },
   {
@@ -4598,6 +4770,9 @@
     "siteKey": "htdp.org",
     "matches": [
       "htdp.org"
+    ],
+    "excludeTags": [
+      "BLOCKQUOTE"
     ],
     "stayOriginalSelectors": [
       ".RktIn"
@@ -4747,7 +4922,14 @@
     "excludeSelectors": [
       ".chat-message-row.ai *",
       ".pdf-viewer"
-    ]
+    ],
+    "aiRule": {
+      "streamingSelector": "",
+      "messageWrapperSelector": ".chat-message-row.ai",
+      "streamingChange": false,
+      "streamingDeepChild": true,
+      "streamingDelayTime": 1000
+    }
   },
   {
     "id": "inciteful",
@@ -4872,6 +5054,11 @@
     ],
     "globalStyles": {
       ".story-info .item-description": "overflow: scroll;"
+    },
+    "globalAttributes": {
+      "header": {
+        "translate": "unset;"
+      }
     }
   },
   {
@@ -6658,7 +6845,8 @@
     ],
     "mutationExcludeSelectors": [
       "#fittPageContainer *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0
   },
   {
     "id": "anthropic-course",
@@ -6708,7 +6896,9 @@
     "mutationExcludeSelectors": [
       ".jw-wrapper *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "dailymotion",
@@ -6721,7 +6911,9 @@
     ],
     "mutationExcludeSelectors": [
       ".player *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "crunchyroll",
@@ -6736,7 +6928,9 @@
     "mutationExcludeSelectors": [
       "#vilos *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "osmosis",
@@ -6751,7 +6945,9 @@
     "mutationExcludeSelectors": [
       "#video-player-container *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "pbs",
@@ -6766,7 +6962,9 @@
     "mutationExcludeSelectors": [
       ".wrapper *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "internetfundamentals",
@@ -6794,7 +6992,9 @@
     ],
     "mutationExcludeSelectors": [
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "smartpoly.teachable.com",
@@ -6817,7 +7017,9 @@
     ],
     "mutationExcludeSelectors": [
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "movie-web",
@@ -6892,7 +7094,9 @@
     ],
     "mutationExcludeSelectors": [
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "quantinsti",
@@ -6977,7 +7181,9 @@
     ],
     "mutationExcludeSelectors": [
       ".jw-wrapper *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "khflix",
@@ -7004,7 +7210,9 @@
     ],
     "mutationExcludeSelectors": [
       ".jw-media *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "lecturio",
@@ -7017,7 +7225,9 @@
     ],
     "mutationExcludeSelectors": [
       "#vjs_video_3 *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "ganjingworld",
@@ -7057,7 +7267,9 @@
     ],
     "mutationExcludeSelectors": [
       ".vp-captions *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "player.vimeo",
@@ -7079,14 +7291,18 @@
     "extraBlockSelectors": [
       "span.vp-captions-line",
       "span[class^=CaptionsRenderer_]"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "laracasts.com",
     "siteKey": "laracasts.com",
     "matches": [
       "laracasts.com"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "tv.adobe",
@@ -7183,7 +7399,9 @@
       ".closed-captions",
       ".wrapper-video-bottom-section",
       ".secondary-controls"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "ardmediathek",
@@ -7222,7 +7440,9 @@
     ],
     "mutationExcludeSelectors": [
       ".p_accessibleHitArea *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "bbc",
@@ -7375,7 +7595,9 @@
     ],
     "mutationExcludeSelectors": [
       ".avia-container *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "gaia",
@@ -7440,7 +7662,9 @@
     ],
     "mutationExcludeSelectors": [
       "#overlay-container *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "gagaoolala",
@@ -7486,7 +7710,9 @@
     "siteKey": "customer-*.cloudflarestream.com",
     "matches": [
       "customer-*.cloudflarestream.com"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "ucdavis",
@@ -7499,7 +7725,9 @@
     ],
     "mutationExcludeSelectors": [
       "[data-testid=\"video-player\"] *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "f1tv",
@@ -7603,7 +7831,9 @@
     "mutationExcludeSelectors": [
       ".plyr__captions *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "tver",
@@ -7657,7 +7887,9 @@
     ],
     "mutationExcludeSelectors": [
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "learningSap",
@@ -7735,6 +7967,9 @@
       "message-actions button",
       ".mdc-button__label .ng-star-inserted",
       ".mdc-list-item__primary-text"
+    ],
+    "excludeTags": [
+      "MAT-TOOLTIP-COMPONENT"
     ]
   },
   {
@@ -7801,7 +8036,15 @@
     "siteKey": "www.etymonline.com",
     "matches": [
       "www.etymonline.com"
-    ]
+    ],
+    "globalAttributes": {
+      ".crossreference.notranslate": {
+        "class": "crossreference"
+      },
+      ".foreign.notranslate": {
+        "class": "foreign"
+      }
+    }
   },
   {
     "id": "arxiv",
@@ -8085,10 +8328,7 @@
     "stayOriginalSelectors": [
       ".tooltip"
     ],
-    "mainFrameSelector": [
-      ".tooltip > .tooltiptext",
-      "body"
-    ]
+    "mainFrameSelector": ".tooltip > .tooltiptext, body"
   },
   {
     "id": "docs.unity.cn",
@@ -8113,11 +8353,7 @@
       ".articleHeaderDropzone2",
       "header"
     ],
-    "mainFrameSelector": [
-      ".article_abstract",
-      ".article_header-title",
-      "[property=\"articleBody\"]"
-    ]
+    "mainFrameSelector": ".article_abstract, .article_header-title, [property=\"articleBody\"]"
   },
   {
     "id": "typeset.io",
@@ -8195,7 +8431,10 @@
     ],
     "extraBlockSelectors": [
       ".inline-flex span"
-    ]
+    ],
+    "aiRule": {
+      "messageWrapperSelector": "[class*='space-y-1.5 break-words pr-8']"
+    }
   },
   {
     "id": "ipinfo",
@@ -9247,7 +9486,12 @@
     "siteKey": "surveymyopinion.researchnow.com",
     "matches": [
       "surveymyopinion.researchnow.com"
-    ]
+    ],
+    "globalAttributes": {
+      "option": {
+        "label": ""
+      }
+    }
   },
   {
     "id": "xfiction.org",
@@ -9871,7 +10115,9 @@
     ],
     "mutationExcludeSelectors": [
       "div[data-handle='captions'] *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "graphpad",
@@ -9886,7 +10132,9 @@
     "mutationExcludeSelectors": [
       "div[data-handle='captions'] *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "wistia",
@@ -9912,7 +10160,9 @@
     "mutationExcludeSelectors": [
       "div[data-handle='captions'] *",
       "#immersive-translate-caption-window *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "barotem",
@@ -10356,7 +10606,9 @@
       "*.video-stream-hosting.de",
       "*.thieme.de",
       "videos.sproutvideo.com"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "common-vtt-jw",
@@ -10371,14 +10623,18 @@
     ],
     "mutationExcludeSelectors": [
       ".jw-wrapper *"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "common-ebutt",
     "siteKey": "www.tagesschau.de",
     "matches": [
       "www.tagesschau.de"
-    ]
+    ],
+    "mainFrameMinTextCount": 0,
+    "mainFrameMinWordCount": 0
   },
   {
     "id": "formatPreSites",
