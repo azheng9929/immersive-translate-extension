@@ -66,7 +66,7 @@ describe("PageController", () => {
 
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
     expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
-    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("[zh-Hans] Search docs");
+    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("Search docs");
 
     controller.restorePage();
     expect(document.querySelector(".imt-translation-block")).toBeNull();
@@ -852,7 +852,7 @@ describe("PageController", () => {
     });
   });
 
-  it("uses safe attribute translation by default", async () => {
+  it("uses conservative safe attribute translation by default", async () => {
     document.body.innerHTML = `
       <main>
         <input placeholder="Search docs" title="Tooltip label" aria-label="Search input" />
@@ -870,8 +870,8 @@ describe("PageController", () => {
 
     await controller.translatePage();
 
-    expect(requestedTexts).toEqual(["Search docs", "Diagram description"]);
-    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("[zh-Hans] Search docs");
+    expect(requestedTexts).toEqual(["Diagram description"]);
+    expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("Search docs");
     expect(document.querySelector("img")?.getAttribute("alt")).toBe("[zh-Hans] Diagram description");
     expect(document.querySelector("input")?.getAttribute("title")).toBe("Tooltip label");
     expect(document.querySelector("input")?.getAttribute("aria-label")).toBe("Search input");

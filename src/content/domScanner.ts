@@ -25,7 +25,7 @@ export type ScannedText = {
   category?: UnitCategory;
 };
 
-export const SAFE_TRANSLATABLE_ATTRIBUTES: readonly TranslatableAttributeName[] = ["placeholder", "alt"];
+export const SAFE_TRANSLATABLE_ATTRIBUTES: readonly TranslatableAttributeName[] = ["alt"];
 export const ALL_TRANSLATABLE_ATTRIBUTES: readonly TranslatableAttributeName[] = [
   "placeholder",
   "alt",

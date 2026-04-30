@@ -84,7 +84,7 @@ describe("buildTranslationUnits", () => {
   });
 
   it("creates attribute units", () => {
-    mountFixture(`<input placeholder="Search docs" />`);
+    mountFixture(`<img alt="Product photo" />`);
     const units = buildTranslationUnits({
       scannedTexts: [],
       attributes: scanTranslatableAttributes(document.body),
@@ -96,7 +96,7 @@ describe("buildTranslationUnits", () => {
     expect(units).toHaveLength(1);
     expect(units[0]!.category).toBe("attribute");
     expect(units[0]!.renderMode).toBe("replace-attribute");
-    expect(units[0]!.originalText).toBe("Search docs");
+    expect(units[0]!.originalText).toBe("Product photo");
   });
 
   it("carries site granularity roots and categories into translation units", () => {

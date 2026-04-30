@@ -199,7 +199,7 @@ describe("scanDocumentText", () => {
         <p data-imt-managed="true">Extension panel text</p>
         <p hidden>Hidden paragraph.</p>
         <p>${"\u8fd9\u91cc\u662f\u4e2d\u6587"} React Server Components</p>
-        <input placeholder="${"\u641c\u7d22"} React Server Components" />
+        <img alt="${"\u641c\u7d22"} React Server Components" />
       </main>
     `);
     const diagnostics = createTranslationDiagnostics();
@@ -250,7 +250,7 @@ describe("scanDocumentText", () => {
 });
 
 describe("scanTranslatableAttributes", () => {
-  it("finds safe attributes by default", () => {
+  it("finds safe non-interactive attributes by default", () => {
     mountFixture(`
       <input placeholder="Search docs" aria-label="Search input" />
       <img alt="Product photo" />
@@ -259,7 +259,6 @@ describe("scanTranslatableAttributes", () => {
 
     const attrs = scanTranslatableAttributes(document.body);
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
-      "placeholder:Search docs",
       "alt:Product photo",
     ]);
   });
@@ -283,37 +282,38 @@ describe("scanTranslatableAttributes", () => {
   it("skips attributes inside nested code regions", () => {
     mountFixture(`
       <input placeholder="Search docs" />
+      <img alt="Product photo" />
       <pre><span title="Code title">x</span></pre>
     `);
 
     const attrs = scanTranslatableAttributes(document.body);
 
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
-      "placeholder:Search docs",
+      "alt:Product photo",
     ]);
   });
 
   it("finds attributes on the root element", () => {
     mountFixture("");
-    const input = document.createElement("input");
-    input.setAttribute("placeholder", "Search docs");
+    const input = document.createElement("img");
+    input.setAttribute("alt", "Product photo");
 
     const attrs = scanTranslatableAttributes(input);
 
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
-      "placeholder:Search docs",
+      "alt:Product photo",
     ]);
   });
 
   it("finds safe attributes inside open shadow roots", () => {
     mountFixture(`<article-card></article-card>`);
     const host = document.querySelector<HTMLElement>("article-card")!;
-    host.attachShadow({ mode: "open" }).innerHTML = `<input placeholder="Search shadow docs" />`;
+    host.attachShadow({ mode: "open" }).innerHTML = `<img alt="Shadow product photo" />`;
 
     const attrs = scanTranslatableAttributes(document.body);
 
     expect(attrs.map((attr) => `${attr.name}:${attr.originalValue}`)).toEqual([
-      "placeholder:Search shadow docs",
+      "alt:Shadow product photo",
     ]);
   });
 });

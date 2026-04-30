@@ -12,6 +12,7 @@ import {
 import { resolveTextGranularity, type GranularityOptions } from "./granularityPolicy";
 import { decideRenderMode } from "./renderDecider";
 import {
+  recordDuplicateUnits,
   recordUnitBuilt,
   recordUnitDropped,
   type TranslationDiagnostics,
@@ -79,7 +80,10 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     }
     const originalText = collected.text;
     const category = categoryFromScanned(rootToCategories.get(root)) ?? classifyRoot(root);
-    recordUnitBuilt(input.diagnostics);
+    recordUnitBuilt(input.diagnostics, category, originalText.length, {
+      code: isCodeLikeRoot(root),
+      ui: isUiCategory(category),
+    });
     units.push({
       id: `u-${input.revision}-${index++}`,
       sessionId: input.sessionId,
@@ -100,7 +104,9 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
   }
 
   for (const attribute of input.attributes) {
-    recordUnitBuilt(input.diagnostics);
+    recordUnitBuilt(input.diagnostics, "attribute", attribute.originalValue.length, {
+      ui: true,
+    });
     units.push({
       id: `u-${input.revision}-${index++}`,
       sessionId: input.sessionId,
@@ -121,7 +127,9 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     });
   }
 
-  return sortUnitsByDocumentOrder(dedupeNestedUnits(units));
+  const dedupedUnits = dedupeNestedUnits(units);
+  recordDuplicateUnits(input.diagnostics, units.length - dedupedUnits.length);
+  return sortUnitsByDocumentOrder(dedupedUnits);
 }
 
 function collectUnitText(
@@ -310,6 +318,19 @@ function priorityForCategory(category: UnitCategory): number {
   if (category === "table-cell") return 50;
   if (category === "attribute") return 20;
   return 40;
+}
+
+function isCodeLikeRoot(root: HTMLElement): boolean {
+  return Boolean(root.closest("pre,code,kbd,samp"));
+}
+
+function isUiCategory(category: UnitCategory): boolean {
+  return category === "button" ||
+    category === "nav" ||
+    category === "menu" ||
+    category === "label" ||
+    category === "inline-ui" ||
+    category === "attribute";
 }
 
 function dedupeNestedUnits(units: TranslationUnit[]): TranslationUnit[] {

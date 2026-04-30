@@ -11,6 +11,12 @@ export type UnitDiagnostics = {
   built: number;
   dropped: number;
   droppedByReason: DiagnosticReasonCounts;
+  byCategory?: DiagnosticReasonCounts;
+  totalTextLength?: number;
+  maxTextLength?: number;
+  codeUnits?: number;
+  uiUnits?: number;
+  duplicateUnits?: number;
 };
 
 export type CandidateDiagnostics = {
@@ -67,6 +73,12 @@ export function createTranslationDiagnostics(): TranslationDiagnostics {
       built: 0,
       dropped: 0,
       droppedByReason: {},
+      byCategory: {},
+      totalTextLength: 0,
+      maxTextLength: 0,
+      codeUnits: 0,
+      uiUnits: 0,
+      duplicateUnits: 0,
     },
     cache: {
       hits: 0,
@@ -97,6 +109,12 @@ export function cloneTranslationDiagnostics(diagnostics: TranslationDiagnostics)
       built: diagnostics.units.built,
       dropped: diagnostics.units.dropped,
       droppedByReason: { ...diagnostics.units.droppedByReason },
+      byCategory: { ...(diagnostics.units.byCategory ?? {}) },
+      totalTextLength: diagnostics.units.totalTextLength ?? 0,
+      maxTextLength: diagnostics.units.maxTextLength ?? 0,
+      codeUnits: diagnostics.units.codeUnits ?? 0,
+      uiUnits: diagnostics.units.uiUnits ?? 0,
+      duplicateUnits: diagnostics.units.duplicateUnits ?? 0,
     },
     cache: {
       hits: diagnostics.cache.hits,
@@ -131,9 +149,30 @@ export function recordScanSkipped(
   incrementReason(diagnostics.scan[bucket].skippedByReason, reason);
 }
 
-export function recordUnitBuilt(diagnostics: TranslationDiagnostics | undefined): void {
+export function recordUnitBuilt(
+  diagnostics: TranslationDiagnostics | undefined,
+  category = "unknown",
+  textLength = 0,
+  options: { code?: boolean; ui?: boolean } = {},
+): void {
   if (!diagnostics) return;
   diagnostics.units.built += 1;
+  diagnostics.units.byCategory ??= {};
+  diagnostics.units.totalTextLength ??= 0;
+  diagnostics.units.maxTextLength ??= 0;
+  diagnostics.units.codeUnits ??= 0;
+  diagnostics.units.uiUnits ??= 0;
+  incrementReason(diagnostics.units.byCategory, category);
+  diagnostics.units.totalTextLength += Math.max(0, textLength);
+  diagnostics.units.maxTextLength = Math.max(diagnostics.units.maxTextLength, Math.max(0, textLength));
+  if (options.code) diagnostics.units.codeUnits += 1;
+  if (options.ui) diagnostics.units.uiUnits += 1;
+}
+
+export function recordDuplicateUnits(diagnostics: TranslationDiagnostics | undefined, count: number): void {
+  if (!diagnostics || count <= 0) return;
+  diagnostics.units.duplicateUnits ??= 0;
+  diagnostics.units.duplicateUnits += count;
 }
 
 export function recordCandidateEvaluated(

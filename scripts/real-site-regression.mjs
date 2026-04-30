@@ -5,7 +5,15 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { resolveRegressionSelection, siteAccessGateReason } from "./real-site-regression-config.mjs";
+import {
+  fixtureExpectationForKind,
+  resolveRegressionSelection,
+  siteAccessGateReason,
+} from "./real-site-regression-config.mjs";
+import {
+  buildFailedRegressionReport,
+  buildStructuredRegressionReport,
+} from "./real-site-regression-evaluator.mjs";
 
 const rootDir = resolve(import.meta.dirname, "..");
 const extensionSourceDir = resolve(rootDir, ".output", "chrome-mv3");
@@ -21,7 +29,7 @@ const regressionSelection = resolveRegressionSelection({
   argv: process.argv.slice(2),
   env: process.env,
 });
-const { profile, dynamicModes, siteFilter, selectedSites } = regressionSelection;
+const { profile, dynamicModes, siteFilter, fixtureKinds, selectedSites } = regressionSelection;
 
 const baseConfig = {
   targetLang: "zh-Hans",
@@ -86,6 +94,7 @@ async function main() {
     provider,
     profile,
     dynamicModes,
+    fixtureKinds,
     config: publicConfig(baseConfig),
     siteFilter,
     sites: [],
@@ -103,7 +112,7 @@ async function main() {
       for (const site of selectedSites) {
         const siteResult = await runSiteRegression(browserSession, serviceWorkerSession, extensionId, site, config);
         report.sites.push(siteResult);
-        console.log(`${siteResult.ok ? "PASS" : "FAIL"} ${site.name} [${dynamicMode}]: ${siteResult.summary}`);
+        console.log(`${siteResult.verdict} ${site.name} [${dynamicMode}]: ${siteResult.summary}`);
       }
     }
 
@@ -128,6 +137,7 @@ async function main() {
 
 async function runSiteRegression(browserSession, serviceWorkerSession, extensionId, site, config) {
   const pageSession = await createPageSession(browserSession);
+  const expectation = fixtureExpectationForKind(site.fixtureKind);
   const runtimeErrors = [];
   const consoleErrors = [];
 
@@ -145,7 +155,9 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await pageSession.send("Page.enable");
     await pageSession.send("Log.enable");
     await pageSession.send("Page.bringToFront").catch(() => undefined);
+    const pageLoadStartedAt = Date.now();
     await navigate(pageSession, site.url);
+    const pageLoadMs = Date.now() - pageLoadStartedAt;
     await pageSession.send("Page.bringToFront").catch(() => undefined);
     await delay(3000);
 
@@ -158,38 +170,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await delay(3500);
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
 
-    const metrics = await evaluate(pageSession, `(() => {
-      const forbiddenTranslations = document.querySelectorAll([
-        '[data-testid="HoverCard"] .imt-translation-block',
-        '[data-imt-managed="true"] .imt-translation-block',
-        '[data-imt-managed="true"] [data-imt-state="translated"]',
-        '#masthead-container [data-imt-state="translated"]',
-        '#guide-content [data-imt-state="translated"]',
-        '#top-level-buttons-computed [data-imt-state="translated"]',
-        '#metadata-line [data-imt-state="translated"]',
-        'ytd-button-renderer [data-imt-state="translated"]',
-        '[data-click-id="share"] [data-imt-state="translated"]',
-        '[data-click-id="upvote"] [data-imt-state="translated"]',
-        '[data-click-id="downvote"] [data-imt-state="translated"]',
-        '[data-testid="post_author_link"] [data-imt-state="translated"]',
-        '[data-testid="comment_author_link"] [data-imt-state="translated"]',
-        '[data-testid="placementTracking"] [data-imt-state="translated"]',
-        '[data-testid="User-Name"] [data-imt-state="translated"]'
-      ].join(',')).length;
-      return {
-        url: location.href,
-        title: document.title,
-        readyState: document.readyState,
-        visibilityState: document.visibilityState,
-        bodyTextLength: document.body?.innerText?.length ?? 0,
-        bodyTextPreview: (document.body?.innerText ?? '').slice(0, 500),
-        translatedBlocks: document.querySelectorAll('.imt-translation-block, .imt-translation-compact').length,
-        translatedRoots: document.querySelectorAll('[data-imt-state="translated"]').length,
-        floatingControl: Boolean(document.querySelector('[data-imt-control="root"]')),
-        forbiddenTranslations,
-      };
-    })()`);
-
+    const metrics = await readRegressionMetrics(pageSession, site, expectation);
     const screenshotPath = await captureScreenshot(pageSession, site.name);
     const extensionErrors = [
       ...runtimeErrors.filter((error) => isExtensionError(error, extensionId)),
@@ -200,54 +181,36 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       ...consoleErrors.filter((error) => !isExtensionError(error, extensionId) && !isIgnorableConsoleError(error.text)),
     ];
     const skipReason = siteAccessGateReason(site, metrics);
-    const skipped = Boolean(skipReason);
-    const pageStatus = pageStatusResponse?.ok ? pageStatusResponse.status : undefined;
-    const excessiveFailures = pageStatus ? pageStatus.failed > Math.max(5, Math.ceil(pageStatus.total * 0.5)) : false;
-    const hoverSatisfied = !site.hoverTooltip || hoverResult?.ok || Boolean(site.hoverTooltipOptional);
-    const ok = Boolean(translateResponse?.ok) &&
-      Boolean(pageStatusResponse?.ok) &&
-      (skipped || metrics.bodyTextLength > 0) &&
-      (skipped || metrics.translatedBlocks > 0 || metrics.translatedRoots > 0) &&
-      metrics.forbiddenTranslations === 0 &&
-      hoverSatisfied &&
-      !excessiveFailures &&
-      pageStatus?.phase !== "failed" &&
-      extensionErrors.length === 0;
+    const restoreStartedAt = Date.now();
+    const restoreResponse = skipReason ? { ok: true } : await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_RESTORE_PAGE" });
+    await delay(500);
+    const restoreMetrics = skipReason ? undefined : await readRestoreMetrics(pageSession);
 
-    return {
-      ...site,
-      provider: config.provider,
-      dynamicMode: config.dynamicMode,
-      ok,
-      skipped,
-      summary: skipped
-        ? `skipped: ${skipReason} (${metrics.bodyTextLength} chars), forbidden=${metrics.forbiddenTranslations}`
-        : [
-            `${metrics.translatedBlocks} blocks, ${metrics.translatedRoots} roots`,
-            `failed=${pageStatus?.failed ?? "n/a"}`,
-            `forbidden=${metrics.forbiddenTranslations}`,
-            `first=${firstProgress.elapsedMs ?? "n/a"}ms`,
-            hoverResult ? `hover=${hoverResult.ok ? "ok" : site.hoverTooltipOptional ? "optional-missing" : "failed"}` : undefined,
-          ].filter(Boolean).join(", "),
+    return buildStructuredRegressionReport({
+      site,
+      config,
+      metrics,
       translateResponse,
       pageStatusResponse,
-      metrics,
-      hoverResult,
       firstProgress,
+      hoverResult,
+      restoreResponse,
+      restoreMetrics,
+      timings: {
+        pageLoadMs,
+        firstTranslationMs: firstProgress.elapsedMs,
+        fullTranslationMs: Date.now() - translateStartedAt,
+        restoreMs: skipReason ? undefined : Date.now() - restoreStartedAt,
+      },
       screenshotPath,
-      errors: extensionErrors,
-      siteErrors: siteErrors.slice(0, 10),
+      extensionErrors,
+      siteErrors,
       siteErrorCount: siteErrors.length,
-    };
+      gateReason: skipReason,
+      expectation,
+    });
   } catch (error) {
-    return {
-      ...site,
-      provider: config.provider,
-      dynamicMode: config.dynamicMode,
-      ok: false,
-      summary: error instanceof Error ? error.message : String(error),
-      errors: [error instanceof Error ? error.stack ?? error.message : String(error)],
-    };
+    return buildFailedRegressionReport({ site, config, error });
   } finally {
     await closeTarget(browserSession, pageSession.targetId);
     await pageSession.close();
@@ -407,6 +370,218 @@ async function scrollPage(pageSession) {
     await evaluate(pageSession, "window.scrollBy(0, Math.max(window.innerHeight, 700))");
     await delay(1000);
   }
+}
+
+async function readRegressionMetrics(pageSession, site, expectation) {
+  return evaluate(pageSession, `(() => {
+    const expectation = ${JSON.stringify({
+      fixtureKind: site.fixtureKind ?? "generic",
+      positiveSelectors: expectation.positiveSelectors,
+      negativeSelectors: expectation.negativeSelectors,
+    })};
+    const TRANSLATED_SELECTOR = [
+      '[data-imt-state="translated"]',
+      '.imt-translation-block',
+      '.imt-translation-compact',
+      '.imt-translation-replacement'
+    ].join(',');
+    const LOADING_SELECTOR = '[data-imt-state="loading"], .imt-translation-loading[data-imt-loading="true"]';
+
+    function safeQueryAll(selector, root = document) {
+      try {
+        return Array.from(root.querySelectorAll(selector));
+      } catch {
+        return [];
+      }
+    }
+
+    function textPreview(element) {
+      return [
+        element.innerText,
+        element.textContent,
+        element.getAttribute?.('value'),
+        element.getAttribute?.('placeholder'),
+        element.getAttribute?.('aria-label'),
+        element.getAttribute?.('title'),
+        element.getAttribute?.('alt'),
+      ].filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 180);
+    }
+
+    function isElementTranslated(element) {
+      return Boolean(
+        element.closest('[data-imt-state="translated"]') ||
+        element.matches('[data-imt-managed="true"], .imt-translation-block, .imt-translation-compact, .imt-translation-replacement') ||
+        element.querySelector(TRANSLATED_SELECTOR) ||
+        element.querySelector('[data-imt-managed="true"]')
+      );
+    }
+
+    function isElementDirectlyTranslated(element) {
+      return Boolean(
+        element.matches('[data-imt-state="translated"], [data-imt-managed="true"], .imt-translation-block, .imt-translation-compact, .imt-translation-replacement')
+      );
+    }
+
+    function isGeneratedTranslationElement(element) {
+      return Boolean(
+        element.closest('[data-imt-managed="true"], .imt-translation-block, .imt-translation-compact, .imt-translation-replacement')
+      );
+    }
+
+    function isNegativeTranslated(element) {
+      return Boolean(
+        isElementDirectlyTranslated(element) ||
+        element.querySelector(TRANSLATED_SELECTOR) ||
+        element.querySelector('[data-imt-managed="true"]')
+      );
+    }
+
+    function isSkippableNegativeElement(element, text) {
+      if (isGeneratedTranslationElement(element)) return true;
+      if (element.matches('script,style,template,noscript')) return true;
+      if (!text) return true;
+      return false;
+    }
+
+    function classifyNegativeViolation(element, selector, text) {
+      const marker = [selector, element.tagName, element.id, element.className, text].join(' ').toLowerCase();
+      if (element.closest('pre,code,kbd,samp') || /\\b(pre|code|kbd|samp)\\b/.test(marker)) return 'code';
+      if (element.closest('input,textarea,select') || /\\b(input|textarea|select|composer|searchbox)\\b/.test(marker)) return 'input';
+      if (/(price|a-price|\\$\\s?\\d|€\\s?\\d|£\\s?\\d|¥\\s?\\d)/i.test(marker)) return 'price';
+      if (/(rating|stars?|reviews?|\\d(?:\\.\\d)?\\s*out of\\s*5)/i.test(marker)) return 'rating';
+      if (/(username|user-name|author|avatar|@\\w+)/i.test(marker)) return 'username';
+      if (element.closest('time') || /\\b(time|date|ago|relative-time)\\b/i.test(marker)) return 'time';
+      if (/(https?:\\/\\/|www\\.|\\burl\\b|cite)/i.test(marker)) return 'url';
+      if (element.closest('button,[role="button"]') || /\\b(button|role=.button|btn)\\b/i.test(marker)) return 'button';
+      if (element.closest('nav,header,footer,menu,[role="navigation"]') || /\\b(nav|header|footer|menu|sidebar)\\b/i.test(marker)) return 'nav';
+      if (/\\b(ad|ads|sponsored|promoted)\\b/i.test(marker)) return 'ad';
+      if (/(views?|likes?|votes?|score|metric|rank|duration|\\d+%|\\d+k\\b|\\d+m\\b)/i.test(marker)) return 'metric';
+      return 'metadata';
+    }
+
+    function samplePositiveSelectors(selectors) {
+      const bySelector = selectors.map((selector) => {
+        const elements = safeQueryAll(selector).slice(0, 40);
+        const samples = elements.slice(0, 8).map((element) => ({
+          selector,
+          textPreview: textPreview(element),
+          translated: isElementTranslated(element),
+        }));
+        return {
+          selector,
+          matchedCount: elements.length,
+          translatedCount: elements.filter(isElementTranslated).length,
+          samples,
+        };
+      });
+      const matched = bySelector.reduce((sum, entry) => sum + entry.matchedCount, 0);
+      const translated = bySelector.reduce((sum, entry) => sum + entry.translatedCount, 0);
+      const untranslatedSamples = bySelector
+        .flatMap((entry) => entry.samples.filter((sample) => !sample.translated && sample.textPreview).map((sample) => sample.textPreview))
+        .slice(0, 10);
+      return {
+        checked: matched,
+        translated,
+        bySelector,
+        untranslatedSamples,
+      };
+    }
+
+    function sampleNegativeSelectors(selectors) {
+      const violations = [];
+      let checked = 0;
+      for (const selector of selectors) {
+        for (const element of safeQueryAll(selector).slice(0, 60)) {
+          checked += 1;
+          const text = textPreview(element);
+          if (isSkippableNegativeElement(element, text)) continue;
+          if (!isNegativeTranslated(element)) continue;
+          const translatedText = Array.from(element.querySelectorAll(TRANSLATED_SELECTOR))
+            .map((node) => textPreview(node))
+            .filter(Boolean)
+            .join(' | ')
+            .slice(0, 180);
+          violations.push({
+            kind: classifyNegativeViolation(element, selector, text),
+            selector,
+            textPreview: text,
+            translatedTextPreview: translatedText || undefined,
+            direct: isElementDirectlyTranslated(element),
+            descendant: Boolean(element.querySelector(TRANSLATED_SELECTOR)),
+          });
+          if (violations.length >= 30) return { checked, violations };
+        }
+      }
+      return { checked, violations };
+    }
+
+    function readRuleVisualizationSelectors() {
+      const status = window.__OPENAI_IT_DEBUG__?.getStatus?.();
+      const selectors = status?.site?.ruleDiagnostics?.visualizationSelectors ?? [];
+      return selectors.map((entry) => ({
+        group: entry.group,
+        selector: entry.selector,
+        label: entry.label,
+        matchedCount: safeQueryAll(entry.selector).length,
+      }));
+    }
+
+    const translatedTextNodes = safeQueryAll('.imt-translation-block, .imt-translation-compact, .imt-translation-replacement');
+    const translatedTextSamples = translatedTextNodes.map(textPreview).filter(Boolean).slice(0, 12);
+    const translatedUnitRoots = safeQueryAll('[data-imt-state="translated"]');
+    const duplicateTranslationCount = translatedUnitRoots.filter((root) =>
+      safeQueryAll('.imt-translation-block, .imt-translation-compact, .imt-translation-replacement', root).length > 1
+    ).length;
+    const loadingNodes = safeQueryAll(LOADING_SELECTOR);
+    const negativeSamples = sampleNegativeSelectors(expectation.negativeSelectors);
+
+    return {
+      url: location.href,
+      title: document.title,
+      readyState: document.readyState,
+      visibilityState: document.visibilityState,
+      fixtureKind: expectation.fixtureKind,
+      bodyTextLength: document.body?.innerText?.length ?? 0,
+      bodyTextPreview: (document.body?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 500),
+      contentReady: Boolean(window.__IMT_CONTENT_READY__),
+      contentGuardLoaded: Boolean(window.__IMT_CONTENT_GUARD_LOADED__),
+      contentMainLoading: Boolean(window.__IMT_CONTENT_MAIN_LOADING__),
+      hasDebugApi: Boolean(window.__OPENAI_IT_DEBUG__),
+      floatingControl: Boolean(document.querySelector('[data-imt-control="root"]')),
+      translatedBlocks: safeQueryAll('.imt-translation-block').length,
+      translatedCompacts: safeQueryAll('.imt-translation-compact').length,
+      translatedReplacements: safeQueryAll('.imt-translation-replacement').length,
+      translatedAttributes: safeQueryAll('[data-imt-original-text]').filter((element) =>
+        !element.matches('.imt-translation-block, .imt-translation-compact, .imt-translation-replacement')
+      ).length,
+      translatedRoots: translatedUnitRoots.length,
+      translatedTextLength: translatedTextSamples.join('\\n').length,
+      translatedTextSamples,
+      loadingDomCount: loadingNodes.length,
+      orphanLoadingCount: loadingNodes.filter((node) => !node.closest('[data-imt-state="loading"]')).length,
+      managedNodeCount: safeQueryAll('[data-imt-managed="true"]').length,
+      duplicateTranslationCount,
+      positiveSamples: samplePositiveSelectors(expectation.positiveSelectors),
+      negativeSamples,
+      forbiddenTranslations: negativeSamples.violations.length,
+      ruleVisualizationSelectors: readRuleVisualizationSelectors(),
+    };
+  })()`);
+}
+
+async function readRestoreMetrics(pageSession) {
+  return evaluate(pageSession, `(() => ({
+    translatedDomAfter: document.querySelectorAll([
+      '[data-imt-state="translated"]',
+      '.imt-translation-block',
+      '.imt-translation-compact',
+      '.imt-translation-replacement'
+    ].join(',')).length,
+    managedDomAfter: document.querySelectorAll('[data-imt-managed="true"]').length,
+    loadingDomAfter: document.querySelectorAll('[data-imt-state="loading"], .imt-translation-loading[data-imt-loading="true"]').length,
+    originalTextMarkersAfter: document.querySelectorAll('[data-imt-original-text]').length,
+    unitIdMarkersAfter: document.querySelectorAll('[data-imt-unit-id]').length,
+  }))()`);
 }
 
 async function runHoverTooltipRegression(pageSession, site) {

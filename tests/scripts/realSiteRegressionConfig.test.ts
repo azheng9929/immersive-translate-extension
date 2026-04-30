@@ -3,7 +3,9 @@ import * as regressionConfig from "../../scripts/real-site-regression-config.mjs
 
 const {
   allRegressionSites,
+  fixtureExpectationForKind,
   realSiteFixtureGroups,
+  realSiteFixtureExpectations,
   parseCsv,
   resolveRegressionSelection,
 } = regressionConfig;
@@ -191,6 +193,19 @@ describe("real-site regression selection", () => {
       expect(sites.length, kind).toBeGreaterThanOrEqual(2);
       expect(sites.length, kind).toBeLessThanOrEqual(3);
       expect(sites.every((site) => site.fixtureKind === kind), kind).toBe(true);
+    }
+  });
+
+  it("defines positive and negative expectations for every fixture kind", () => {
+    expect(Object.keys(realSiteFixtureExpectations).sort()).toEqual(Object.keys(realSiteFixtureGroups).sort());
+
+    for (const kind of Object.keys(realSiteFixtureGroups)) {
+      const expectation = fixtureExpectationForKind(kind);
+      expect(expectation.positiveSelectors.length, kind).toBeGreaterThan(0);
+      expect(expectation.negativeSelectors.length, kind).toBeGreaterThan(0);
+      expect(expectation.minPositiveTranslated, kind).toBeGreaterThan(0);
+      expect(expectation.minUnits, kind).toBeGreaterThan(0);
+      expect(expectation.requiredCategories.length, kind).toBeGreaterThan(0);
     }
   });
 

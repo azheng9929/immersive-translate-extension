@@ -10,6 +10,18 @@ export type RegressionSite = {
   requiresLogin?: boolean;
 };
 
+export type FixtureExpectation = {
+  positiveSelectors: string[];
+  negativeSelectors: string[];
+  minPositiveTranslated: number;
+  maxNegativeTranslated: number;
+  minUnits: number;
+  minAcceptedCandidates: number;
+  requiredCategories: string[];
+  requiresDynamic?: boolean;
+  requiresHover?: boolean;
+};
+
 export type RegressionSelection = {
   profile: "smoke" | "high-dynamic" | "core-rules" | "long-tail-rules" | "fixture-matrix" | "all";
   dynamicModes: string[];
@@ -20,6 +32,9 @@ export type RegressionSelection = {
 
 export const realSiteFixtureGroups: Record<string, RegressionSite[]>;
 export const allRegressionSites: RegressionSite[];
+export const realSiteFixtureExpectations: Record<string, FixtureExpectation>;
+
+export function fixtureExpectationForKind(fixtureKind?: string): FixtureExpectation;
 
 export function resolveRegressionSelection(input?: {
   argv?: string[];
