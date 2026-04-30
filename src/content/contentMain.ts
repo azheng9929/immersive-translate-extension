@@ -1,5 +1,6 @@
 import { FloatingTranslationControl } from "./floatingControl";
 import { BackgroundTranslationCache } from "./backgroundTranslationCache";
+import { DebugOverlay, installContentDebugApi } from "./debugOverlay";
 import { scheduleAutoTranslate } from "./autoTranslate";
 import { InputTranslator } from "./inputTranslator";
 import { shouldMountOriginalTextTooltip } from "./interactionPolicy";
@@ -39,6 +40,7 @@ export async function runContentMain(): Promise<void> {
     let pageSession = createPageSession(config, pageRules);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
+    let debugOverlay = createDebugOverlay(config, pageSession);
     let cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
     const originalTextTooltip = shouldMountOriginalTextTooltip() ? new OriginalTextTooltip() : undefined;
     const floatingControl = new FloatingTranslationControl({
@@ -51,7 +53,15 @@ export async function runContentMain(): Promise<void> {
     if (config.showFloatingBall) floatingControl.mount();
     selectionTranslator.mount();
     inputTranslator?.mount();
+    debugOverlay?.mount();
     originalTextTooltip?.mount();
+    installContentDebugApi({
+      getConfig: () => config,
+      getStatus: () => pageSession.getStatus(),
+      getRule: () => pageSession.getStatus().site,
+      restore: () => pageSession.restorePage(),
+      reAnalyze: () => pageSession.translatePage(),
+    });
 
     const isTopFrame = isCurrentTopFrame();
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -85,10 +95,12 @@ export async function runContentMain(): Promise<void> {
           cancelAutoTranslate?.();
           pageSession.restorePage();
           pageSession.dispose();
+          debugOverlay?.unmount();
           config = nextConfig;
           pageRules = await loadWebRules(window.location.href);
           injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules }));
           pageSession = createPageSession(config, pageRules);
+          debugOverlay = createDebugOverlay(config, pageSession);
           cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
           selectionTranslator.unmount();
           selectionTranslator = createSelectionTranslator(config);
@@ -96,6 +108,7 @@ export async function runContentMain(): Promise<void> {
           inputTranslator?.unmount();
           inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
           inputTranslator?.mount();
+          debugOverlay?.mount();
           floatingControl.hide();
           if (config.showFloatingBall) floatingControl.mount();
           sendResponse({ ok: true });
@@ -212,6 +225,14 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
       dynamicModeSource: sitePolicy.dynamicModeSource,
       isHighDynamic: sitePolicy.isHighDynamic,
     },
+  });
+}
+
+function createDebugOverlay(config: ExtensionConfig, pageSession: PageTranslationSession): DebugOverlay | undefined {
+  if (!config.showDebugOverlay) return undefined;
+  return new DebugOverlay({
+    getStatus: () => pageSession.getStatus(),
+    subscribeStatus: (listener) => pageSession.subscribe(listener),
   });
 }
 

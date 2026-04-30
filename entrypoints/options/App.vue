@@ -491,6 +491,16 @@ function providerLabel(value: ExtensionProvider | FallbackProvider): string {
         </label>
 
         <label class="toggle-row">
+          <span>调试面板</span>
+          <input
+            data-testid="options-debug-overlay-toggle"
+            type="checkbox"
+            :checked="config.showDebugOverlay"
+            @change="updateConfig({ showDebugOverlay: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+
+        <label class="toggle-row">
           <span>输入框翻译</span>
           <input
             data-testid="options-input-translator-toggle"

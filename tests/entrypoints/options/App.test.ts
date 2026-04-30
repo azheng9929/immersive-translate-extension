@@ -51,15 +51,18 @@ describe("options App", () => {
 
     const inputTranslator = wrapper.find<HTMLInputElement>("[data-testid='options-input-translator-toggle']");
     const floatingBall = wrapper.find<HTMLInputElement>("[data-testid='options-floating-ball-toggle']");
+    const debugOverlay = wrapper.find<HTMLInputElement>("[data-testid='options-debug-overlay-toggle']");
     const cache = wrapper.find<HTMLInputElement>("[data-testid='options-cache-toggle']");
     const newContent = wrapper.find<HTMLInputElement>("[data-testid='options-new-content-toggle']");
     expect(inputTranslator.element.checked).toBe(false);
     expect(floatingBall.element.checked).toBe(true);
+    expect(debugOverlay.element.checked).toBe(false);
     expect(cache.element.checked).toBe(true);
     expect(newContent.element.checked).toBe(true);
 
     await inputTranslator.setValue(true);
     await floatingBall.setValue(false);
+    await debugOverlay.setValue(true);
     await cache.setValue(false);
     await newContent.setValue(false);
     await flushPromises();
@@ -71,6 +74,10 @@ describe("options App", () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
       patch: { showFloatingBall: false },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { showDebugOverlay: true },
     });
     expect(sendMessage).toHaveBeenCalledWith({
       type: "IMT_UPDATE_CONFIG",
