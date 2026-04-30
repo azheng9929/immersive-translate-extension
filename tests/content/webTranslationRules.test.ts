@@ -585,16 +585,40 @@ describe("webTranslationRules", () => {
         excludes: [".styles_buttons__kKy_S", ".styles_count___6_8F"],
       },
       {
+        url: "https://news.google.com/home",
+        ruleId: "googleNews",
+        selectors: ["article h3", "article h4", ".gPFEn", ".JtKRv"],
+        excludes: ["time", "[role='button']"],
+      },
+      {
         url: "https://www.amazon.com/dp/example",
         ruleId: "amazon",
         selectors: ["#productTitle", "#feature-bullets li", "#productDescription p"],
         excludes: ["#navFooter", ".a-price"],
       },
       {
+        url: "https://shopee.com/product/123/456",
+        ruleId: "shopee",
+        selectors: ["h1", "[data-sqe='name']", ".WBVL_7", ".ellipsis-content"],
+        excludes: ["button", ".shopee-rating-stars"],
+      },
+      {
+        url: "https://www.aliexpress.com/item/100500.html",
+        ruleId: "aliexpress",
+        selectors: ["h1", ".product-title-text", "[class*='titleText']", "[class*='product-title']"],
+        excludes: [".product-price", "[class*='price']"],
+      },
+      {
         url: "https://www.tiktok.com/@openai/video/123",
         ruleId: "tiktok",
         selectors: ["[data-e2e='browse-video-desc']", "[data-e2e='video-desc']", "[data-e2e='comment-level-1']"],
         excludes: ["[data-e2e*='-count']", "[data-e2e='nav-foryou']"],
+      },
+      {
+        url: "https://www.youporn.com/watch/123/example/",
+        ruleId: "yourporn",
+        selectors: ["h1", ".video-title", ".title", ".video-box-title"],
+        excludes: [".duration", ".views"],
       },
     ];
 

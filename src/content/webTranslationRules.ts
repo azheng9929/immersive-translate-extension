@@ -295,6 +295,72 @@ export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
     detectParagraphLanguage: true,
   },
   {
+    id: "googleNews",
+    siteKey: "news.google.com",
+    matches: ["*://news.google.com/*"],
+    selectors: [
+      "article h3",
+      "article h4",
+      "article a[href*='/articles/']",
+      ".gPFEn",
+      ".JtKRv",
+      ".IBr9hb",
+      ".ipQwMb",
+      ".xrnccd",
+    ],
+    contentSelectors: [
+      { selector: "article h3, article h4, .gPFEn, .JtKRv, .ipQwMb", category: "heading" },
+      { selector: "article a[href*='/articles/'], .IBr9hb, .xrnccd", category: "card-text" },
+    ],
+    excludeSelectors: [
+      ".EyERq",
+      ".AOl7G.eejsDc",
+      "[aria-label='Home']",
+      "[aria-label='For you']",
+      "[aria-label='Following']",
+      "[aria-label='World']",
+      "[aria-label='Local']",
+      ".gb_Fc",
+      ".wBQf7b",
+      ".yPI8Rb",
+      ".jKHa4e",
+      ".u43Gd",
+      ".Zgjpyb",
+      "[role='button']",
+      "[jsname='rymPhb']",
+      ".cbz1ld",
+      ".VfPpkd-P5QLlc",
+      ".XvhY1d",
+      "time",
+      "button",
+      "nav",
+      "header",
+      "footer",
+    ],
+    mutationExcludeSelectors: ["[role='button']", "time", "nav", "header"],
+    injectedCss: [
+      `
+.oovtQ,
+.MCAGUe,
+.To2ZZb.DbQnIe,
+h4,
+.IBr9hb,
+.gPFEn,
+.JtKRv,
+.ipQwMb {
+  height: unset !important;
+  max-height: none !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+    dynamicPreset: "conservative",
+    isHighDynamic: true,
+  },
+  {
     id: "x",
     siteKey: "x.com",
     matches: ["*://x.com/*", "*://*.x.com/*"],
@@ -1323,6 +1389,111 @@ span[data-a-max-rows] {
     detectParagraphLanguage: true,
   },
   {
+    id: "shopee",
+    siteKey: "shopee.*",
+    matches: ["*://shopee.*/*", "*://*.shopee.*/*"],
+    selectors: [
+      "h1",
+      "[data-sqe='name']",
+      ".WBVL_7",
+      ".ellipsis-content",
+      "[class*='product-title']",
+      "[class*='item-card'] [class*='name']",
+      "[class*='ProductName']",
+    ],
+    contentSelectors: [
+      { selector: "h1, [class*='product-title'], [class*='ProductName']", category: "heading" },
+      { selector: "[data-sqe='name'], .WBVL_7, .ellipsis-content, [class*='item-card'] [class*='name']", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "button",
+      "[role='button']",
+      "input",
+      "textarea",
+      "select",
+      "nav",
+      "header",
+      "footer",
+      ".shopee-rating-stars",
+      "[class*='price']",
+      "[class*='Price']",
+      "[class*='rating']",
+      "[class*='sold']",
+    ],
+    injectedCss: [
+      `
+.WBVL_7,
+.ellipsis-content,
+[class*='product-title'],
+[class*='ProductName'] {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+    dynamicPreset: "conservative",
+    isHighDynamic: true,
+  },
+  {
+    id: "aliexpress",
+    siteKey: "aliexpress.*",
+    matches: ["*://aliexpress.*/*", "*://*.aliexpress.*/*"],
+    selectors: [
+      "h1",
+      ".product-title-text",
+      "[class*='product-title']",
+      "[class*='ProductTitle']",
+      "[class*='titleText']",
+      "[class*='TitleText']",
+      "[class*='multi--titleText']",
+      "[class*='manhattan--titleText']",
+    ],
+    contentSelectors: [
+      { selector: "h1, .product-title-text, [class*='product-title'], [class*='ProductTitle']", category: "heading" },
+      {
+        selector:
+          "[class*='titleText'], [class*='TitleText'], [class*='multi--titleText'], [class*='manhattan--titleText']",
+        category: "card-text",
+      },
+    ],
+    excludeSelectors: [
+      "button",
+      "[role='button']",
+      "input",
+      "textarea",
+      "select",
+      "nav",
+      "header",
+      "footer",
+      ".product-price",
+      "[class*='price']",
+      "[class*='Price']",
+      "[class*='rating']",
+      "[class*='sold']",
+      "[class*='shipping']",
+    ],
+    injectedCss: [
+      `
+.product-title-text,
+[class*='product-title'],
+[class*='ProductTitle'],
+[class*='titleText'],
+[class*='TitleText'] {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+    dynamicPreset: "conservative",
+    isHighDynamic: true,
+  },
+  {
     id: "tiktok",
     siteKey: "tiktok.com",
     matches: ["*://www.tiktok.com/*/video/*", "*://www.tiktok.com/*", "*://tiktok.com/*/video/*", "*://tiktok.com/*"],
@@ -1489,6 +1660,64 @@ section div.bg-white.rounded-lg.p-6 {
     extraBlockSelectors: ["section div.prose", "section div.bg-white.rounded-lg.p-6"],
     bodyRule: { enable: false },
     detectParagraphLanguage: true,
+  },
+  {
+    id: "yourporn",
+    siteKey: "youporn.com",
+    matches: ["*://youporn.com/*", "*://*.youporn.com/*"],
+    selectors: [
+      "h1",
+      ".video-title",
+      ".videoTitle",
+      ".title",
+      ".video-box-title",
+      ".video-box-title a",
+      ".thumbTitle",
+      ".thumbTitle a",
+      ".videoListItem .title",
+    ],
+    contentSelectors: [
+      { selector: "h1, .video-title, .videoTitle", category: "heading" },
+      {
+        selector: ".title, .video-box-title, .video-box-title a, .thumbTitle, .thumbTitle a, .videoListItem .title",
+        category: "card-text",
+      },
+    ],
+    excludeSelectors: [
+      "button",
+      "[role='button']",
+      "input",
+      "textarea",
+      "select",
+      "nav",
+      "header",
+      "footer",
+      ".duration",
+      ".views",
+      ".rating",
+      ".username",
+    ],
+    injectedCss: [
+      `
+.video-title,
+.videoTitle,
+.title,
+.video-box-title,
+.thumbTitle {
+  height: unset !important;
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    extraBlockSelectors: [".video-box-title", ".thumbTitle"],
+    detectParagraphLanguage: true,
+    paragraphMinTextCount: 1,
+    paragraphMinWordCount: 1,
+    blockMinTextCount: 0,
+    blockMinWordCount: 0,
   },
   {
     id: "xvideos",

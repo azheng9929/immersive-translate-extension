@@ -222,6 +222,18 @@ upstream default_config.json
 - `match-only`：只能识别 URL 或页面形态。
 - `unsafe`：保留概念，表示绝不应该进入网页翻译内核。
 
+## 样式-only 规则如何理解
+
+新版沉浸式翻译里，很多商业化站点规则只有 `globalStyles`、`injectedCss`、`excludeSelectors`、`extraBlockSelectors`，没有 `selectors`。这通常不是遗漏，而是它的通用正文引擎足够强：通用 TreeWalker、正文 root scoring、block/inline 分类、bodyRule 和动态调度先把内容找出来，站点规则只负责修复截断、折叠、line-clamp、广告区、导航区等问题。
+
+本项目不能直接假设这些规则已经完整适配。处理方式是三层：
+
+1. 对普通站点，保留样式/排除信息，并按 fallback profile 加保守 extractor。
+2. 对高价值或已暴露问题的网站，提升成自己的 core rule，补明确的 `selectors/contentSelectors/excludeSelectors`。
+3. 对仍然只有样式、且 fallback 不稳的网站，列入 `npm.cmd run audit:web-rules` 的 review candidates，后续逐站点调试。
+
+已经提升过的典型样式-only 上游规则包括：Threads、StackOverflow、Substack、GitHub Blog、Google News、ProductHunt、Amazon、Shopee、AliExpress、Pornhub、XVideos、YouPorn。
+
 降级策略：
 
 - 非 content-ready 规则命中页面时，不假装已经完整适配。

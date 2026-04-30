@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { JSDOM } from "jsdom";
 
 const DATA_PATH = resolve(process.cwd(), "public/data/imported-immersive-web-rules.json");
+const CORE_RULES_PATH = resolve(process.cwd(), "src/content/webTranslationRules.ts");
 
 const VIDEO_HINTS = ["youtube", "youtu.be", "pornhub", "xvideos", "youporn", "vimeo", "twitch", "bilibili", "dailymotion", "tiktok"];
 const SOCIAL_HINTS = ["twitter", "x.com", "threads", "facebook", "instagram", "mastodon", "discord", "telegram"];
@@ -12,6 +13,7 @@ const ARTICLE_HINTS = ["docs", "documentation", "wiki", "wikipedia", "medium", "
 
 const rules = JSON.parse(await readFile(DATA_PATH, "utf8"));
 if (!Array.isArray(rules)) throw new Error("Imported web rules payload is not an array");
+const coreRuleIds = await readCoreRuleIds();
 
 const summaries = rules.map((rule) => ({ rule, ...analyze(rule) }));
 const byCapability = countBy(summaries, (summary) => summary.capability);
@@ -21,6 +23,7 @@ const selectorAudit = auditSelectors(rules);
 const styleAudit = auditStyles(rules);
 const needsCoreReview = summaries
   .filter((summary) => summary.capability !== "content-ready" && summary.fallbackProfile !== "generic")
+  .filter((summary) => !coreRuleIds.has(normalizeRuleId(summary.rule.id)))
   .slice(0, 30)
   .map((summary) => `${summary.rule.id} [${summary.capability}/${summary.fallbackProfile}]`);
 
@@ -45,8 +48,17 @@ if (styleAudit.reviewGlobalStyles.length > 0 || styleAudit.reviewInjectedCss.len
     console.log(`- ${item.id}.${item.field}: ${item.preview}`);
   }
 }
-console.log("Review candidates:");
+console.log("Review candidates without core promotion:");
 for (const line of needsCoreReview) console.log(`- ${line}`);
+
+async function readCoreRuleIds() {
+  const source = await readFile(CORE_RULES_PATH, "utf8");
+  return new Set([...source.matchAll(/id:\s*"([^"]+)"/g)].map((match) => normalizeRuleId(match[1])));
+}
+
+function normalizeRuleId(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 function analyze(rule) {
   const contentAnchorCount = [
