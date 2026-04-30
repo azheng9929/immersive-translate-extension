@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILTIN_WEB_TRANSLATION_RULES,
   compileRulePolicy,
+  inferStyleRuleIntent,
   matchWebTranslationRule,
   mergeWebTranslationRules,
   resolveWebTranslationPolicy,
@@ -825,6 +826,63 @@ describe("webTranslationRules", () => {
       dynamicRuleIds: ["docs-dynamic"],
       unsafeRuleIds: ["docs-unsafe"],
     });
+  });
+
+  it("prevents lower-capability stack layers from replacing content anchors", () => {
+    const resolution = resolveWebTranslationRuleResolution("https://docs.example.com/guide", undefined, [
+      {
+        id: "docs-content",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        selectors: ["article p"],
+        contentSelectors: [{ selector: "article p", category: "content-block" }],
+        excludeSelectors: ["footer"],
+      },
+      {
+        id: "docs-structure",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        ruleCapability: "structure-only",
+        stayOriginalTags: { replace: ["PRE"] },
+        excludeSelectors: { replace: [".code-tools"] },
+      },
+      {
+        id: "docs-style",
+        siteKey: "docs.example.com",
+        matches: ["docs.example.com"],
+        ruleCapability: "modifier-only",
+        excludeSelectors: { replace: [".sponsor"] },
+        globalStyles: {
+          ".article-title": "-webkit-line-clamp: unset;",
+        },
+      },
+    ]);
+
+    expect(resolution.finalRule.selectors).toEqual(["article p"]);
+    expect(resolution.finalRule.contentSelectors).toEqual([{ selector: "article p", category: "content-block" }]);
+    expect(resolution.finalRule.excludeSelectors).toEqual(["footer", ".code-tools", ".sponsor"]);
+    expect(resolution.finalRule.stayOriginalTags).toEqual(["CODE", "KBD", "SAMP", "PRE"]);
+  });
+
+  it("infers style-only rule intent from CSS selectors and layout repairs", () => {
+    const intent = inferStyleRuleIntent({
+      id: "style-intent",
+      globalStyles: {
+        ".card-title, .summary-text": "-webkit-line-clamp: unset; max-height: none;",
+        ".sidebar-ad": "display: none;",
+      },
+      injectedCss: [
+        `
+.post-desc { overflow: visible; }
+.footer-links { display: none; }
+`,
+      ],
+    });
+
+    expect(intent.weakCandidateSelectors).toEqual([".card-title", ".summary-text", ".post-desc"]);
+    expect(intent.excludeHints).toEqual([".sidebar-ad", ".footer-links"]);
+    expect(intent.styleFixes).toContain(".card-title");
+    expect(intent.layoutHints).toContain(".post-desc");
   });
 
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {

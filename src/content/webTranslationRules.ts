@@ -98,6 +98,15 @@ export type RuleResolutionResult = {
   reasons: readonly string[];
 };
 
+export type StyleRuleIntent = {
+  styleFixes: readonly string[];
+  weakCandidateSelectors: readonly string[];
+  excludeHints: readonly string[];
+  layoutHints: readonly string[];
+};
+
+type WebTranslationAdvanceMergeEntry = NonNullable<WebTranslationRule["advanceMergeConfig"]>[number];
+
 export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
   '[data-imt-managed="true"]',
   '[data-imt-skip="true"]',
@@ -1997,16 +2006,13 @@ export function resolveWebTranslationRuleResolution(
   }
 
   const compatibleRules = compatibleRulesForPrimary(primary.rule, rankedMatches, normalizeHostnameFromUrl(url));
-  const mergeableRules = compatibleRules.filter((match) =>
+  const mergeableRules = orderRuleStack(compatibleRules).filter((match) =>
     analyzeWebTranslationRuleCapability(match.rule).capability !== "unsafe"
   );
   const base = primary.rule.id === "twitter"
     ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, coreWebTranslationRule("x"))
     : GENERAL_WEB_TRANSLATION_RULE;
-  const merged = mergeableRules.reduce<ResolvedWebTranslationRule>(
-    (current, match) => mergeWebTranslationRules(current, match.rule),
-    mergeWebTranslationRules(base, { id: "general" }),
-  );
+  const merged = mergeRuleStack(mergeWebTranslationRules(base, { id: "general" }), mergeableRules);
   const finalRule = withRuleMetadata(merged, {
     ruleId: primary.rule.id,
     ruleSource: primary.rule.ruleSource ?? "core",
@@ -2021,7 +2027,7 @@ export function resolveWebTranslationRuleResolution(
     finalRule,
     [
       `primary:${primary.rule.id}`,
-      compatibleRules.length > 1 ? `merged:${compatibleRules.map((match) => match.rule.id).join(",")}` : "single-rule",
+      mergeableRules.length > 1 ? `stack:${mergeableRules.map((match) => match.rule.id).join(",")}` : "single-rule",
     ],
   );
 }
@@ -2049,6 +2055,8 @@ export function compileRulePolicy(
     ...capability,
     capability: capabilityFromRuleResolution(rule.ruleResolution) ?? capability.capability,
   };
+  const styleIntent = inferStyleRuleIntent(rule);
+  const excludeSelectors = unique([...rule.excludeSelectors, ...styleIntent.excludeHints]);
   const fallbackScanRootSelectors = fallbackScanRootSelectorsForRule(rule, effectiveCapability);
   const fallbackContentSelectors = fallbackContentSelectorsForRule(rule, effectiveCapability);
   const base = {
@@ -2072,12 +2080,12 @@ export function compileRulePolicy(
     buildContainerSelectors: rule.buildContainerSelectors,
     skipBuildContainerSelectors: rule.skipBuildContainerSelectors,
     preferredScanRootSelectors: unique([...rule.selectors, ...fallbackScanRootSelectors]),
-    weakCandidateSelectors: weakCandidateSelectorsFromRule(rule),
-    excludeSelectors: rule.excludeSelectors,
+    weakCandidateSelectors: styleIntent.weakCandidateSelectors,
+    excludeSelectors,
     contentSelectors: unique([...rule.contentSelectors, ...fallbackContentSelectors], contentSelectorKey),
     selectorFallbackPolicy: rule.selectorFallbackPolicy ?? defaultSelectorFallbackPolicy(effectiveCapability),
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
-    excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
+    excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...excludeSelectors, ...rule.mutationExcludeSelectors]),
     injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
     globalAttributes: rule.globalAttributes,
     translationClasses: rule.translationClasses,
@@ -2294,17 +2302,17 @@ function resolveWebTranslationRuleResolutionWithImportedDeltas(
     const compatibleImportedRules = importedMatches.filter((rule) =>
       rule.ruleSource !== "imported-experimental" && isSameRuleFamily(coreMatch, rule, hostname)
     );
-    const mergeableImportedRules = compatibleImportedRules.filter((rule) =>
-      analyzeWebTranslationRuleCapability(rule).capability !== "unsafe"
-    );
+    const mergeableImportedMatches = orderRuleStack(compatibleImportedRules.map((rule) => ({
+      rule,
+      score: 0,
+      reasons: ["imported-compatible"],
+    }))).filter((match) => analyzeWebTranslationRuleCapability(match.rule).capability !== "unsafe");
+    const mergeableImportedRules = mergeableImportedMatches.map((match) => match.rule);
     if (compatibleImportedRules.length === 0) {
       return resolveWebTranslationRuleResolution(url, doc, CORE_WEB_TRANSLATION_RULES);
     }
 
-    const merged = mergeableImportedRules.reduce<ResolvedWebTranslationRule>(
-      (current, importedRule) => mergeWebTranslationRules(current, importedRule),
-      coreRule,
-    );
+    const merged = mergeRuleStack(coreRule, mergeableImportedMatches);
 
     const mergedWithCoreSiteKey = coreRule.siteKey ? { ...merged, siteKey: coreRule.siteKey } : merged;
     const finalRule = withRuleMetadata(mergedWithCoreSiteKey, {
@@ -2331,12 +2339,18 @@ function resolveWebTranslationRuleResolutionWithImportedDeltas(
   if (!importedPrimary) return resolveWebTranslationRuleResolution(url, doc, BUILTIN_WEB_TRANSLATION_RULES);
 
   const sameFamilyRules = importedMatches.filter((rule) => isSameRuleFamily(importedPrimary, rule, hostname));
-  const mergeableSameFamilyRules = sameFamilyRules.filter((rule) =>
-    analyzeWebTranslationRuleCapability(rule).capability !== "unsafe"
+  const sameFamilyMatches = orderRuleStack(sameFamilyRules.map((rule) => ({
+    rule,
+    score: 0,
+    reasons: ["imported-same-family"],
+  })));
+  const mergeableSameFamilyMatches = sameFamilyMatches.filter((match) =>
+    analyzeWebTranslationRuleCapability(match.rule).capability !== "unsafe"
   );
-  const merged = mergeableSameFamilyRules.reduce<ResolvedWebTranslationRule>(
-    (current, importedRule) => mergeWebTranslationRules(current, importedRule),
+  const mergeableSameFamilyRules = mergeableSameFamilyMatches.map((match) => match.rule);
+  const merged = mergeRuleStack(
     mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }),
+    mergeableSameFamilyMatches,
   );
 
   const finalRule = withRuleMetadata(merged, {
@@ -2381,6 +2395,218 @@ function firstRuleWithCapability(
   capability: WebTranslationRuleCapability,
 ): WebTranslationRuleMatch | undefined {
   return matches.find((match) => analyzeWebTranslationRuleCapability(match.rule).capability === capability);
+}
+
+function mergeRuleStack(
+  base: ResolvedWebTranslationRule,
+  matches: readonly WebTranslationRuleMatch[],
+): ResolvedWebTranslationRule {
+  return orderRuleStack(matches).reduce<ResolvedWebTranslationRule>((current, match) => {
+    const capability = analyzeWebTranslationRuleCapability(match.rule).capability;
+    if (capability === "unsafe") return current;
+    return mergeWebTranslationRules(current, ruleForStackCapability(match.rule, capability));
+  }, base);
+}
+
+function orderRuleStack(matches: readonly WebTranslationRuleMatch[]): readonly WebTranslationRuleMatch[] {
+  return [...matches].sort((left, right) => {
+    const capabilityDelta = stackCapabilityOrder(left.rule) - stackCapabilityOrder(right.rule);
+    if (capabilityDelta !== 0) return capabilityDelta;
+    return right.score - left.score;
+  });
+}
+
+function stackCapabilityOrder(rule: WebTranslationRule): number {
+  switch (analyzeWebTranslationRuleCapability(rule).capability) {
+    case "content-ready":
+      return 0;
+    case "scope-ready":
+      return 1;
+    case "structure-only":
+      return 2;
+    case "modifier-only":
+      return 3;
+    case "dynamic-only":
+      return 4;
+    case "match-only":
+      return 5;
+    case "unsafe":
+      return 99;
+  }
+}
+
+function ruleForStackCapability(
+  rule: WebTranslationRule,
+  capability: WebTranslationRuleCapability,
+): WebTranslationRule {
+  switch (capability) {
+    case "content-ready":
+      return rule;
+    case "scope-ready":
+      return scopeRuleDelta(rule);
+    case "structure-only":
+      return structureRuleDelta(rule);
+    case "modifier-only":
+      return modifierRuleDelta(rule);
+    case "dynamic-only":
+      return dynamicRuleDelta(rule);
+    case "match-only":
+      return matchOnlyRuleDelta(rule);
+    case "unsafe":
+      return { id: rule.id, ruleCapability: "unsafe" };
+  }
+}
+
+function baseStackDelta(rule: WebTranslationRule): WebTranslationRule {
+  return {
+    id: rule.id,
+    ...(rule.siteKey ? { siteKey: rule.siteKey } : {}),
+    ...(rule.ruleSource ? { ruleSource: rule.ruleSource } : {}),
+    ...(rule.ruleCapability ? { ruleCapability: rule.ruleCapability } : {}),
+    ...(rule.fallbackProfile ? { fallbackProfile: rule.fallbackProfile } : {}),
+    ...(rule.selectorFallbackPolicy ? { selectorFallbackPolicy: rule.selectorFallbackPolicy } : {}),
+  };
+}
+
+function scopeRuleDelta(rule: WebTranslationRule): WebTranslationRule {
+  return {
+    ...baseStackDelta(rule),
+    ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
+    ...(rule.mainFrameMinTextCount !== undefined ? { mainFrameMinTextCount: rule.mainFrameMinTextCount } : {}),
+    ...(rule.mainFrameMinWordCount !== undefined ? { mainFrameMinWordCount: rule.mainFrameMinWordCount } : {}),
+    ...(rule.bodyRule ? { bodyRule: rule.bodyRule } : {}),
+    ...(rule.containerMinTextCount !== undefined ? { containerMinTextCount: rule.containerMinTextCount } : {}),
+    ...stackArrayField("excludeSelectors", rule.excludeSelectors),
+    ...stackArrayField("additionalExcludeSelectors", rule.additionalExcludeSelectors),
+    ...stackArrayField("excludeTags", rule.excludeTags),
+    ...stackArrayField("additionalExcludeTags", rule.additionalExcludeTags),
+  };
+}
+
+function structureRuleDelta(rule: WebTranslationRule): WebTranslationRule {
+  return {
+    ...baseStackDelta(rule),
+    ...stackArrayField("extraBlockSelectors", rule.extraBlockSelectors),
+    ...stackArrayField("extraInlineSelectors", rule.extraInlineSelectors),
+    ...stackArrayField("atomicBlockSelectors", rule.atomicBlockSelectors),
+    ...stackArrayField("inlineTags", rule.inlineTags),
+    ...stackArrayField("preWhitespaceDetectedTags", rule.preWhitespaceDetectedTags),
+    ...stackArrayField("buildContainerSelectors", rule.buildContainerSelectors),
+    ...stackArrayField("skipBuildContainerSelectors", rule.skipBuildContainerSelectors),
+    ...stackArrayField("stayOriginalSelectors", rule.stayOriginalSelectors),
+    ...stackArrayField("stayOriginalTags", rule.stayOriginalTags),
+    ...stackArrayField("excludeSelectors", rule.excludeSelectors),
+    ...stackArrayField("additionalExcludeSelectors", rule.additionalExcludeSelectors),
+    ...stackArrayField("excludeTags", rule.excludeTags),
+    ...stackArrayField("additionalExcludeTags", rule.additionalExcludeTags),
+    ...(rule.paragraphMinTextCount !== undefined ? { paragraphMinTextCount: rule.paragraphMinTextCount } : {}),
+    ...(rule.paragraphMinWordCount !== undefined ? { paragraphMinWordCount: rule.paragraphMinWordCount } : {}),
+    ...(rule.blockMinTextCount !== undefined ? { blockMinTextCount: rule.blockMinTextCount } : {}),
+    ...(rule.blockMinWordCount !== undefined ? { blockMinWordCount: rule.blockMinWordCount } : {}),
+    ...(rule.containerMinTextCount !== undefined ? { containerMinTextCount: rule.containerMinTextCount } : {}),
+    ...(rule.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: rule.lineBreakMaxTextCount } : {}),
+  };
+}
+
+function modifierRuleDelta(rule: WebTranslationRule): WebTranslationRule {
+  return {
+    ...baseStackDelta(rule),
+    ...stackArrayField("excludeSelectors", rule.excludeSelectors),
+    ...stackArrayField("additionalExcludeSelectors", rule.additionalExcludeSelectors),
+    ...stackArrayField("excludeTags", rule.excludeTags),
+    ...stackArrayField("additionalExcludeTags", rule.additionalExcludeTags),
+    ...stackArrayField("mutationExcludeSelectors", rule.mutationExcludeSelectors),
+    ...stackArrayField("injectedCss", rule.injectedCss),
+    ...stackArrayField("additionalInjectedCss", rule.additionalInjectedCss),
+    ...stackRecordField("globalStyles", rule.globalStyles),
+    ...stackRecordField("globalAttributes", rule.globalAttributes),
+    ...stackArrayField("translationClasses", rule.translationClasses),
+    ...(rule.wrapperPrefix !== undefined ? { wrapperPrefix: rule.wrapperPrefix } : {}),
+    ...(rule.wrapperSuffix !== undefined ? { wrapperSuffix: rule.wrapperSuffix } : {}),
+  };
+}
+
+function dynamicRuleDelta(rule: WebTranslationRule): WebTranslationRule {
+  return {
+    ...baseStackDelta(rule),
+    ...(rule.dynamicPreset ? { dynamicPreset: rule.dynamicPreset } : {}),
+    ...(rule.isHighDynamic !== undefined ? { isHighDynamic: rule.isHighDynamic } : {}),
+    ...(rule.allowTooltip !== undefined ? { allowTooltip: rule.allowTooltip } : {}),
+    ...(rule.observeUrlChange !== undefined ? { observeUrlChange: rule.observeUrlChange } : {}),
+    ...(rule.urlChangeDelay !== undefined ? { urlChangeDelay: rule.urlChangeDelay } : {}),
+    ...(rule.debounceMs !== undefined ? { debounceMs: rule.debounceMs } : {}),
+    ...(rule.lazyRootMargin !== undefined ? { lazyRootMargin: rule.lazyRootMargin } : {}),
+    ...(rule.lazyThreshold !== undefined ? { lazyThreshold: rule.lazyThreshold } : {}),
+    ...(rule.eagerLazyRootMargin !== undefined ? { eagerLazyRootMargin: rule.eagerLazyRootMargin } : {}),
+    ...(rule.maxEagerLazyRoots !== undefined ? { maxEagerLazyRoots: rule.maxEagerLazyRoots } : {}),
+    ...(rule.viewportSupplement !== undefined ? { viewportSupplement: rule.viewportSupplement } : {}),
+    ...(rule.viewportSupplementDebounceMs !== undefined ? { viewportSupplementDebounceMs: rule.viewportSupplementDebounceMs } : {}),
+    ...(rule.viewportSupplementRootMargin !== undefined ? { viewportSupplementRootMargin: rule.viewportSupplementRootMargin } : {}),
+    ...(rule.viewportSupplementMaxRoots !== undefined ? { viewportSupplementMaxRoots: rule.viewportSupplementMaxRoots } : {}),
+    ...(rule.maxQueueSize !== undefined ? { maxQueueSize: rule.maxQueueSize } : {}),
+    ...(rule.maxRootsPerFlush !== undefined ? { maxRootsPerFlush: rule.maxRootsPerFlush } : {}),
+    ...(rule.maxObservedRoots !== undefined ? { maxObservedRoots: rule.maxObservedRoots } : {}),
+    ...(rule.maxMutationNodesPerWindow !== undefined ? { maxMutationNodesPerWindow: rule.maxMutationNodesPerWindow } : {}),
+    ...(rule.mutationWindowMs !== undefined ? { mutationWindowMs: rule.mutationWindowMs } : {}),
+    ...stackArrayField("mutationExcludeSelectors", rule.mutationExcludeSelectors),
+    ...optionalRuleValue("advanceMergeConfig", stackDynamicAdvanceMergeConfig(rule)),
+  };
+}
+
+function matchOnlyRuleDelta(rule: WebTranslationRule): WebTranslationRule {
+  return baseStackDelta(rule);
+}
+
+function stackArrayField<Key extends keyof WebTranslationRule, T>(
+  key: Key,
+  value: RuleArrayValue<T> | undefined,
+): Partial<WebTranslationRule> {
+  return optionalRuleValue(key, stackAddOnly(value) as WebTranslationRule[Key] | undefined);
+}
+
+function stackRecordField<Key extends keyof WebTranslationRule, T>(
+  key: Key,
+  value: RuleRecordValue<T> | undefined,
+): Partial<WebTranslationRule> {
+  return optionalRuleValue(key, stackRecordAddOnly(value) as WebTranslationRule[Key] | undefined);
+}
+
+function stackDynamicAdvanceMergeConfig(rule: WebTranslationRule): WebTranslationRule["advanceMergeConfig"] | undefined {
+  if (!rule.advanceMergeConfig?.length) return undefined;
+  const entries = rule.advanceMergeConfig.flatMap((entry) => {
+    const advanceConfig = dynamicAdvanceConfig(entry.advanceConfig);
+    return Object.keys(advanceConfig).length ? [{ condition: entry.condition, advanceConfig }] : [];
+  });
+  return entries.length ? entries : undefined;
+}
+
+function dynamicAdvanceConfig(rule: WebTranslationAdvanceMergeEntry["advanceConfig"]): WebTranslationAdvanceMergeEntry["advanceConfig"] {
+  return {
+    ...(rule.dynamicPreset ? { dynamicPreset: rule.dynamicPreset } : {}),
+    ...(rule.isHighDynamic !== undefined ? { isHighDynamic: rule.isHighDynamic } : {}),
+    ...(rule.allowTooltip !== undefined ? { allowTooltip: rule.allowTooltip } : {}),
+    ...(rule.observeUrlChange !== undefined ? { observeUrlChange: rule.observeUrlChange } : {}),
+    ...(rule.urlChangeDelay !== undefined ? { urlChangeDelay: rule.urlChangeDelay } : {}),
+    ...(rule.debounceMs !== undefined ? { debounceMs: rule.debounceMs } : {}),
+    ...(rule.lazyRootMargin !== undefined ? { lazyRootMargin: rule.lazyRootMargin } : {}),
+    ...(rule.lazyThreshold !== undefined ? { lazyThreshold: rule.lazyThreshold } : {}),
+    ...(rule.eagerLazyRootMargin !== undefined ? { eagerLazyRootMargin: rule.eagerLazyRootMargin } : {}),
+    ...(rule.maxEagerLazyRoots !== undefined ? { maxEagerLazyRoots: rule.maxEagerLazyRoots } : {}),
+    ...(rule.viewportSupplement !== undefined ? { viewportSupplement: rule.viewportSupplement } : {}),
+    ...(rule.viewportSupplementDebounceMs !== undefined
+      ? { viewportSupplementDebounceMs: rule.viewportSupplementDebounceMs }
+      : {}),
+    ...(rule.viewportSupplementRootMargin !== undefined
+      ? { viewportSupplementRootMargin: rule.viewportSupplementRootMargin }
+      : {}),
+    ...(rule.viewportSupplementMaxRoots !== undefined ? { viewportSupplementMaxRoots: rule.viewportSupplementMaxRoots } : {}),
+    ...(rule.maxQueueSize !== undefined ? { maxQueueSize: rule.maxQueueSize } : {}),
+    ...(rule.maxRootsPerFlush !== undefined ? { maxRootsPerFlush: rule.maxRootsPerFlush } : {}),
+    ...(rule.maxObservedRoots !== undefined ? { maxObservedRoots: rule.maxObservedRoots } : {}),
+    ...(rule.maxMutationNodesPerWindow !== undefined ? { maxMutationNodesPerWindow: rule.maxMutationNodesPerWindow } : {}),
+    ...(rule.mutationWindowMs !== undefined ? { mutationWindowMs: rule.mutationWindowMs } : {}),
+    ...stackArrayField("mutationExcludeSelectors", rule.mutationExcludeSelectors),
+  };
 }
 
 function compatibleRulesForPrimary(
@@ -2727,6 +2953,20 @@ function addOnly<T>(value: RuleArrayValue<T> | undefined): RuleArrayValue<T> | u
   };
 }
 
+function stackAddOnly<T>(value: RuleArrayValue<T> | undefined): RuleArrayValue<T> | undefined {
+  if (!value) return undefined;
+  if (!isRuleArrayOperation(value)) return { add: listValue(value) };
+  const additions = [...listValue(value.replace), ...listValue(value.add)];
+  return additions.length ? { add: additions } : undefined;
+}
+
+function stackRecordAddOnly<T>(value: RuleRecordValue<T> | undefined): RuleRecordValue<T> | undefined {
+  if (!value) return undefined;
+  if (isRuleRecord(value)) return { add: value };
+  const additions = { ...(value.replace ?? {}), ...(value.add ?? {}) };
+  return Object.keys(additions).length ? { add: additions } : undefined;
+}
+
 function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value as readonly T[] : [value as T];
@@ -2865,18 +3105,63 @@ function globalStylesToCss(globalStyles: Readonly<Record<string, string>>): stri
 
 const WEAK_CANDIDATE_SELECTOR_TEXT = /(title|text|content|summary|name|desc|description|headline|body|caption|excerpt|abstract|comment|message|post)/i;
 const LAYOUT_REPAIR_STYLE_TEXT = /(line-clamp|max-height|overflow|white-space|\bheight\b|\bdisplay\b)/i;
+const EXCLUDE_HINT_SELECTOR_TEXT = /(^|[\s.#:[>+~_-])(nav|navigation|sidebar|footer|header|ad|ads|advert|sponsor|popup|modal|promo|toolbar|menu)([\s.#:[\]>+~_-]|$)/i;
 
-function weakCandidateSelectorsFromRule(rule: ResolvedWebTranslationRule): readonly string[] {
-  const selectors: string[] = [];
-  for (const [selectorText, styleText] of Object.entries(rule.globalStyles)) {
-    if (!LAYOUT_REPAIR_STYLE_TEXT.test(styleText)) continue;
+export function inferStyleRuleIntent(rule: WebTranslationRule): StyleRuleIntent {
+  const styleFixes: string[] = [];
+  const weakCandidateSelectors: string[] = [];
+  const excludeHints: string[] = [];
+  const layoutHints: string[] = [];
+
+  for (const { selectorText, styleText } of styleRuleEntries(rule)) {
+    const hasLayoutRepair = LAYOUT_REPAIR_STYLE_TEXT.test(styleText);
     for (const selector of selectorText.split(",")) {
       const trimmed = selector.trim();
       if (!trimmed || isUnsafeWeakCandidateSelector(trimmed)) continue;
-      if (WEAK_CANDIDATE_SELECTOR_TEXT.test(trimmed)) selectors.push(trimmed);
+      if (hasLayoutRepair) {
+        styleFixes.push(trimmed);
+        layoutHints.push(trimmed);
+        if (WEAK_CANDIDATE_SELECTOR_TEXT.test(trimmed)) weakCandidateSelectors.push(trimmed);
+      }
+      if (EXCLUDE_HINT_SELECTOR_TEXT.test(trimmed)) excludeHints.push(trimmed);
     }
   }
-  return unique(selectors);
+
+  return {
+    styleFixes: unique(styleFixes),
+    weakCandidateSelectors: unique(weakCandidateSelectors),
+    excludeHints: unique(excludeHints),
+    layoutHints: unique(layoutHints),
+  };
+}
+
+function styleRuleEntries(rule: WebTranslationRule): Array<{ selectorText: string; styleText: string }> {
+  const entries = Object.entries(recordValue(rule.globalStyles)).map(([selectorText, styleText]) => ({
+    selectorText,
+    styleText,
+  }));
+
+  for (const cssText of arrayValue(rule.injectedCss)) {
+    entries.push(...cssRuleEntries(cssText));
+  }
+  for (const cssText of arrayValue(rule.additionalInjectedCss)) {
+    entries.push(...cssRuleEntries(cssText));
+  }
+  return entries;
+}
+
+function cssRuleEntries(cssText: string): Array<{ selectorText: string; styleText: string }> {
+  const entries: Array<{ selectorText: string; styleText: string }> = [];
+  const rulePattern = /([^{}]+)\{([^{}]+)\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = rulePattern.exec(cssText)) !== null) {
+    const selectorText = match[1]?.trim();
+    const styleText = match[2]?.trim();
+    if (!selectorText || !styleText) continue;
+    if (selectorText.startsWith("@")) continue;
+    entries.push({ selectorText, styleText });
+  }
+  return entries;
 }
 
 function isUnsafeWeakCandidateSelector(selector: string): boolean {
