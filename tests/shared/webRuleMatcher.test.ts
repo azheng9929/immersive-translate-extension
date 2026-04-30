@@ -36,4 +36,17 @@ describe("webRuleMatcher", () => {
       "news",
     ]);
   });
+
+  it("accepts scalar string match fields from advanced user config", () => {
+    const rules = [
+      {
+        id: "scalar",
+        matches: "example.com",
+        excludeMatches: "example.com/private/*",
+      },
+    ] as unknown as WebTranslationRule[];
+
+    expect(matchWebTranslationRule("https://example.com/post", undefined, rules)?.id).toBe("scalar");
+    expect(matchWebTranslationRule("https://example.com/private/post", undefined, rules)).toBeUndefined();
+  });
 });

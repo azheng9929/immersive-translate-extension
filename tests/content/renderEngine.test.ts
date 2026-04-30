@@ -85,4 +85,21 @@ describe("renderTranslation", () => {
     expect(input.getAttribute("placeholder")).toBe("Search docs");
     expect(input.hasAttribute("data-imt-original-text")).toBe(false);
   });
+
+  it("applies rule translation classes and wrapper text to inserted translations", () => {
+    document.body.innerHTML = "<p>Hello world</p>";
+    const unit = {
+      ...baseUnit(document.querySelector("p")!, "bilingual-inside"),
+      translationClasses: ["imt-user-style", "site-translation"],
+      wrapperPrefix: "「",
+      wrapperSuffix: "」",
+    };
+    renderTranslation(unit, "Translated hello");
+
+    const translated = document.querySelector<HTMLElement>("[data-imt-managed='true']");
+    expect(translated?.classList.contains("imt-translation-block")).toBe(true);
+    expect(translated?.classList.contains("imt-user-style")).toBe(true);
+    expect(translated?.classList.contains("site-translation")).toBe(true);
+    expect(translated?.textContent).toBe("「Translated hello」");
+  });
 });

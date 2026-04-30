@@ -34,29 +34,36 @@ export function filterMatchingWebTranslationRules(
 }
 
 export function mayWebTranslationRuleMatchUrl(url: string, rule: WebTranslationRule): boolean {
-  if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  return Boolean(rule.matches?.length || hasSelectorConditions(rule));
+  const matches = listValue(rule.matches);
+  const excludeMatches = listValue(rule.excludeMatches);
+  if (matches.length && !matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  if (excludeMatches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  return Boolean(matches.length || hasSelectorConditions(rule));
 }
 
 function matchesRule(url: string, doc: Document | undefined, rule: WebTranslationRule): boolean {
-  if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  if (rule.selectorMatches?.length && (!doc || !rule.selectorMatches.some((selector) => hasSelector(doc, selector)))) {
+  const matches = listValue(rule.matches);
+  const excludeMatches = listValue(rule.excludeMatches);
+  const selectorMatches = listValue(rule.selectorMatches);
+  const excludeSelectorMatches = listValue(rule.excludeSelectorMatches);
+  if (matches.length && !matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  if (excludeMatches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  if (selectorMatches.length && (!doc || !selectorMatches.some((selector) => hasSelector(doc, selector)))) {
     return false;
   }
-  if (doc && rule.excludeSelectorMatches?.some((selector) => hasSelector(doc, selector))) return false;
+  if (doc && excludeSelectorMatches.some((selector) => hasSelector(doc, selector))) return false;
   return true;
 }
 
 function matchesUrlOnly(url: string, rule: WebTranslationRule): boolean {
-  if (!rule.matches?.length) return false;
-  if (!rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
-  return !rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern));
+  const matches = listValue(rule.matches);
+  if (!matches.length) return false;
+  if (!matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
+  return !listValue(rule.excludeMatches).some((pattern) => matchesUrlPattern(url, pattern));
 }
 
 function hasSelectorConditions(rule: WebTranslationRule): boolean {
-  return Boolean(rule.selectorMatches?.length || rule.excludeSelectorMatches?.length);
+  return Boolean(listValue(rule.selectorMatches).length || listValue(rule.excludeSelectorMatches).length);
 }
 
 function matchesUrlPattern(url: string, pattern: string): boolean {
@@ -118,4 +125,9 @@ function parseUrl(value: string): URL | undefined {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value as readonly T[] : [value as T];
 }

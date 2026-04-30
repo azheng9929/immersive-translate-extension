@@ -45,6 +45,9 @@ export type TranslationUnit = {
   targetLang: string;
   category: UnitCategory;
   renderMode: RenderMode;
+  translationClasses?: readonly string[];
+  wrapperPrefix?: string;
+  wrapperSuffix?: string;
   priority: number;
   state: UnitState;
   reason?: string;

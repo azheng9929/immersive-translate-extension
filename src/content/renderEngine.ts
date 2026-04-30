@@ -63,8 +63,11 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
   const span = document.createElement("span");
   span.setAttribute("data-imt-managed", "true");
   span.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
-  span.className = unit.renderMode === "compact-bilingual" ? "imt-translation-compact" : "imt-translation-block";
-  span.textContent = translatedText;
+  span.className = [
+    unit.renderMode === "compact-bilingual" ? "imt-translation-compact" : "imt-translation-block",
+    ...(unit.translationClasses ?? []),
+  ].filter(Boolean).join(" ");
+  span.textContent = withWrapperText(unit, translatedText);
   unit.root.appendChild(span);
   return [{ type: "inserted-node", unitId: unit.id, node: span }];
 }
@@ -74,9 +77,13 @@ function renderTextReplacement(unit: TranslationUnit, translatedText: string): R
 
   unit.textNodes.forEach((node, index) => {
     records.push({ type: "text-replace", unitId: unit.id, textNode: node, originalText: node.textContent ?? "" });
-    node.textContent = index === 0 ? translatedText : "";
+    node.textContent = index === 0 ? withWrapperText(unit, translatedText) : "";
   });
 
   unit.root.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
   return records;
+}
+
+function withWrapperText(unit: TranslationUnit, translatedText: string): string {
+  return `${unit.wrapperPrefix ?? ""}${translatedText}${unit.wrapperSuffix ?? ""}`;
 }

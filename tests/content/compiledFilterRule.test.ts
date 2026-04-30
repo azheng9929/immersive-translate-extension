@@ -66,4 +66,20 @@ describe("compiledFilterRule", () => {
     expect(findTranslationRoot(document.querySelector("#emoji")!, filterRule)).toBe(document.querySelector("#paragraph"));
     expect(findTranslationRoot(document.querySelector("#headline")!, filterRule)).toBe(document.querySelector("#headline"));
   });
+
+  it("honors rule-level excluded and inline tags", () => {
+    mountFixture(`
+      <article>
+        <aside><span id="aside-text">Skip this sidebar.</span></aside>
+        <p>Hello <mark id="mark">highlight</mark> world.</p>
+      </article>
+    `);
+    const filterRule = compileFilterRule({
+      excludeTags: ["aside"],
+      inlineTags: ["mark"],
+    });
+
+    expect(classifyElementForTranslation(document.querySelector("#aside-text")!, filterRule).kind).toBe("excluded");
+    expect(classifyElementForTranslation(document.querySelector("#mark")!, filterRule).kind).toBe("inline");
+  });
 });

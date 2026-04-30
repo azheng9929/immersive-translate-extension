@@ -52,6 +52,9 @@ type ControllerOptions = {
   excludeSelectors?: readonly string[];
   contentSelectors?: readonly SiteContentSelector[];
   filterRule?: CompiledFilterRule;
+  translationClasses?: readonly string[];
+  wrapperPrefix?: string;
+  wrapperSuffix?: string;
   allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
   progressiveBatchItems?: number;
@@ -267,6 +270,9 @@ export class PageController {
       ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
       ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
       ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),
+      ...(this.options.translationClasses ? { translationClasses: this.options.translationClasses } : {}),
+      ...(this.options.wrapperPrefix !== undefined ? { wrapperPrefix: this.options.wrapperPrefix } : {}),
+      ...(this.options.wrapperSuffix !== undefined ? { wrapperSuffix: this.options.wrapperSuffix } : {}),
       diagnostics,
     });
   }

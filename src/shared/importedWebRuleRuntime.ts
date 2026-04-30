@@ -12,17 +12,28 @@ const SUPPORTED_RULE_KEYS = new Set([
   "selectorMatches",
   "excludeSelectorMatches",
   "selectors",
+  "additionalSelectors",
   "excludeSelectors",
+  "additionalExcludeSelectors",
+  "excludeTags",
+  "additionalExcludeTags",
   "mutationExcludeSelectors",
   "injectedCss",
+  "additionalInjectedCss",
   "extraBlockSelectors",
   "extraInlineSelectors",
   "atomicBlockSelectors",
+  "inlineTags",
+  "preWhitespaceDetectedTags",
   "buildContainerSelectors",
   "skipBuildContainerSelectors",
   "stayOriginalSelectors",
   "stayOriginalTags",
   "globalStyles",
+  "globalAttributes",
+  "translationClasses",
+  "wrapperPrefix",
+  "wrapperSuffix",
   "contentSelectors",
   "attributeNames",
   "mainFrameSelector",
@@ -39,6 +50,8 @@ const SUPPORTED_RULE_KEYS = new Set([
   "paragraphMinWordCount",
   "blockMinTextCount",
   "blockMinWordCount",
+  "containerMinTextCount",
+  "lineBreakMaxTextCount",
   "debounceMs",
   "lazyRootMargin",
   "lazyThreshold",
@@ -53,22 +66,32 @@ const SUPPORTED_RULE_KEYS = new Set([
   "maxObservedRoots",
   "maxMutationNodesPerWindow",
   "mutationWindowMs",
+  "aiRule",
   "advanceMergeConfig",
 ]);
 
 const SUPPORTED_DELTA_FIELDS = [
   "selectors",
+  "additionalSelectors",
   "excludeSelectors",
+  "additionalExcludeSelectors",
+  "excludeTags",
+  "additionalExcludeTags",
   "mutationExcludeSelectors",
   "injectedCss",
+  "additionalInjectedCss",
   "extraBlockSelectors",
   "extraInlineSelectors",
   "atomicBlockSelectors",
+  "inlineTags",
+  "preWhitespaceDetectedTags",
   "buildContainerSelectors",
   "skipBuildContainerSelectors",
   "stayOriginalSelectors",
   "stayOriginalTags",
   "globalStyles",
+  "globalAttributes",
+  "translationClasses",
   "contentSelectors",
   "attributeNames",
 ];
@@ -78,17 +101,24 @@ const NON_WEB_RULE_TEXT_PATTERN = /immersive-translate-(pdf|ebook|subtitle)|appl
 
 const STABLE_RUNTIME_FIELDS = [
   "selectors",
+  "additionalSelectors",
   "excludeSelectors",
+  "additionalExcludeSelectors",
+  "excludeTags",
   "mutationExcludeSelectors",
   "injectedCss",
+  "additionalInjectedCss",
   "extraBlockSelectors",
   "extraInlineSelectors",
   "atomicBlockSelectors",
+  "inlineTags",
   "buildContainerSelectors",
   "skipBuildContainerSelectors",
   "stayOriginalSelectors",
   "stayOriginalTags",
   "globalStyles",
+  "globalAttributes",
+  "translationClasses",
   "contentSelectors",
   "attributeNames",
   "mainFrameSelector",
@@ -145,12 +175,36 @@ function isRuntimeWebPageRule(rule: WebTranslationRule): boolean {
   const searchableText = [
     id,
     rule.siteKey,
-    ...(rule.matches ?? []),
-    ...(rule.selectorMatches ?? []),
-    ...(rule.selectors && Array.isArray(rule.selectors) ? rule.selectors : []),
+    ...listValue(rule.matches),
+    ...listValue(rule.selectorMatches),
+    ...arrayValue(rule.selectors),
+    ...arrayValue(rule.additionalSelectors),
   ].filter(Boolean).join("\n");
 
   return !NON_WEB_RULE_TEXT_PATTERN.test(searchableText);
+}
+
+function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value as readonly T[] : [value as T];
+}
+
+function arrayValue<T>(value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[] } | undefined): readonly T[] {
+  if (value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  if (!isArrayOperation(value)) return [value as T];
+  return listValue(value.replace ?? value.add);
+}
+
+function isArrayOperation<T>(
+  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[] } | undefined,
+): value is { replace?: T | readonly T[]; add?: T | readonly T[] } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      ("replace" in value || "add" in value),
+  );
 }
 
 function importedRuleSource(rule: WebTranslationRule): WebTranslationRuleSource {

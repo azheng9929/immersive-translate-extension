@@ -121,6 +121,7 @@ function deriveCapability(input: {
 function countContentAnchors(rule: WebTranslationRule): number {
   return [
     ...arrayValue(rule.selectors),
+    ...arrayValue(rule.additionalSelectors),
     ...arrayValue<RuleContentSelector>(rule.contentSelectors).map((entry) => entry.selector),
     rule.mainFrameSelector,
     rule.bodyRule?.bodySelector,
@@ -132,8 +133,8 @@ function inferFallbackProfile(rule: WebTranslationRule): WebTranslationFallbackP
   const text = [
     rule.id,
     rule.siteKey,
-    ...(rule.matches ?? []),
-    ...(rule.selectorMatches ?? []),
+    ...listValue(rule.matches),
+    ...listValue(rule.selectorMatches),
   ].join("\n").toLowerCase();
 
   if (hasHint(text, VIDEO_HINTS)) return "video";
@@ -163,8 +164,14 @@ function hasAnyRecordValue(value: unknown): boolean {
 function arrayValue<T>(value: RuleArrayValue<T> | undefined): readonly T[] {
   if (!value) return [];
   if (Array.isArray(value)) return value;
-  const operation = value as { replace?: readonly T[]; add?: readonly T[] };
-  return operation.replace ?? operation.add ?? [];
+  if (typeof value !== "object") return [value];
+  const operation = value as { replace?: T | readonly T[]; add?: T | readonly T[] };
+  return listValue(operation.replace ?? operation.add);
+}
+
+function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value as readonly T[] : [value as T];
 }
 
 function capabilityReasons(input: {

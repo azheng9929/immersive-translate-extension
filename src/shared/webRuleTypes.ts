@@ -1,9 +1,11 @@
 import type { TranslatableAttributeName, UnitCategory } from "./types";
 
-export type RuleArrayValue<T> = readonly T[] | {
-  replace?: readonly T[];
-  add?: readonly T[];
-  remove?: readonly T[];
+export type RuleListValue<T> = T | readonly T[];
+
+export type RuleArrayValue<T> = RuleListValue<T> | {
+  replace?: RuleListValue<T>;
+  add?: RuleListValue<T>;
+  remove?: RuleListValue<T>;
 };
 
 export type RuleRecordValue<T> = Readonly<Record<string, T>> | {
@@ -20,6 +22,7 @@ export type RuleContentSelector = {
 export type WebTranslationRuleSource = "core" | "core+imported" | "imported-stable" | "imported-experimental";
 export type WebTranslationRuleCapability = "content-ready" | "modifier-only" | "structure-only" | "match-only" | "unsafe";
 export type WebTranslationFallbackProfile = "none" | "article" | "video" | "social" | "forum" | "commerce" | "generic";
+export type WebTranslationGlobalAttributes = Readonly<Record<string, Readonly<Record<string, string | null>>>>;
 
 export type WebTranslationBodyRule = {
   enable?: boolean;
@@ -36,22 +39,33 @@ export type WebTranslationRule = {
   ruleCapability?: WebTranslationRuleCapability;
   fallbackProfile?: WebTranslationFallbackProfile;
   siteKey?: string;
-  matches?: readonly string[];
-  excludeMatches?: readonly string[];
-  selectorMatches?: readonly string[];
-  excludeSelectorMatches?: readonly string[];
+  matches?: RuleListValue<string>;
+  excludeMatches?: RuleListValue<string>;
+  selectorMatches?: RuleListValue<string>;
+  excludeSelectorMatches?: RuleListValue<string>;
   selectors?: RuleArrayValue<string>;
+  additionalSelectors?: RuleArrayValue<string>;
   excludeSelectors?: RuleArrayValue<string>;
+  additionalExcludeSelectors?: RuleArrayValue<string>;
+  excludeTags?: RuleArrayValue<string>;
+  additionalExcludeTags?: RuleArrayValue<string>;
   mutationExcludeSelectors?: RuleArrayValue<string>;
   injectedCss?: RuleArrayValue<string>;
+  additionalInjectedCss?: RuleArrayValue<string>;
   extraBlockSelectors?: RuleArrayValue<string>;
   extraInlineSelectors?: RuleArrayValue<string>;
   atomicBlockSelectors?: RuleArrayValue<string>;
+  inlineTags?: RuleArrayValue<string>;
+  preWhitespaceDetectedTags?: RuleArrayValue<string>;
   buildContainerSelectors?: RuleArrayValue<string>;
   skipBuildContainerSelectors?: RuleArrayValue<string>;
   stayOriginalSelectors?: RuleArrayValue<string>;
   stayOriginalTags?: RuleArrayValue<string>;
   globalStyles?: RuleRecordValue<string>;
+  globalAttributes?: RuleRecordValue<Readonly<Record<string, string | null>>>;
+  translationClasses?: RuleArrayValue<string>;
+  wrapperPrefix?: string;
+  wrapperSuffix?: string;
   contentSelectors?: RuleArrayValue<RuleContentSelector>;
   attributeNames?: RuleArrayValue<TranslatableAttributeName>;
   mainFrameSelector?: string;
@@ -68,6 +82,8 @@ export type WebTranslationRule = {
   paragraphMinWordCount?: number;
   blockMinTextCount?: number;
   blockMinWordCount?: number;
+  containerMinTextCount?: number;
+  lineBreakMaxTextCount?: number;
   debounceMs?: number;
   lazyRootMargin?: string;
   lazyThreshold?: number;
@@ -82,6 +98,7 @@ export type WebTranslationRule = {
   maxObservedRoots?: number;
   maxMutationNodesPerWindow?: number;
   mutationWindowMs?: number;
+  aiRule?: Readonly<Record<string, unknown>>;
   advanceMergeConfig?: readonly {
     condition: string;
     advanceConfig: Omit<

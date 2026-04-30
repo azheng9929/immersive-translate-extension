@@ -4,6 +4,7 @@ import type { RuleContentSelector } from "../shared/webRuleTypes";
 export type FilterRuleInput = {
   selectors?: readonly string[];
   excludeSelectors?: readonly string[];
+  excludeTags?: readonly string[];
   mutationExcludeSelectors?: readonly string[];
   injectedCss?: readonly string[];
   contentSelectors?: readonly RuleContentSelector[];
@@ -11,6 +12,8 @@ export type FilterRuleInput = {
   extraBlockSelectors?: readonly string[];
   extraInlineSelectors?: readonly string[];
   atomicBlockSelectors?: readonly string[];
+  inlineTags?: readonly string[];
+  preWhitespaceDetectedTags?: readonly string[];
   stayOriginalSelectors?: readonly string[];
   stayOriginalTags?: readonly string[];
 };
@@ -19,6 +22,7 @@ export type CompiledFilterRule = Required<Pick<
   FilterRuleInput,
   | "selectors"
   | "excludeSelectors"
+  | "excludeTags"
   | "mutationExcludeSelectors"
   | "injectedCss"
   | "contentSelectors"
@@ -26,6 +30,8 @@ export type CompiledFilterRule = Required<Pick<
   | "extraBlockSelectors"
   | "extraInlineSelectors"
   | "atomicBlockSelectors"
+  | "inlineTags"
+  | "preWhitespaceDetectedTags"
   | "stayOriginalSelectors"
 >> & {
   stayOriginalTags: readonly string[];
@@ -62,6 +68,7 @@ export function compileFilterRule(rule: FilterRuleInput): CompiledFilterRule {
   return {
     selectors: cleanSelectors(rule.selectors),
     excludeSelectors: cleanSelectors(rule.excludeSelectors),
+    excludeTags: cleanTags(rule.excludeTags),
     mutationExcludeSelectors: cleanSelectors(rule.mutationExcludeSelectors),
     injectedCss: cleanSelectors(rule.injectedCss),
     contentSelectors: [...(rule.contentSelectors ?? [])],
@@ -69,8 +76,10 @@ export function compileFilterRule(rule: FilterRuleInput): CompiledFilterRule {
     extraBlockSelectors: cleanSelectors(rule.extraBlockSelectors),
     extraInlineSelectors: cleanSelectors(rule.extraInlineSelectors),
     atomicBlockSelectors: cleanSelectors(rule.atomicBlockSelectors),
+    inlineTags: cleanTags(rule.inlineTags),
+    preWhitespaceDetectedTags: cleanTags(rule.preWhitespaceDetectedTags),
     stayOriginalSelectors: cleanSelectors(rule.stayOriginalSelectors),
-    stayOriginalTags: [...new Set((rule.stayOriginalTags ?? []).map((tag) => tag.trim().toUpperCase()).filter(Boolean))],
+    stayOriginalTags: cleanTags(rule.stayOriginalTags),
   };
 }
 
@@ -78,7 +87,7 @@ export function classifyElementForTranslation(element: Element, rule: CompiledFi
   const root = element instanceof HTMLElement ? element : element.parentElement;
   if (!root) return { kind: "excluded", root: document.body };
 
-  if (matchesClosestSelector(root, rule.excludeSelectors)) return { kind: "excluded", root };
+  if (matchesExcludedElement(root, rule)) return { kind: "excluded", root };
   if (isStayOriginalElement(root, rule)) return { kind: "stay-original", root };
 
   const atomicRoot = closestMatchingElement(root, rule.atomicBlockSelectors);
@@ -87,7 +96,7 @@ export function classifyElementForTranslation(element: Element, rule: CompiledFi
   const extraBlockRoot = closestMatchingElement(root, rule.extraBlockSelectors);
   if (extraBlockRoot) return { kind: "block", root: extraBlockRoot };
 
-  if (matchesClosestSelector(root, rule.extraInlineSelectors) || isInlineByStyle(root)) {
+  if (matchesClosestSelector(root, rule.extraInlineSelectors) || matchesTagInAncestry(root, rule.inlineTags) || isInlineByStyle(root)) {
     return { kind: "inline", root };
   }
 
@@ -141,6 +150,22 @@ function isInlineByStyle(element: HTMLElement): boolean {
   return display ? INLINE_DISPLAY_VALUES.has(display) : false;
 }
 
+function matchesExcludedElement(element: HTMLElement, rule: CompiledFilterRule): boolean {
+  return matchesClosestSelector(element, rule.excludeSelectors) || matchesTagInAncestry(element, rule.excludeTags);
+}
+
+function matchesTagInAncestry(element: HTMLElement, tags: readonly string[]): boolean {
+  if (tags.length === 0) return false;
+  for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+    if (tags.includes(current.tagName)) return true;
+  }
+  return false;
+}
+
 function cleanSelectors(selectors: readonly string[] | undefined): string[] {
   return [...new Set((selectors ?? []).map((selector) => selector.trim()).filter(Boolean))];
+}
+
+function cleanTags(tags: readonly string[] | undefined): string[] {
+  return [...new Set((tags ?? []).map((tag) => tag.trim().toUpperCase()).filter(Boolean))];
 }

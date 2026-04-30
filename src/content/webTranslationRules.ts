@@ -10,6 +10,7 @@ import type {
   RuleRecordValue,
   WebTranslationBodyRule,
   WebTranslationFallbackProfile,
+  WebTranslationGlobalAttributes,
   WebTranslationRule,
   WebTranslationRuleCapability,
   WebTranslationRuleSource,
@@ -22,17 +23,26 @@ export { matchWebTranslationRule, selectWebTranslationRulesForContent } from "..
 type ResolvedWebTranslationRule = Omit<
   WebTranslationRule,
   | "selectors"
+  | "additionalSelectors"
   | "excludeSelectors"
+  | "additionalExcludeSelectors"
+  | "excludeTags"
+  | "additionalExcludeTags"
   | "mutationExcludeSelectors"
   | "injectedCss"
+  | "additionalInjectedCss"
   | "extraBlockSelectors"
   | "extraInlineSelectors"
   | "atomicBlockSelectors"
+  | "inlineTags"
+  | "preWhitespaceDetectedTags"
   | "buildContainerSelectors"
   | "skipBuildContainerSelectors"
   | "stayOriginalSelectors"
   | "stayOriginalTags"
   | "globalStyles"
+  | "globalAttributes"
+  | "translationClasses"
   | "contentSelectors"
   | "attributeNames"
   | "advanceMergeConfig"
@@ -42,16 +52,21 @@ type ResolvedWebTranslationRule = Omit<
   mergedRuleIds: readonly string[];
   selectors: readonly string[];
   excludeSelectors: readonly string[];
+  excludeTags: readonly string[];
   mutationExcludeSelectors: readonly string[];
   injectedCss: readonly string[];
   extraBlockSelectors: readonly string[];
   extraInlineSelectors: readonly string[];
   atomicBlockSelectors: readonly string[];
+  inlineTags: readonly string[];
+  preWhitespaceDetectedTags: readonly string[];
   buildContainerSelectors: readonly string[];
   skipBuildContainerSelectors: readonly string[];
   stayOriginalSelectors: readonly string[];
   stayOriginalTags: readonly string[];
   globalStyles: Readonly<Record<string, string>>;
+  globalAttributes: WebTranslationGlobalAttributes;
+  translationClasses: readonly string[];
   contentSelectors: readonly RuleContentSelector[];
   attributeNames: readonly TranslatableAttributeName[];
   bodyRule?: WebTranslationBodyRule;
@@ -117,6 +132,8 @@ const DEFAULT_SITE_POLICY = {
   mutationWindowMs: 5000,
   excludedDynamicSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   injectedCss: [],
+  globalAttributes: {},
+  translationClasses: [],
   filterRule: compileFilterRule({}),
   observeUrlChange: true,
   urlChangeDelay: 250,
@@ -198,11 +215,14 @@ export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
   ruleSource: "core",
   siteKey: "",
   excludeSelectors: [],
+  excludeTags: [],
   mutationExcludeSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   attributeNames: SAFE_TRANSLATABLE_ATTRIBUTES,
   extraBlockSelectors: [],
   extraInlineSelectors: [],
   atomicBlockSelectors: [],
+  inlineTags: [],
+  preWhitespaceDetectedTags: [],
   buildContainerSelectors: [],
   skipBuildContainerSelectors: [],
   stayOriginalSelectors: [],
@@ -1145,6 +1165,10 @@ export function compileRulePolicy(
     allowTooltip: rule.allowTooltip ?? DEFAULT_SITE_POLICY.allowTooltip,
     excludedDynamicSelectors: unique([...DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, ...rule.excludeSelectors, ...rule.mutationExcludeSelectors]),
     injectedCss: unique([...rule.injectedCss, ...globalStylesToCss(rule.globalStyles)]),
+    globalAttributes: rule.globalAttributes,
+    translationClasses: rule.translationClasses,
+    ...(rule.wrapperPrefix !== undefined ? { wrapperPrefix: rule.wrapperPrefix } : {}),
+    ...(rule.wrapperSuffix !== undefined ? { wrapperSuffix: rule.wrapperSuffix } : {}),
     filterRule: compileFilterRule(rule),
     observeUrlChange: rule.observeUrlChange ?? DEFAULT_SITE_POLICY.observeUrlChange,
     urlChangeDelay: rule.urlChangeDelay ?? DEFAULT_SITE_POLICY.urlChangeDelay,
@@ -1381,7 +1405,7 @@ function isSameRuleFamily(base: WebTranslationRule, candidate: WebTranslationRul
 }
 
 function normalizedRuleSiteKey(rule: WebTranslationRule, hostname: string): string | undefined {
-  const raw = rule.siteKey ?? rule.matches?.[0];
+  const raw = rule.siteKey ?? listValue(rule.matches)[0];
   if (!raw && rule === GENERAL_WEB_TRANSLATION_RULE) return normalizeHostname(hostname);
   const host = parseRuleHost(raw);
   return host?.replace(/^www\./, "").replace(/^\*\./, "").toLowerCase();
@@ -1408,19 +1432,26 @@ function mergeOneRule(base: ResolvedWebTranslationRule, delta: WebTranslationRul
     id: delta.id,
     ...(siteKey ? { siteKey } : {}),
     ...(bodyRule ? { bodyRule } : {}),
-    selectors: mergeArray(base.selectors, delta.selectors),
-    excludeSelectors: mergeArray(base.excludeSelectors, delta.excludeSelectors),
+    selectors: mergeArray(mergeArray(base.selectors, delta.selectors), addOnly(delta.additionalSelectors)),
+    excludeSelectors: mergeArray(mergeArray(base.excludeSelectors, delta.excludeSelectors), addOnly(delta.additionalExcludeSelectors)),
+    excludeTags: mergeArray(mergeArray(base.excludeTags, delta.excludeTags), addOnly(delta.additionalExcludeTags), upperKey)
+      .map((tag) => tag.toUpperCase()),
     mutationExcludeSelectors: mergeArray(base.mutationExcludeSelectors, delta.mutationExcludeSelectors),
-    injectedCss: mergeArray(base.injectedCss, delta.injectedCss),
+    injectedCss: mergeArray(mergeArray(base.injectedCss, delta.injectedCss), addOnly(delta.additionalInjectedCss)),
     extraBlockSelectors: mergeArray(base.extraBlockSelectors, delta.extraBlockSelectors),
     extraInlineSelectors: mergeArray(base.extraInlineSelectors, delta.extraInlineSelectors),
     atomicBlockSelectors: mergeArray(base.atomicBlockSelectors, delta.atomicBlockSelectors),
+    inlineTags: mergeArray(base.inlineTags, delta.inlineTags, upperKey).map((tag) => tag.toUpperCase()),
+    preWhitespaceDetectedTags: mergeArray(base.preWhitespaceDetectedTags, delta.preWhitespaceDetectedTags, upperKey)
+      .map((tag) => tag.toUpperCase()),
     buildContainerSelectors: mergeArray(base.buildContainerSelectors, delta.buildContainerSelectors),
     skipBuildContainerSelectors: mergeArray(base.skipBuildContainerSelectors, delta.skipBuildContainerSelectors),
     stayOriginalSelectors: mergeArray(base.stayOriginalSelectors, delta.stayOriginalSelectors),
-    stayOriginalTags: mergeArray(base.stayOriginalTags, delta.stayOriginalTags, (tag) => String(tag).toUpperCase())
+    stayOriginalTags: mergeArray(base.stayOriginalTags, delta.stayOriginalTags, upperKey)
       .map((tag) => tag.toUpperCase()),
     globalStyles: mergeRecord(base.globalStyles, delta.globalStyles),
+    globalAttributes: mergeRecord(base.globalAttributes, delta.globalAttributes),
+    translationClasses: mergeArray(base.translationClasses, delta.translationClasses),
     contentSelectors: mergeArray(base.contentSelectors, delta.contentSelectors, contentSelectorKey),
     attributeNames: mergeArray(base.attributeNames, delta.attributeNames),
   };
@@ -1432,18 +1463,24 @@ function toResolvedRule(rule: WebTranslationRule): ResolvedWebTranslationRule {
     ruleId: rule.id,
     ruleSource: rule.ruleSource ?? "core",
     mergedRuleIds: [rule.id],
-    selectors: arrayValue(rule.selectors),
-    excludeSelectors: arrayValue(rule.excludeSelectors),
+    selectors: mergeArray(arrayValue(rule.selectors), addOnly(rule.additionalSelectors)),
+    excludeSelectors: mergeArray(arrayValue(rule.excludeSelectors), addOnly(rule.additionalExcludeSelectors)),
+    excludeTags: mergeArray(arrayValue(rule.excludeTags), addOnly(rule.additionalExcludeTags), upperKey)
+      .map((tag) => tag.toUpperCase()),
     mutationExcludeSelectors: arrayValue(rule.mutationExcludeSelectors),
-    injectedCss: arrayValue(rule.injectedCss),
+    injectedCss: mergeArray(arrayValue(rule.injectedCss), addOnly(rule.additionalInjectedCss)),
     extraBlockSelectors: arrayValue(rule.extraBlockSelectors),
     extraInlineSelectors: arrayValue(rule.extraInlineSelectors),
     atomicBlockSelectors: arrayValue(rule.atomicBlockSelectors),
+    inlineTags: arrayValue(rule.inlineTags).map((tag) => tag.toUpperCase()),
+    preWhitespaceDetectedTags: arrayValue(rule.preWhitespaceDetectedTags).map((tag) => tag.toUpperCase()),
     buildContainerSelectors: arrayValue(rule.buildContainerSelectors),
     skipBuildContainerSelectors: arrayValue(rule.skipBuildContainerSelectors),
     stayOriginalSelectors: arrayValue(rule.stayOriginalSelectors),
     stayOriginalTags: arrayValue(rule.stayOriginalTags).map((tag) => tag.toUpperCase()),
     globalStyles: recordValue(rule.globalStyles),
+    globalAttributes: recordValue(rule.globalAttributes),
+    translationClasses: arrayValue(rule.translationClasses),
     contentSelectors: arrayValue(rule.contentSelectors),
     attributeNames: arrayValue(rule.attributeNames),
   };
@@ -1454,17 +1491,26 @@ function normalizeVersionedRuleDeltas(rule: WebTranslationRule): WebTranslationR
   return {
     ...rule,
     ...optionalRuleValue("selectors", withVersionedArrayDeltas(raw, "selectors")),
+    ...optionalRuleValue("additionalSelectors", withVersionedArrayDeltas(raw, "additionalSelectors")),
     ...optionalRuleValue("excludeSelectors", withVersionedArrayDeltas(raw, "excludeSelectors")),
+    ...optionalRuleValue("additionalExcludeSelectors", withVersionedArrayDeltas(raw, "additionalExcludeSelectors")),
+    ...optionalRuleValue("excludeTags", withVersionedArrayDeltas(raw, "excludeTags")),
+    ...optionalRuleValue("additionalExcludeTags", withVersionedArrayDeltas(raw, "additionalExcludeTags")),
     ...optionalRuleValue("mutationExcludeSelectors", withVersionedArrayDeltas(raw, "mutationExcludeSelectors")),
     ...optionalRuleValue("injectedCss", withVersionedArrayDeltas(raw, "injectedCss")),
+    ...optionalRuleValue("additionalInjectedCss", withVersionedArrayDeltas(raw, "additionalInjectedCss")),
     ...optionalRuleValue("extraBlockSelectors", withVersionedArrayDeltas(raw, "extraBlockSelectors")),
     ...optionalRuleValue("extraInlineSelectors", withVersionedArrayDeltas(raw, "extraInlineSelectors")),
     ...optionalRuleValue("atomicBlockSelectors", withVersionedArrayDeltas(raw, "atomicBlockSelectors")),
+    ...optionalRuleValue("inlineTags", withVersionedArrayDeltas(raw, "inlineTags")),
+    ...optionalRuleValue("preWhitespaceDetectedTags", withVersionedArrayDeltas(raw, "preWhitespaceDetectedTags")),
     ...optionalRuleValue("buildContainerSelectors", withVersionedArrayDeltas(raw, "buildContainerSelectors")),
     ...optionalRuleValue("skipBuildContainerSelectors", withVersionedArrayDeltas(raw, "skipBuildContainerSelectors")),
     ...optionalRuleValue("stayOriginalSelectors", withVersionedArrayDeltas(raw, "stayOriginalSelectors")),
     ...optionalRuleValue("stayOriginalTags", withVersionedArrayDeltas(raw, "stayOriginalTags")),
     ...optionalRuleValue("globalStyles", withVersionedRecordDeltas(raw, "globalStyles")),
+    ...optionalRuleValue("globalAttributes", withVersionedRecordDeltas(raw, "globalAttributes")),
+    ...optionalRuleValue("translationClasses", withVersionedArrayDeltas(raw, "translationClasses")),
   };
 }
 
@@ -1481,19 +1527,34 @@ function mergeArray<T>(
   keyOf: (item: T) => string = (item) => String(item),
 ): readonly T[] {
   if (!value) return base;
-  if (isRuleArray(value)) return unique(value, keyOf);
+  if (!isRuleArrayOperation(value)) return unique(listValue(value), keyOf);
 
-  let next = value.replace ? [...value.replace] : [...base];
-  const removeKeys = new Set((value.remove ?? []).map(keyOf));
+  let next = value.replace !== undefined ? [...listValue(value.replace)] : [...base];
+  const removeKeys = new Set(listValue(value.remove).map(keyOf));
   next = next.filter((item) => !removeKeys.has(keyOf(item)));
-  if (value.add) next.push(...value.add);
+  next.push(...listValue(value.add));
   return unique(next, keyOf);
 }
 
 function arrayValue<T>(value: RuleArrayValue<T> | undefined): readonly T[] {
   if (!value) return [];
-  if (isRuleArray(value)) return unique(value);
-  return unique(value.replace ?? value.add ?? []);
+  if (!isRuleArrayOperation(value)) return unique(listValue(value));
+  return unique(value.replace !== undefined ? listValue(value.replace) : listValue(value.add));
+}
+
+function addOnly<T>(value: RuleArrayValue<T> | undefined): RuleArrayValue<T> | undefined {
+  if (!value) return undefined;
+  if (!isRuleArrayOperation(value)) return { add: listValue(value) };
+  return {
+    ...(value.replace !== undefined ? { replace: listValue(value.replace) } : {}),
+    ...(value.add !== undefined ? { add: listValue(value.add) } : {}),
+    ...(value.remove !== undefined ? { remove: listValue(value.remove) } : {}),
+  };
+}
+
+function listValue<T>(value: T | readonly T[] | undefined): readonly T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value as readonly T[] : [value as T];
 }
 
 function withVersionedArrayDeltas<T extends string | RuleContentSelector | TranslatableAttributeName>(
@@ -1501,21 +1562,31 @@ function withVersionedArrayDeltas<T extends string | RuleContentSelector | Trans
   field: keyof WebTranslationRule,
 ): RuleArrayValue<T> | undefined {
   const direct = rule[field] as RuleArrayValue<T> | undefined;
+  let replace: T[] | undefined;
   const add: T[] = [];
   const remove: T[] = [];
 
   for (const [key, value] of Object.entries(rule)) {
+    if (key === `${String(field)}.replace`) replace = arrayLikeValue<T>(value);
+    if (key === `${String(field)}.add`) add.push(...arrayLikeValue<T>(value));
+    if (key === `${String(field)}.remove`) remove.push(...arrayLikeValue<T>(value));
     if (key.startsWith(`${String(field)}.add_v.`)) add.push(...arrayLikeValue<T>(value));
     if (key.startsWith(`${String(field)}.remove_v.`)) remove.push(...arrayLikeValue<T>(value));
   }
 
-  if (add.length === 0 && remove.length === 0) return direct;
-  if (!direct) return { add, remove };
-  if (isRuleArray(direct)) return { replace: direct, add, remove };
+  if (replace === undefined && add.length === 0 && remove.length === 0) return direct;
+  if (!direct) return { ...(replace !== undefined ? { replace } : {}), add, remove };
+  if (!isRuleArrayOperation(direct)) {
+    return { replace: replace ?? listValue(direct), add, remove };
+  }
   return {
-    ...(direct.replace ? { replace: direct.replace } : {}),
-    add: [...(direct.add ?? []), ...add],
-    remove: [...(direct.remove ?? []), ...remove],
+    ...(replace !== undefined
+      ? { replace }
+      : direct.replace !== undefined
+        ? { replace: listValue(direct.replace) }
+        : {}),
+    add: [...listValue(direct.add), ...add],
+    remove: [...listValue(direct.remove), ...remove],
   };
 }
 
@@ -1542,19 +1613,23 @@ function withVersionedRecordDeltas<T>(
   field: keyof WebTranslationRule,
 ): RuleRecordValue<T> | undefined {
   const direct = rule[field] as RuleRecordValue<T> | undefined;
+  let replace: Record<string, T> | undefined;
   const add: Record<string, T> = {};
   const remove: string[] = [];
 
   for (const [key, value] of Object.entries(rule)) {
+    if (key === `${String(field)}.replace`) replace = recordLikeValue<T>(value);
+    if (key === `${String(field)}.add`) Object.assign(add, recordLikeValue<T>(value));
+    if (key === `${String(field)}.remove`) remove.push(...arrayLikeValue<string>(value));
     if (key.startsWith(`${String(field)}.add_v.`)) Object.assign(add, recordLikeValue<T>(value));
     if (key.startsWith(`${String(field)}.remove_v.`)) remove.push(...arrayLikeValue<string>(value));
   }
 
-  if (Object.keys(add).length === 0 && remove.length === 0) return direct;
-  if (!direct) return { add, remove };
-  if (isRuleRecord(direct)) return { replace: direct, add, remove };
+  if (replace === undefined && Object.keys(add).length === 0 && remove.length === 0) return direct;
+  if (!direct) return { ...(replace !== undefined ? { replace } : {}), add, remove };
+  if (isRuleRecord(direct)) return { replace: replace ?? direct, add, remove };
   return {
-    ...(direct.replace ? { replace: direct.replace } : {}),
+    ...(replace !== undefined ? { replace } : direct.replace ? { replace: direct.replace } : {}),
     add: { ...(direct.add ?? {}), ...add },
     remove: [...(direct.remove ?? []), ...remove],
   };
@@ -1562,6 +1637,17 @@ function withVersionedRecordDeltas<T>(
 
 function isRuleArray<T>(value: RuleArrayValue<T>): value is readonly T[] {
   return Array.isArray(value);
+}
+
+function isRuleArrayOperation<T>(
+  value: RuleArrayValue<T> | undefined,
+): value is { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      ("replace" in value || "add" in value || "remove" in value),
+  );
 }
 
 function isRuleRecord<T>(value: RuleRecordValue<T>): value is Readonly<Record<string, T>> {
@@ -1592,6 +1678,10 @@ function unique<T>(items: readonly T[], keyOf: (item: T) => string = (item) => S
 
 function contentSelectorKey(item: RuleContentSelector): string {
   return `${item.selector}:${item.category}`;
+}
+
+function upperKey(item: string): string {
+  return item.toUpperCase();
 }
 
 function globalStylesToCss(globalStyles: Readonly<Record<string, string>>): string[] {

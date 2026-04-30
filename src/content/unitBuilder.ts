@@ -29,6 +29,9 @@ type BuildInput = {
   contentSelectors?: GranularityOptions["contentSelectors"];
   excludeSelectors?: GranularityOptions["excludeSelectors"];
   filterRule?: CompiledFilterRule;
+  translationClasses?: readonly string[];
+  wrapperPrefix?: string;
+  wrapperSuffix?: string;
   diagnostics?: TranslationDiagnostics;
 };
 
@@ -81,6 +84,9 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       targetLang: input.targetLang,
       category,
       renderMode: decideRenderMode(category, root, originalText),
+      ...(input.translationClasses ? { translationClasses: input.translationClasses } : {}),
+      ...(input.wrapperPrefix !== undefined ? { wrapperPrefix: input.wrapperPrefix } : {}),
+      ...(input.wrapperSuffix !== undefined ? { wrapperSuffix: input.wrapperSuffix } : {}),
       priority: priorityForCategory(category),
       state: "pending",
     });
@@ -100,6 +106,9 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       targetLang: input.targetLang,
       category: "attribute",
       renderMode: "replace-attribute",
+      ...(input.translationClasses ? { translationClasses: input.translationClasses } : {}),
+      ...(input.wrapperPrefix !== undefined ? { wrapperPrefix: input.wrapperPrefix } : {}),
+      ...(input.wrapperSuffix !== undefined ? { wrapperSuffix: input.wrapperSuffix } : {}),
       priority: priorityForCategory("attribute"),
       state: "pending",
     });

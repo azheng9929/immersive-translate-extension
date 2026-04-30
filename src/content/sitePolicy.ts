@@ -2,6 +2,7 @@ import type { DynamicMode } from "../shared/config";
 import type {
   WebTranslationBodyRule,
   WebTranslationFallbackProfile,
+  WebTranslationGlobalAttributes,
   WebTranslationRuleCapability,
   WebTranslationRuleSource,
 } from "../shared/webRuleTypes";
@@ -61,6 +62,10 @@ export type SitePolicy = {
   mutationWindowMs: number;
   excludedDynamicSelectors: readonly string[];
   injectedCss: readonly string[];
+  globalAttributes: WebTranslationGlobalAttributes;
+  translationClasses: readonly string[];
+  wrapperPrefix?: string;
+  wrapperSuffix?: string;
   filterRule: CompiledFilterRule;
   observeUrlChange: boolean;
   urlChangeDelay: number;

@@ -156,6 +156,48 @@ describe("webTranslationRules", () => {
     });
   });
 
+  it("supports documented flat user-rule deltas and compatibility aliases", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "custom",
+        matches: "example.com",
+        "selectors.add": ".extra-body",
+        "excludeSelectors.remove": "nav",
+        additionalSelectors: ".legacy-extra",
+        additionalExcludeSelectors: ".legacy-skip",
+        additionalInjectedCss: ".legacy-extra { max-height: unset; }",
+        "excludeTags.add": ["ASIDE"],
+        "inlineTags.add": "MARK",
+        translationClasses: "imt-user-style",
+        globalAttributes: {
+          ".clamped": {
+            "data-expanded": "true",
+            title: null,
+          },
+        },
+        wrapperPrefix: "「",
+        wrapperSuffix: "」",
+      } as unknown as WebTranslationRule),
+      "example.com",
+      "normal",
+    );
+
+    expect(policy.preferredScanRootSelectors).toEqual(["main p", "article p", ".extra-body", ".legacy-extra"]);
+    expect(policy.excludeSelectors).toEqual(["footer", ".legacy-skip"]);
+    expect(policy.injectedCss).toContain(".legacy-extra { max-height: unset; }");
+    expect(policy.filterRule.excludeTags).toContain("ASIDE");
+    expect(policy.filterRule.inlineTags).toContain("MARK");
+    expect(policy.translationClasses).toEqual(["imt-user-style"]);
+    expect(policy.globalAttributes).toEqual({
+      ".clamped": {
+        "data-expanded": "true",
+        title: null,
+      },
+    });
+    expect(policy.wrapperPrefix).toBe("「");
+    expect(policy.wrapperSuffix).toBe("」");
+  });
+
   it("keeps body and container rule fields in compiled site policy", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

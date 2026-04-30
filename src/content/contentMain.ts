@@ -37,6 +37,7 @@ export async function runContentMain(): Promise<void> {
     let pageRules = await loadWebRules(window.location.href);
     const sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
     injectSitePolicyCss(sitePolicy);
+    let cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
     let pageSession = createPageSession(config, pageRules);
     let selectionTranslator = createSelectionTranslator(config);
     let inputTranslator = config.showInputTranslator ? createInputTranslator(config) : undefined;
@@ -96,9 +97,12 @@ export async function runContentMain(): Promise<void> {
           pageSession.restorePage();
           pageSession.dispose();
           debugOverlay?.unmount();
+          cleanupSitePolicyAttributes();
           config = nextConfig;
           pageRules = await loadWebRules(window.location.href);
-          injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules }));
+          const nextSitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+          injectSitePolicyCss(nextSitePolicy);
+          cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(nextSitePolicy);
           pageSession = createPageSession(config, pageRules);
           debugOverlay = createDebugOverlay(config, pageSession);
           cancelAutoTranslate = scheduleAutoTranslate(config, () => pageSession.translatePage());
@@ -185,6 +189,9 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     excludeSelectors: sitePolicy.excludeSelectors,
     contentSelectors: sitePolicy.contentSelectors,
     filterRule: sitePolicy.filterRule,
+    translationClasses: sitePolicy.translationClasses,
+    ...(sitePolicy.wrapperPrefix !== undefined ? { wrapperPrefix: sitePolicy.wrapperPrefix } : {}),
+    ...(sitePolicy.wrapperSuffix !== undefined ? { wrapperSuffix: sitePolicy.wrapperSuffix } : {}),
     allowTooltip: sitePolicy.allowTooltip,
     getPageTitle: readPageTitleContext,
     ...progressivePageBatchOptions(config),
@@ -271,6 +278,31 @@ function injectSitePolicyCss(sitePolicy: SitePolicy): void {
   style.dataset.imtManaged = "true";
   style.textContent = sitePolicy.injectedCss.join("\n");
   (document.head || document.documentElement).append(style);
+}
+
+function applySitePolicyGlobalAttributes(sitePolicy: SitePolicy): () => void {
+  const records: Array<{ element: Element; attribute: string; originalValue: string | null }> = [];
+
+  for (const [selector, attributes] of Object.entries(sitePolicy.globalAttributes)) {
+    try {
+      document.querySelectorAll(selector).forEach((element) => {
+        for (const [attribute, value] of Object.entries(attributes)) {
+          records.push({ element, attribute, originalValue: element.getAttribute(attribute) });
+          if (value === null) element.removeAttribute(attribute);
+          else element.setAttribute(attribute, value);
+        }
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return () => {
+    for (const record of records.reverse()) {
+      if (record.originalValue === null) record.element.removeAttribute(record.attribute);
+      else record.element.setAttribute(record.attribute, record.originalValue);
+    }
+  };
 }
 
 function createSelectionTranslator(config: ExtensionConfig): SelectionTranslator {
