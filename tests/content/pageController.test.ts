@@ -267,6 +267,38 @@ describe("PageController", () => {
     expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
   });
 
+  it("requests duplicate cache-key text only once and renders every matching unit", async () => {
+    document.body.innerHTML = `
+      <main>
+        <p id="first">Repeated sentence.</p>
+        <p id="second">Repeated sentence.</p>
+        <button id="action">Repeated sentence.</button>
+      </main>
+    `;
+    const requestedTextsByCall: string[][] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      providerId: "mock",
+      translateBatch: async (items) => {
+        requestedTextsByCall.push(items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(requestedTextsByCall).toEqual([["Repeated sentence."]]);
+    expect(result).toEqual({
+      total: 3,
+      translated: 3,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(document.querySelector("#first .imt-translation-block")?.textContent).toBe("[zh-Hans] Repeated sentence.");
+    expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Repeated sentence.");
+    expect(document.querySelector("#action")?.textContent).toBe("[zh-Hans] Repeated sentence.");
+  });
+
   it("keys cached translations by page title context", async () => {
     document.body.innerHTML = `<main><p>Comps</p></main>`;
     const cache = new MemoryTranslationCache();

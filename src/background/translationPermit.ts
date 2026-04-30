@@ -2,7 +2,12 @@ import type { ProviderId } from "./providers/providerTypes";
 
 type PermitState = {
   active: number;
-  queue: (() => void)[];
+  queue: PermitQueueEntry[];
+};
+
+type PermitQueueEntry = {
+  resolve: () => void;
+  reject: (error: Error) => void;
 };
 
 const states = new Map<ProviderId, PermitState>();
@@ -27,10 +32,10 @@ export function resetTranslationPermitStateForTests(): void {
 export function clearTranslationPermitQueues(provider?: ProviderId): void {
   if (provider) {
     const state = states.get(provider);
-    if (state) state.queue = [];
+    if (state) rejectQueuedPermits(state);
     return;
   }
-  for (const state of states.values()) state.queue = [];
+  for (const state of states.values()) rejectQueuedPermits(state);
 }
 
 async function acquireTranslationPermit(
@@ -45,8 +50,8 @@ async function acquireTranslationPermit(
     return () => releasePermit(provider);
   }
 
-  await new Promise<void>((resolve) => {
-    state.queue.push(resolve);
+  await new Promise<void>((resolve, reject) => {
+    state.queue.push({ resolve, reject });
   });
   state.active += 1;
   return () => releasePermit(provider);
@@ -55,7 +60,12 @@ async function acquireTranslationPermit(
 function releasePermit(provider: ProviderId): void {
   const state = getState(provider);
   state.active = Math.max(0, state.active - 1);
-  state.queue.shift()?.();
+  state.queue.shift()?.resolve();
+}
+
+function rejectQueuedPermits(state: PermitState): void {
+  const queued = state.queue.splice(0);
+  for (const entry of queued) entry.reject(new Error("Translation queue cleared"));
 }
 
 function getState(provider: ProviderId): PermitState {

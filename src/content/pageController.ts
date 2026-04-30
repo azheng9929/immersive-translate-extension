@@ -21,6 +21,7 @@ import {
 type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
 type MissingUnit = { unit: TranslationUnit; item: BatchItem };
+type MissingUnitGroup = { item: BatchItem; entries: MissingUnit[] };
 export type TranslationProgressDelta = TranslationPageSummary;
 export type TranslationProgressListener = (delta: TranslationProgressDelta) => void;
 type TranslationRetryOptions = {
@@ -174,7 +175,7 @@ export class PageController {
     };
 
     const lookupByUnitId = this.buildCacheLookups(units);
-    const cacheHits = await this.readCache([...lookupByUnitId.values()]);
+    const cacheHits = await this.readCache(uniqueTranslationCacheLookups([...lookupByUnitId.values()]));
     if (revision !== this.revision) return summary;
 
     const missingUnits: TranslationUnit[] = [];
@@ -388,8 +389,9 @@ export class PageController {
   ): Promise<void> {
     if (missingUnits.length === 0) return;
 
-    const chunks = chunkMissingUnits(
-      missingUnits,
+    const groups = groupMissingUnitsByCacheKey(missingUnits, lookupByUnitId);
+    const chunks = chunkMissingUnitGroups(
+      groups,
       this.progressiveBatchItems(missingUnits.length),
       this.progressiveBatchChars(),
     );
@@ -401,25 +403,27 @@ export class PageController {
         const chunk = chunks[nextChunkIndex];
         nextChunkIndex += 1;
         if (!chunk) return;
-        await this.translateMissingUnitChunk(chunk, lookupByUnitId, cacheWrites, summary, revision, onProgress);
+        await this.translateMissingUnitGroupChunk(chunk, lookupByUnitId, cacheWrites, summary, revision, onProgress);
       }
     };
 
     await Promise.all(Array.from({ length: workerCount }, runWorker));
   }
 
-  private async translateMissingUnitChunk(
-    missingUnits: MissingUnit[],
+  private async translateMissingUnitGroupChunk(
+    missingUnitGroups: MissingUnitGroup[],
     lookupByUnitId: Map<string, TranslationCacheLookup>,
     cacheWrites: TranslationCacheWrite[],
     summary: TranslationPageSummary,
     revision: number,
     onProgress: TranslationProgressListener | undefined,
   ): Promise<void> {
-    const batch = missingUnits.map((entry) => entry.item);
-    for (const { unit } of missingUnits) {
-      if (this.renderState !== "original") this.records.push(...renderTranslationLoading(unit));
-      unit.state = "loading";
+    const batch = missingUnitGroups.map((group) => group.item);
+    for (const group of missingUnitGroups) {
+      for (const { unit } of group.entries) {
+        if (this.renderState !== "original") this.records.push(...renderTranslationLoading(unit));
+        unit.state = "loading";
+      }
     }
 
     const results = await this.translateBatchWithRetries(batch);
@@ -432,26 +436,31 @@ export class PageController {
     const resultById = new Map(results.map((result) => [result.id, result]));
     const delta: TranslationProgressDelta = { total: 0, translated: 0, failed: 0, skipped: 0 };
 
-    for (const { unit } of missingUnits) {
-      const result = resultById.get(unit.id);
-      removeTranslationLoading(unit);
-      if (!result || result.status !== "ok") {
-        unit.state = result?.status === "skipped" ? "skipped" : "failed";
-        if (unit.state === "skipped") {
-          summary.skipped += 1;
-          delta.skipped += 1;
-        } else {
-          summary.failed += 1;
-          delta.failed += 1;
+    for (const group of missingUnitGroups) {
+      const result = resultById.get(group.item.id);
+      for (const { unit } of group.entries) {
+        removeTranslationLoading(unit);
+        if (!result || result.status !== "ok") {
+          unit.state = result?.status === "skipped" ? "skipped" : "failed";
+          if (unit.state === "skipped") {
+            summary.skipped += 1;
+            delta.skipped += 1;
+          } else {
+            summary.failed += 1;
+            delta.failed += 1;
+          }
+          continue;
         }
-        continue;
+
+        this.applyTranslation(unit, result.text);
+        summary.translated += 1;
+        delta.translated += 1;
       }
 
-      this.applyTranslation(unit, result.text);
-      summary.translated += 1;
-      delta.translated += 1;
-      const lookup = lookupByUnitId.get(unit.id);
-      if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
+      if (result?.status === "ok") {
+        const lookup = lookupByUnitId.get(group.item.id);
+        if (lookup) cacheWrites.push({ ...lookup, translatedText: result.text });
+      }
     }
 
     notifyProgress(onProgress, delta);
@@ -499,13 +508,34 @@ function sleep(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-function chunkMissingUnits(missingUnits: MissingUnit[], maxItems: number, maxChars: number): MissingUnit[][] {
-  const chunks: MissingUnit[][] = [];
-  let chunk: MissingUnit[] = [];
-  let chunkChars = 0;
+function groupMissingUnitsByCacheKey(
+  missingUnits: MissingUnit[],
+  lookupByUnitId: Map<string, TranslationCacheLookup>,
+): MissingUnitGroup[] {
+  const groups: MissingUnitGroup[] = [];
+  const groupByKey = new Map<string, MissingUnitGroup>();
 
   for (const entry of missingUnits) {
-    const itemChars = entry.item.text.length;
+    const key = lookupByUnitId.get(entry.unit.id)?.key ?? `${entry.item.category}\u001f${entry.item.text}`;
+    let group = groupByKey.get(key);
+    if (!group) {
+      group = { item: entry.item, entries: [] };
+      groupByKey.set(key, group);
+      groups.push(group);
+    }
+    group.entries.push(entry);
+  }
+
+  return groups;
+}
+
+function chunkMissingUnitGroups(groups: MissingUnitGroup[], maxItems: number, maxChars: number): MissingUnitGroup[][] {
+  const chunks: MissingUnitGroup[][] = [];
+  let chunk: MissingUnitGroup[] = [];
+  let chunkChars = 0;
+
+  for (const group of groups) {
+    const itemChars = group.item.text.length;
     const wouldOverflowItems = chunk.length >= maxItems;
     const wouldOverflowChars = chunk.length > 0 && chunkChars + itemChars > maxChars;
     if (wouldOverflowItems || wouldOverflowChars) {
@@ -514,12 +544,16 @@ function chunkMissingUnits(missingUnits: MissingUnit[], maxItems: number, maxCha
       chunkChars = 0;
     }
 
-    chunk.push(entry);
+    chunk.push(group);
     chunkChars += itemChars;
   }
 
   if (chunk.length > 0) chunks.push(chunk);
   return chunks;
+}
+
+function uniqueTranslationCacheLookups(lookups: TranslationCacheLookup[]): TranslationCacheLookup[] {
+  return [...new Map(lookups.map((lookup) => [lookup.key, lookup])).values()];
 }
 
 function notifyProgress(listener: TranslationProgressListener | undefined, delta: TranslationProgressDelta): void {
