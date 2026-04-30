@@ -94,6 +94,10 @@ const DEFAULT_SITE_POLICY = {
   lazyThreshold: 0.1,
   eagerLazyRootMargin: "900px",
   maxEagerLazyRoots: 120,
+  viewportSupplement: false,
+  viewportSupplementDebounceMs: 700,
+  viewportSupplementRootMargin: "700px",
+  viewportSupplementMaxRoots: 20,
   maxQueueSize: 300,
   maxRootsPerFlush: 20,
   maxObservedRoots: 300,
@@ -133,6 +137,10 @@ const DYNAMIC_PRESETS = {
     lazyRootMargin: "700px",
     eagerLazyRootMargin: "900px",
     maxEagerLazyRoots: 80,
+    viewportSupplement: true,
+    viewportSupplementDebounceMs: 700,
+    viewportSupplementRootMargin: "900px",
+    viewportSupplementMaxRoots: 20,
     maxQueueSize: 120,
     maxRootsPerFlush: 12,
     maxObservedRoots: 160,
@@ -546,6 +554,14 @@ export function compileRulePolicy(
     ...(rule.lazyThreshold !== undefined ? { lazyThreshold: rule.lazyThreshold } : {}),
     ...(rule.eagerLazyRootMargin !== undefined ? { eagerLazyRootMargin: rule.eagerLazyRootMargin } : {}),
     ...(rule.maxEagerLazyRoots !== undefined ? { maxEagerLazyRoots: rule.maxEagerLazyRoots } : {}),
+    ...(rule.viewportSupplement !== undefined ? { viewportSupplement: rule.viewportSupplement } : {}),
+    ...(rule.viewportSupplementDebounceMs !== undefined
+      ? { viewportSupplementDebounceMs: rule.viewportSupplementDebounceMs }
+      : {}),
+    ...(rule.viewportSupplementRootMargin !== undefined
+      ? { viewportSupplementRootMargin: rule.viewportSupplementRootMargin }
+      : {}),
+    ...(rule.viewportSupplementMaxRoots !== undefined ? { viewportSupplementMaxRoots: rule.viewportSupplementMaxRoots } : {}),
     ...(rule.maxQueueSize !== undefined ? { maxQueueSize: rule.maxQueueSize } : {}),
     ...(rule.maxRootsPerFlush !== undefined ? { maxRootsPerFlush: rule.maxRootsPerFlush } : {}),
     ...(rule.maxObservedRoots !== undefined ? { maxObservedRoots: rule.maxObservedRoots } : {}),

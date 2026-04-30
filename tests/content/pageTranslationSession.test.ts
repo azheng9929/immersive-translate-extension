@@ -10,6 +10,7 @@ describe("PageTranslationSession", () => {
     session = undefined;
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    setVisibilityState("visible");
     document.body.innerHTML = "";
   });
 
@@ -315,6 +316,60 @@ describe("PageTranslationSession", () => {
 
     expect(requestedTexts).toEqual(["Hello world.", "Late content."]);
     expect(session.getStatus()).toMatchObject({ phase: "translated", observation: "observing", dynamicRuns: 1 });
+  });
+
+  it("supplements high-dynamic visible tweet text on scroll without translating hover cards", async () => {
+    vi.useFakeTimers();
+    setVisibilityState("hidden");
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <div data-testid="tweetText" id="first">First visible English tweet.</div>
+        </article>
+      </main>
+    `;
+    setElementRect(document.querySelector("#first")!, { top: 20, bottom: 80, left: 0, right: 300 });
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: ['[data-testid="tweetText"]'],
+      excludeSelectors: ['[data-testid="HoverCard"]'],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      dynamicMode: "conservative",
+      viewportSupplement: true,
+      viewportSupplementDebounceMs: 20,
+      viewportSupplementRootMargin: "120px",
+      viewportSupplementMaxRoots: 4,
+      excludedDynamicSelectors: ['[data-testid="HoverCard"]', '[data-imt-state="translated"]'],
+    });
+
+    await session.translatePage();
+    expect(session.getStatus().observation).toBe("paused");
+
+    const secondTweet = document.createElement("article");
+    secondTweet.innerHTML = `<div data-testid="tweetText" id="second">Second visible English tweet.</div>`;
+    document.querySelector("main")?.append(secondTweet);
+    const hoverCard = document.createElement("div");
+    hoverCard.setAttribute("data-testid", "HoverCard");
+    hoverCard.innerHTML = `<div data-testid="tweetText" id="hover">Hover card English text.</div>`;
+    document.body.append(hoverCard);
+    setElementRect(document.querySelector("#second")!, { top: 100, bottom: 160, left: 0, right: 300 });
+    setElementRect(document.querySelector("#hover")!, { top: 120, bottom: 180, left: 0, right: 300 });
+
+    window.dispatchEvent(new Event("scroll"));
+    await vi.advanceTimersByTimeAsync(20);
+    await waitFor(() => requestedTexts.includes("Second visible English tweet."));
+
+    expect(requestedTexts).toEqual(["First visible English tweet.", "Second visible English tweet."]);
+    expect(document.body.textContent).toContain("[zh-Hans] Second visible English tweet.");
+    expect(document.querySelector("#hover .imt-translation-block")).toBeNull();
+    expect(session.getStatus()).toMatchObject({ phase: "translated", dynamicRuns: 1 });
   });
 
   it("retranslates the page after SPA pushState route changes", async () => {

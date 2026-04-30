@@ -63,6 +63,10 @@ export type WebTranslationRule = {
   lazyThreshold?: number;
   eagerLazyRootMargin?: string;
   maxEagerLazyRoots?: number;
+  viewportSupplement?: boolean;
+  viewportSupplementDebounceMs?: number;
+  viewportSupplementRootMargin?: string;
+  viewportSupplementMaxRoots?: number;
   maxQueueSize?: number;
   maxRootsPerFlush?: number;
   maxObservedRoots?: number;

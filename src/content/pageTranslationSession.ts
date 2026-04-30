@@ -38,6 +38,10 @@ type PageTranslationSessionOptions = {
   eagerLazyRootMargin?: string;
   maxEagerLazyRoots?: number;
   viewportFirst?: boolean;
+  viewportSupplement?: boolean;
+  viewportSupplementDebounceMs?: number;
+  viewportSupplementRootMargin?: string;
+  viewportSupplementMaxRoots?: number;
   lazyDiscoveryDelayMs?: number;
   dynamicMode?: DynamicTranslationMode;
   excludedDynamicSelectors?: readonly string[];
@@ -97,9 +101,12 @@ export class PageTranslationSession {
   private listeningForUrlChange = false;
   private lastObservedUrl = globalThis.location?.href ?? "";
   private urlChangeTimer: ReturnType<typeof setTimeout> | undefined;
+  private viewportSupplementTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly handleVisibilityChangeBound = () => this.handleVisibilityChange();
   private readonly handleUrlChangeBound = () => this.handleUrlChange();
+  private readonly handleViewportScrollBound = () => this.handleViewportScroll();
   private renderState: PageRenderState;
+  private listeningForViewportScroll = false;
 
   constructor(
     private readonly controller: PageController,
@@ -229,9 +236,11 @@ export class PageTranslationSession {
   private activateDynamicObserver(phase: PageTranslationPhase = this.status.phase): DynamicObservationState {
     this.disconnectMutationObserver();
     this.removeUrlChangeListener();
+    this.updateViewportSupplementListener(canSupplement(phase) && this.dynamicMode() !== "off" && !this.dynamicSuspended);
     if (this.dynamicSuspended) return "suspended";
     if (!canSupplement(phase) || this.dynamicMode() === "off") {
       this.removeVisibilityListener();
+      this.removeViewportSupplementListener();
       return "inactive";
     }
     this.addVisibilityListener();
@@ -284,6 +293,11 @@ export class PageTranslationSession {
       clearTimeout(this.urlChangeTimer);
       this.urlChangeTimer = undefined;
     }
+    if (this.viewportSupplementTimer) {
+      clearTimeout(this.viewportSupplementTimer);
+      this.viewportSupplementTimer = undefined;
+    }
+    this.removeViewportSupplementListener();
   }
 
   private handleMutations(mutations: MutationRecord[]): void {
@@ -360,6 +374,39 @@ export class PageTranslationSession {
         this.scheduleFlush(0);
       }
     }, Math.max(0, this.options.urlChangeDelay ?? 250));
+  }
+
+  private handleViewportScroll(): void {
+    if (!this.options.viewportSupplement || !this.canHandleDynamicMutations()) return;
+    this.scheduleViewportSupplement();
+  }
+
+  private scheduleViewportSupplement(delayMs = this.viewportSupplementDebounceMs()): void {
+    if (!this.options.viewportSupplement || this.dynamicSuspended || !this.canHandleDynamicMutations()) return;
+    if (this.viewportSupplementTimer) clearTimeout(this.viewportSupplementTimer);
+    if (this.isPageVisible()) this.setStatus({ ...this.status, observation: "queued" });
+    this.viewportSupplementTimer = setTimeout(() => {
+      this.viewportSupplementTimer = undefined;
+      void this.flushViewportSupplement();
+    }, delayMs);
+  }
+
+  private async flushViewportSupplement(): Promise<void> {
+    if (!this.options.viewportSupplement || !this.canHandleDynamicMutations()) return;
+    const root = this.options.observeRoot ?? document.body;
+    if (!(root instanceof HTMLElement)) return;
+
+    const roots = this.controller.collectViewportTranslatableRoots(root, {
+      rootMargin: this.options.viewportSupplementRootMargin ?? this.options.eagerLazyRootMargin ?? "900px",
+      maxRoots: this.options.viewportSupplementMaxRoots ?? this.maxRootsPerFlush(),
+    }).filter((candidate) => candidate.isConnected && !this.shouldIgnoreRoot(candidate));
+
+    if (roots.length === 0) {
+      this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
+      return;
+    }
+
+    await this.translateRoots(roots, true);
   }
 
   private addPendingRoot(
@@ -633,6 +680,11 @@ export class PageTranslationSession {
     this.disconnectMutationObserver();
     this.removeVisibilityListener();
     this.removeUrlChangeListener();
+    this.removeViewportSupplementListener();
+    if (this.viewportSupplementTimer) {
+      clearTimeout(this.viewportSupplementTimer);
+      this.viewportSupplementTimer = undefined;
+    }
     this.setStatus({ ...this.status, observation: "suspended", lastError: SUSPENDED_MESSAGE });
   }
 
@@ -657,6 +709,10 @@ export class PageTranslationSession {
 
   private tooltipDebounceMs(): number {
     return Math.min(this.dynamicDebounceMs(), this.options.tooltipDebounceMs ?? 120);
+  }
+
+  private viewportSupplementDebounceMs(): number {
+    return Math.max(0, this.options.viewportSupplementDebounceMs ?? 700);
   }
 
   private maxQueueSize(): number {
@@ -706,6 +762,26 @@ export class PageTranslationSession {
     window.removeEventListener("hashchange", this.handleUrlChangeBound, false);
     window.removeEventListener(URL_CHANGE_EVENT, this.handleUrlChangeBound, false);
     this.listeningForUrlChange = false;
+  }
+
+  private updateViewportSupplementListener(active: boolean): void {
+    if (active && this.options.viewportSupplement) {
+      this.addViewportSupplementListener();
+      return;
+    }
+    this.removeViewportSupplementListener();
+  }
+
+  private addViewportSupplementListener(): void {
+    if (this.listeningForViewportScroll) return;
+    window.addEventListener("scroll", this.handleViewportScrollBound, { passive: true });
+    this.listeningForViewportScroll = true;
+  }
+
+  private removeViewportSupplementListener(): void {
+    if (!this.listeningForViewportScroll) return;
+    window.removeEventListener("scroll", this.handleViewportScrollBound);
+    this.listeningForViewportScroll = false;
   }
 
   private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics" | "site" | "renderState"> & {

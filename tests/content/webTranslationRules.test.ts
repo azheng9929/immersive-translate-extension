@@ -214,6 +214,20 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
   });
 
+  it("enables scroll viewport supplements for X without broad mutation pressure", () => {
+    const policy = resolveWebTranslationPolicy("https://x.com/home", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "x.com",
+      isHighDynamic: true,
+      dynamicMode: "conservative",
+      maxRootsPerFlush: 12,
+      viewportSupplement: true,
+      viewportSupplementRootMargin: "900px",
+      viewportSupplementMaxRoots: 20,
+    });
+  });
+
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {
