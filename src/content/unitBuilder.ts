@@ -32,7 +32,13 @@ type BuildInput = {
   translationClasses?: readonly string[];
   wrapperPrefix?: string;
   wrapperSuffix?: string;
+  lineBreakMaxTextCount?: number;
   diagnostics?: TranslationDiagnostics;
+};
+
+type TextPart = {
+  text: string;
+  breakBefore: boolean;
 };
 
 const CONTENT_TAGS = new Set(["P", "BLOCKQUOTE", "FIGCAPTION", "ARTICLE"]);
@@ -65,6 +71,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
       ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
       ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
       targetLang: input.targetLang,
+      ...(input.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: input.lineBreakMaxTextCount } : {}),
     }, input.filterRule);
     if (!collected.text) {
       recordUnitDropped(input.diagnostics, collected.skipReason);
@@ -120,11 +127,11 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
 function collectUnitText(
   root: HTMLElement,
   fallbackTextNodes: Text[],
-  options: GranularityOptions & { allowTooltip?: boolean },
+  options: GranularityOptions & { allowTooltip?: boolean; lineBreakMaxTextCount?: number },
   filterRule?: CompiledFilterRule,
 ): { text: string; skipReason?: string } {
   let rawText = "";
-  const textParts: string[] = [];
+  const textParts: TextPart[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
@@ -149,19 +156,27 @@ function collectUnitText(
       !resolveTextGranularity(parent, normalizeVisibleText(nodeText), options).skip
     ) {
       const visibleText = normalizeVisibleText(nodeText);
-      if (visibleText) textParts.push(visibleText);
+      if (visibleText) {
+        textParts.push({
+          text: visibleText,
+          breakBefore: shouldBreakBeforeTextPart(parent, root, filterRule),
+        });
+      }
     }
     node = walker.nextNode();
   }
 
   const normalizedRawText = normalizeVisibleText(rawText);
   if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return { text: "", skipReason: "target-language" };
-  const text = normalizeCollectedText(textParts);
+  const text = normalizeCollectedText(textParts, options.lineBreakMaxTextCount);
   if (text) {
     if (shouldSkipForTargetLanguage(text, options.targetLang)) return { text: "", skipReason: "target-language" };
     return { text };
   }
-  const fallbackText = normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
+  const fallbackText = applyLineBreakMaxTextCount(
+    normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" ")),
+    options.lineBreakMaxTextCount,
+  );
   if (shouldSkipForTargetLanguage(fallbackText, options.targetLang)) return { text: "", skipReason: "target-language" };
   return fallbackText ? { text: fallbackText } : { text: "", skipReason: "empty" };
 }
@@ -187,8 +202,70 @@ function matchesClosestSelector(element: HTMLElement, selectors: readonly string
   return false;
 }
 
-function normalizeCollectedText(parts: readonly string[]): string {
-  return normalizeVisibleText(parts.join(" ")).replace(/\s+([.,!?;:%])/g, "$1");
+function normalizeCollectedText(parts: readonly TextPart[], lineBreakMaxTextCount: number | undefined): string {
+  let text = "";
+  for (const part of parts) {
+    if (!text) {
+      text = part.text;
+      continue;
+    }
+    text += `${part.breakBefore ? "\n" : " "}${part.text}`;
+  }
+
+  const normalized = text
+    .replace(/[ \t\r\f\v]+/g, " ")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
+    .replace(/\s+([.,!?;:%])/g, "$1")
+    .trim();
+  return applyLineBreakMaxTextCount(normalized, lineBreakMaxTextCount);
+}
+
+function shouldBreakBeforeTextPart(
+  element: HTMLElement,
+  root: HTMLElement,
+  filterRule: CompiledFilterRule | undefined,
+): boolean {
+  const tags = filterRule?.preWhitespaceDetectedTags;
+  if (!tags || tags.length === 0) return false;
+
+  for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+    if (tags.includes(current.tagName)) return true;
+    if (current === root) return false;
+  }
+  return false;
+}
+
+function applyLineBreakMaxTextCount(text: string, lineBreakMaxTextCount: number | undefined): string {
+  if (!lineBreakMaxTextCount || lineBreakMaxTextCount <= 0 || text.length <= lineBreakMaxTextCount) return text;
+  return text
+    .split("\n")
+    .flatMap((line) => splitLongLine(line, lineBreakMaxTextCount))
+    .join("\n")
+    .trim();
+}
+
+function splitLongLine(line: string, maxTextCount: number): string[] {
+  if (line.length <= maxTextCount) return [line];
+  const sentenceParts = line.match(/[^.!?。！？]+[.!?。！？]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [line];
+  const lines: string[] = [];
+  let current = "";
+
+  for (const sentence of sentenceParts) {
+    if (!current) {
+      current = sentence;
+      continue;
+    }
+
+    if (`${current} ${sentence}`.length > maxTextCount) {
+      lines.push(current);
+      current = sentence;
+    } else {
+      current = `${current} ${sentence}`;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [line];
 }
 
 function categoryFromScanned(categories: UnitCategory[] | undefined): UnitCategory | undefined {

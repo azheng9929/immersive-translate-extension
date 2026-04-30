@@ -1239,6 +1239,7 @@ export function compileRulePolicy(
     translationClasses: rule.translationClasses,
     ...(rule.wrapperPrefix !== undefined ? { wrapperPrefix: rule.wrapperPrefix } : {}),
     ...(rule.wrapperSuffix !== undefined ? { wrapperSuffix: rule.wrapperSuffix } : {}),
+    ...(rule.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: rule.lineBreakMaxTextCount } : {}),
     filterRule: compileFilterRule(rule),
     observeUrlChange: rule.observeUrlChange ?? DEFAULT_SITE_POLICY.observeUrlChange,
     urlChangeDelay: rule.urlChangeDelay ?? DEFAULT_SITE_POLICY.urlChangeDelay,

@@ -105,10 +105,11 @@ export function classifyElementForTranslation(element: Element, rule: CompiledFi
 
 export function findTranslationRoot(element: HTMLElement, rule: CompiledFilterRule): HTMLElement {
   const classification = classifyElementForTranslation(element, rule);
-  if (classification.kind === "atomic" || classification.kind === "block") return classification.root;
+  if (classification.kind === "atomic") return classification.root;
 
   const configuredContentRoot = findConfiguredContentRoot(element, rule);
   if (configuredContentRoot) return configuredContentRoot;
+  if (classification.kind === "block") return classification.root;
 
   const blockRoot = closestMatchingElement(element, [DEFAULT_BLOCK_ROOT_SELECTOR]);
   return blockRoot ?? element;

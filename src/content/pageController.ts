@@ -55,6 +55,7 @@ type ControllerOptions = {
   translationClasses?: readonly string[];
   wrapperPrefix?: string;
   wrapperSuffix?: string;
+  lineBreakMaxTextCount?: number;
   allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
   progressiveBatchItems?: number;
@@ -273,6 +274,7 @@ export class PageController {
       ...(this.options.translationClasses ? { translationClasses: this.options.translationClasses } : {}),
       ...(this.options.wrapperPrefix !== undefined ? { wrapperPrefix: this.options.wrapperPrefix } : {}),
       ...(this.options.wrapperSuffix !== undefined ? { wrapperSuffix: this.options.wrapperSuffix } : {}),
+      ...(this.options.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: this.options.lineBreakMaxTextCount } : {}),
       diagnostics,
     });
   }
@@ -641,9 +643,7 @@ function collectMainFrameRoots(root: ParentNode, mainFrameSelector: string | und
       if (root.matches(selector) || root.closest(selector)) return [root];
     }
 
-    root.querySelectorAll?.(selector).forEach((element) => {
-      if (element instanceof HTMLElement) addMainRoot(element);
-    });
+    for (const element of querySelectorAllDeep(root, selector)) addMainRoot(element);
   } catch {
     return [root];
   }
@@ -673,10 +673,7 @@ function collectPreferredScanRoots(root: ParentNode, preferredSelectors: readonl
 
   for (const selector of preferredSelectors) {
     try {
-      if (root instanceof HTMLElement && root.matches(selector)) addRoot(root);
-      root.querySelectorAll?.(selector).forEach((element) => {
-        if (element instanceof HTMLElement) addRoot(element);
-      });
+      for (const element of querySelectorAllDeep(root, selector)) addRoot(element);
     } catch {
       continue;
     }
@@ -691,12 +688,10 @@ function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions):
   const roots: HTMLElement[] = [];
   for (const selector of selectors) {
     try {
-      if (root instanceof HTMLElement && root.matches(selector)) addRoot(roots, root);
-      root.querySelectorAll?.(selector).forEach((element) => {
-        if (!(element instanceof HTMLElement)) return;
-        if (matchesClosestSelector(element, options.skipBuildContainerSelectors)) return;
+      for (const element of querySelectorAllDeep(root, selector)) {
+        if (matchesClosestSelector(element, options.skipBuildContainerSelectors)) continue;
         addRoot(roots, element);
-      });
+      }
     } catch {
       continue;
     }
@@ -774,10 +769,7 @@ function collectCandidateViewportRoots(root: ParentNode, preferredSelectors: rea
   };
 
   try {
-    if (root instanceof HTMLElement && root.matches(selectorText)) addCandidate(root);
-    root.querySelectorAll?.(selectorText).forEach((element) => {
-      if (element instanceof HTMLElement) addCandidate(element);
-    });
+    for (const element of querySelectorAllDeep(root, selectorText)) addCandidate(element);
   } catch {
     return [];
   }
@@ -791,6 +783,50 @@ function addRoot(roots: HTMLElement[], candidate: HTMLElement): void {
     if (candidate.contains(existing)) roots.splice(roots.indexOf(existing), 1);
   }
   roots.push(candidate);
+}
+
+function querySelectorAllDeep(root: ParentNode, selector: string): HTMLElement[] {
+  const results: HTMLElement[] = [];
+  const seenElements = new Set<HTMLElement>();
+  const seenRoots = new Set<ParentNode>();
+
+  const addResult = (element: Element): void => {
+    if (!(element instanceof HTMLElement) || seenElements.has(element)) return;
+    seenElements.add(element);
+    results.push(element);
+  };
+
+  const visit = (scanRoot: ParentNode): void => {
+    if (seenRoots.has(scanRoot)) return;
+    seenRoots.add(scanRoot);
+
+    if (scanRoot instanceof HTMLElement) {
+      try {
+        if (scanRoot.matches(selector)) addResult(scanRoot);
+      } catch {
+        return;
+      }
+    }
+
+    scanRoot.querySelectorAll?.(selector).forEach(addResult);
+
+    for (const element of elementsInRoot(scanRoot)) {
+      if (element.shadowRoot) visit(element.shadowRoot);
+    }
+  };
+
+  try {
+    visit(root);
+  } catch {
+    return [];
+  }
+
+  return results;
+}
+
+function elementsInRoot(root: ParentNode): HTMLElement[] {
+  const descendants = Array.from(root.querySelectorAll?.<HTMLElement>("*") ?? []);
+  return root instanceof HTMLElement ? [root, ...descendants] : descendants;
 }
 
 function classifyViewportCandidate(element: HTMLElement): UnitCategory {

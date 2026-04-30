@@ -43,6 +43,16 @@ export function ensureRuntimeStyle(): void {
       letter-spacing: 0;
       overflow-wrap: anywhere;
     }
+    .imt-translation-replacement {
+      display: inline;
+      box-sizing: border-box;
+      max-width: 100%;
+      color: currentColor;
+      font: inherit;
+      line-height: inherit;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
     .imt-translation-loading {
       display: inline-flex;
       width: 0.78em;

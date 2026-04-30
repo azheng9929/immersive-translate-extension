@@ -57,7 +57,9 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
   }
 
   if (unit.renderMode === "replace-text") {
-    return renderTextReplacement(unit, translatedText);
+    return shouldUseRichTextReplacement(unit)
+      ? renderRichTextReplacement(unit, translatedText)
+      : renderTextReplacement(unit, translatedText);
   }
 
   const span = document.createElement("span");
@@ -82,6 +84,47 @@ function renderTextReplacement(unit: TranslationUnit, translatedText: string): R
 
   unit.root.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
   return records;
+}
+
+function renderRichTextReplacement(unit: TranslationUnit, translatedText: string): RestoreRecord[] {
+  const records: RestoreRecord[] = [];
+  const replacement = document.createElement("span");
+  replacement.setAttribute("data-imt-managed", "true");
+  replacement.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
+  replacement.className = ["imt-translation-replacement", ...(unit.translationClasses ?? [])]
+    .filter(Boolean)
+    .join(" ");
+  replacement.textContent = withWrapperText(unit, translatedText);
+
+  unit.root.insertBefore(replacement, unit.root.firstChild);
+  records.push({ type: "inserted-node", unitId: unit.id, node: replacement });
+
+  unit.textNodes.forEach((node) => {
+    records.push({ type: "text-replace", unitId: unit.id, textNode: node, originalText: node.textContent ?? "" });
+    node.textContent = "";
+  });
+
+  for (const child of Array.from(unit.root.children)) {
+    if (!(child instanceof HTMLElement) || child === replacement || child.dataset.imtManaged === "true") continue;
+    records.push({
+      type: "style-change",
+      unitId: unit.id,
+      element: child,
+      property: "display",
+      originalValue: child.style.getPropertyValue("display"),
+    });
+    child.style.setProperty("display", "none");
+  }
+
+  unit.root.setAttribute(ORIGINAL_TEXT_ATTRIBUTE, unit.originalText);
+  return records;
+}
+
+function shouldUseRichTextReplacement(unit: TranslationUnit): boolean {
+  if (unit.textNodes.length <= 1) return false;
+  return Array.from(unit.root.children).some((child) =>
+    child instanceof HTMLElement && child.dataset.imtManaged !== "true"
+  );
 }
 
 function withWrapperText(unit: TranslationUnit, translatedText: string): string {

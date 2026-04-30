@@ -199,6 +199,7 @@ function ruleFiltersLabel(status: PageTranslationStatus): string {
     `attrs ${diagnostics.globalAttributeRuleCount}`,
     `page-attrs ${diagnostics.attributeNameCount}`,
     `classes ${diagnostics.translationClassCount}`,
+    `line ${diagnostics.lineBreakMaxTextCount ?? "off"}`,
   ].join(", ");
 }
 
@@ -312,6 +313,7 @@ class RuleVisualizer {
   hide(): void {
     for (const element of this.markedElements) {
       element.removeAttribute("data-imt-rule-visualization");
+      element.removeAttribute("data-imt-rule-visualization-reason");
     }
     this.markedElements.clear();
     this.legendElement?.remove();
@@ -340,11 +342,39 @@ class RuleVisualizer {
 }
 
 function queryRuleElements(selector: string): Element[] {
+  const results: Element[] = [];
+  const seenElements = new Set<Element>();
+  const seenRoots = new Set<ParentNode>();
+
+  const addResult = (element: Element): void => {
+    if (seenElements.has(element)) return;
+    seenElements.add(element);
+    results.push(element);
+  };
+
+  const visit = (root: ParentNode): void => {
+    if (seenRoots.has(root)) return;
+    seenRoots.add(root);
+
+    if (root instanceof Element && root.matches(selector)) addResult(root);
+    root.querySelectorAll?.(selector).forEach(addResult);
+
+    for (const element of elementsInRoot(root)) {
+      if (element.shadowRoot) visit(element.shadowRoot);
+    }
+  };
+
   try {
-    return Array.from(document.querySelectorAll(selector));
+    visit(document);
+    return results;
   } catch {
     return [];
   }
+}
+
+function elementsInRoot(root: ParentNode): Element[] {
+  const descendants = Array.from(root.querySelectorAll?.("*") ?? []);
+  return root instanceof Element ? [root, ...descendants] : descendants;
 }
 
 function isExtensionElement(element: Element): boolean {
@@ -355,6 +385,7 @@ function markElement(element: Element, group: PageTranslationRuleVisualizationGr
   const groups = new Set((element.getAttribute("data-imt-rule-visualization") ?? "").split(/\s+/).filter(Boolean));
   groups.add(group);
   element.setAttribute("data-imt-rule-visualization", [...groups].join(" "));
+  element.setAttribute("data-imt-rule-visualization-reason", [...groups].join(", "));
 }
 
 function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTMLElement {

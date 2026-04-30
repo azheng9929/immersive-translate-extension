@@ -66,6 +66,7 @@ export type SitePolicy = {
   translationClasses: readonly string[];
   wrapperPrefix?: string;
   wrapperSuffix?: string;
+  lineBreakMaxTextCount?: number;
   filterRule: CompiledFilterRule;
   observeUrlChange: boolean;
   urlChangeDelay: number;

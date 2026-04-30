@@ -207,4 +207,55 @@ describe("buildTranslationUnits", () => {
     expect(units[0]!.root).toBe(document.querySelector("[itemprop=description]"));
     expect(units[2]!.root).toBe(document.querySelector(".headline"));
   });
+
+  it("uses pre whitespace detected tags to preserve meaningful inline breaks", () => {
+    mountFixture(`
+      <div class="post-body">
+        <span>First line keeps its own rhythm.</span>
+        <span>Second line should not be joined as one sentence.</span>
+      </div>
+    `);
+    const filterRule = compileFilterRule({
+      contentSelectors: [{ selector: ".post-body", category: "content-block" }],
+      preWhitespaceDetectedTags: ["SPAN"],
+    });
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, {
+        contentSelectors: [{ selector: ".post-body", category: "content-block" }],
+        filterRule,
+      }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      contentSelectors: [{ selector: ".post-body", category: "content-block" }],
+      filterRule,
+    });
+
+    expect(units).toHaveLength(1);
+    expect(units[0]!.originalText).toBe(
+      "First line keeps its own rhythm.\nSecond line should not be joined as one sentence.",
+    );
+  });
+
+  it("splits very long units by sentence when a rule configures lineBreakMaxTextCount", () => {
+    mountFixture(`
+      <p>First long sentence for a compact card. Second long sentence for the same card. Third long sentence should remain ordered.</p>
+    `);
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      lineBreakMaxTextCount: 36,
+    });
+
+    expect(units).toHaveLength(1);
+    expect(units[0]!.originalText).toBe(
+      "First long sentence for a compact card.\nSecond long sentence for the same card.\nThird long sentence should remain ordered.",
+    );
+  });
 });

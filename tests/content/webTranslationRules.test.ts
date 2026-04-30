@@ -198,6 +198,21 @@ describe("webTranslationRules", () => {
     expect(policy.wrapperSuffix).toBe("」");
   });
 
+  it("keeps text-flow tuning fields in compiled site policy", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "flow",
+        preWhitespaceDetectedTags: { add: ["SPAN", "DIV"] },
+        lineBreakMaxTextCount: 120,
+      }),
+      "example.com",
+      "normal",
+    );
+
+    expect(policy.filterRule.preWhitespaceDetectedTags).toEqual(["SPAN", "DIV"]);
+    expect(policy.lineBreakMaxTextCount).toBe(120);
+  });
+
   it("keeps body and container rule fields in compiled site policy", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

@@ -93,6 +93,56 @@ describe("PageController", () => {
     expect(shadowRoot.querySelector("p")?.textContent).toBe("Shadow article text.");
   });
 
+  it("uses preferred scan roots inside open shadow roots", async () => {
+    document.body.innerHTML = `<main><article-card></article-card><p>Generic page chrome should stay original.</p></main>`;
+    const host = document.querySelector<HTMLElement>("article-card")!;
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    shadowRoot.innerHTML = `<article><p class="shadow-title">Shadow preferred title.</p></article>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: [".shadow-title"],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Shadow preferred title."]);
+    expect(shadowRoot.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Shadow preferred title.");
+    expect(document.body.textContent).toContain("Generic page chrome should stay original.");
+    expect(document.body.textContent).not.toContain("[zh-Hans] Generic page chrome should stay original.");
+  });
+
+  it("collects near-viewport preferred roots inside open shadow roots", () => {
+    document.body.innerHTML = `<main><article-card></article-card></main>`;
+    const host = document.querySelector<HTMLElement>("article-card")!;
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    shadowRoot.innerHTML = `
+      <article>
+        <p class="shadow-title" id="visible-shadow">Visible shadow title.</p>
+        <p class="shadow-title" id="far-shadow">Far shadow title.</p>
+      </article>
+    `;
+    setElementRect(shadowRoot.querySelector("#visible-shadow")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(shadowRoot.querySelector("#far-shadow")!, { top: 2200, bottom: 2240, left: 0, right: 200 });
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: [".shadow-title"],
+      translateBatch: async (items) =>
+        items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const })),
+    });
+
+    const roots = controller.collectViewportTranslatableRoots(document.body, {
+      rootMargin: "100px",
+      maxRoots: 10,
+    });
+
+    expect(roots).toEqual([shadowRoot.querySelector("#visible-shadow")]);
+  });
+
   it("does not write stale translation results after restore", async () => {
     document.body.innerHTML = `<p>Hello world.</p>`;
     let resolveBatch: ((value: Array<{ id: string; text: string; status: "ok" }>) => void) | undefined;

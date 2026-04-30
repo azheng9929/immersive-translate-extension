@@ -35,7 +35,9 @@ export function restoreRecords(records: RestoreRecord[]): void {
       }
     } else if (record.type === "style-change") {
       affectedNodes.add(record.element);
-      record.element.style.setProperty(record.property, record.originalValue);
+      if (record.originalValue) record.element.style.setProperty(record.property, record.originalValue);
+      else record.element.style.removeProperty(record.property);
+      if (!record.element.getAttribute("style")) record.element.removeAttribute("style");
     }
   }
 

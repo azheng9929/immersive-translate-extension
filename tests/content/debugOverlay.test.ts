@@ -32,6 +32,7 @@ describe("DebugOverlay", () => {
     expect(rowText(root, "debug-overlay-rule-filters")).toContain("build 2");
     expect(rowText(root, "debug-overlay-rule-filters")).toContain("skip 3");
     expect(rowText(root, "debug-overlay-rule-filters")).toContain("css 4");
+    expect(rowText(root, "debug-overlay-rule-filters")).toContain("line 120");
     expect(rowText(root, "debug-overlay-rule-runtime")).toContain("queue 80");
     expect(rowText(root, "debug-overlay-rule-runtime")).toContain("flush 12");
     expect(rowText(root, "debug-overlay-rule-runtime")).toContain("url 350ms");
@@ -108,6 +109,27 @@ describe("DebugOverlay", () => {
 
     overlay.unmount();
   });
+
+  it("visualizes rule selectors inside open shadow roots", () => {
+    document.body.innerHTML = `<main><article-card></article-card></main>`;
+    const host = document.querySelector<HTMLElement>("article-card")!;
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    shadowRoot.innerHTML = `<article class="tweet"><p class="body-text">Shadow tweet text</p></article>`;
+    const status = createStatus();
+    const overlay = new DebugOverlay({
+      getStatus: () => status,
+      subscribeStatus: () => () => undefined,
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+
+    expect(shadowRoot.querySelector(".tweet")?.getAttribute("data-imt-rule-visualization")).toContain("scan-root");
+    expect(shadowRoot.querySelector(".body-text")?.getAttribute("data-imt-rule-visualization")).toContain("content");
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("content 1");
+
+    overlay.unmount();
+  });
 });
 
 function createStatus(): PageTranslationStatus {
@@ -143,6 +165,7 @@ function createStatus(): PageTranslationStatus {
         globalAttributeRuleCount: 1,
         attributeNameCount: 0,
         translationClassCount: 2,
+        lineBreakMaxTextCount: 120,
         allowTooltip: false,
         observeUrlChange: true,
         urlChangeDelay: 350,

@@ -67,6 +67,30 @@ describe("renderTranslation", () => {
     expect(button.title).toBe("Native hint");
   });
 
+  it("uses a managed replacement wrapper for complex inline-only rendering and restores rich markup", () => {
+    document.body.innerHTML = '<p>Hello <a href="/docs">docs</a> and <strong>bold</strong> <code>const x = 1</code>.</p>';
+    const root = document.querySelector("p")!;
+    const unit = {
+      ...baseUnit(root, "replace-text"),
+      textNodes: Array.from(root.querySelectorAll("*"))
+        .flatMap((element) => Array.from(element.childNodes))
+        .concat(Array.from(root.childNodes))
+        .filter((node): node is Text => node.nodeType === Node.TEXT_NODE),
+    };
+
+    const records = renderTranslation(unit, "Translated rich text.");
+
+    const replacement = document.querySelector<HTMLElement>(".imt-translation-replacement");
+    expect(replacement?.textContent).toBe("Translated rich text.");
+    expect(document.querySelector("a")?.style.display).toBe("none");
+    expect(document.querySelector("strong")?.style.display).toBe("none");
+    expect(document.querySelector("code")?.style.display).toBe("none");
+    expect(root.textContent).toBe("Translated rich text.");
+
+    restoreAll(records);
+    expect(document.body.innerHTML).toBe('<p>Hello <a href="/docs">docs</a> and <strong>bold</strong> <code>const x = 1</code>.</p>');
+  });
+
   it("replaces attributes, exposes original text for hover, and restores them", () => {
     document.body.innerHTML = '<input placeholder="Search docs" />';
     const input = document.querySelector("input")!;
