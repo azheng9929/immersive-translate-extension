@@ -3,6 +3,7 @@ export const allRegressionSites = [
   { name: "Threads", host: "threads.com", url: "https://www.threads.com/" },
   { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
+  { name: "Old Reddit", host: "old.reddit.com", url: "https://old.reddit.com/r/TrueReddit/" },
   { name: "Inworld", host: "inworld.ai", url: "https://inworld.ai/" },
   { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
   { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
@@ -21,7 +22,7 @@ const regressionProfiles = {
   },
   "high-dynamic": {
     dynamicModes: ["conservative"],
-    siteFilter: ["x", "threads", "youtube", "reddit", "metatft", "metatft augments", "tactics"],
+    siteFilter: ["x", "threads", "youtube", "https://www.reddit.com/r/technology/", "metatft", "metatft augments", "tactics"],
   },
   all: {
     dynamicModes: ["conservative", "normal"],
@@ -68,6 +69,13 @@ export function parseCsv(value) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+export function siteAccessGateReason(site, metrics) {
+  if (isXLoginWall(site, metrics)) return "login wall";
+  if (isRedditHumanityCheck(site, metrics)) return "humanity check";
+  if (isRedditNetworkSecurityBlock(site, metrics)) return "network security block";
+  return undefined;
+}
+
 function readArg(argv, name) {
   const prefix = `--${name}=`;
   const inline = argv.find((arg) => arg.startsWith(prefix));
@@ -75,4 +83,27 @@ function readArg(argv, name) {
   const index = argv.indexOf(`--${name}`);
   if (index >= 0) return argv[index + 1] || "";
   return "";
+}
+
+function isXLoginWall(site, metrics) {
+  return site.host === "x.com" && (
+    metrics.url.includes("x.com/i/flow/login") ||
+    metrics.bodyTextLength < 100
+  );
+}
+
+function isRedditHumanityCheck(site, metrics) {
+  return isRedditSite(site) && (
+    /prove your humanity/i.test(metrics.title) ||
+    metrics.url.includes("js_challenge=1") ||
+    metrics.url.includes("/r/technology/?solution=")
+  );
+}
+
+function isRedditNetworkSecurityBlock(site, metrics) {
+  return isRedditSite(site) && /blocked by network security/i.test(metrics.bodyTextPreview ?? "");
+}
+
+function isRedditSite(site) {
+  return site.host === "reddit.com" || site.host === "old.reddit.com" || site.host.endsWith(".reddit.com");
 }

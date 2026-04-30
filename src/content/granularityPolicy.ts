@@ -282,6 +282,95 @@ const REDDIT_POLICY: SiteGranularityPolicy = {
   ],
 };
 
+const OLD_REDDIT_POLICY: SiteGranularityPolicy = {
+  domains: ["old.reddit.com"],
+  contentRules: [
+    { selector: "p.title > a.title, .thing.link .entry a.title", category: "card-text" },
+    { selector: ".linkflairlabel", category: "label" },
+    {
+      selector:
+        ".selftext .usertext-body .md, .expando .usertext .md, .res-expando-box .md, .media-gallery .usertext",
+      category: "content-block",
+    },
+    { selector: ".comment .usertext-body .md, .commentarea .comment .usertext-body .md", category: "comment" },
+    { selector: ".side .md h1, .side .md h2, .side .md h3", category: "heading" },
+    { selector: ".side .md p, .side .md li", category: "content-block" },
+  ],
+  skipSelectors: [
+    "#sr-header-area",
+    "#header",
+    "#header-bottom-left",
+    "#header-bottom-right",
+    "#searchexpando",
+    "#search",
+    ".tabmenu",
+    ".pagename",
+    ".rank",
+    ".score",
+    ".midcol",
+    ".arrow",
+    ".thumbnail",
+    ".expando-button",
+    ".entry .tagline",
+    ".tagline",
+    ".flat-list",
+    ".buttons",
+    ".domain",
+    ".redditname",
+    ".subscribers",
+    ".users-online",
+    ".subscribe-button",
+    ".fancy-toggle-button",
+    ".sidebox",
+    ".login-form-side",
+    ".morelink",
+    ".titlebox .bottom",
+    ".titlebox .age",
+    ".account-activity-box",
+    ".footer-parent",
+    ".bottommenu",
+    ".nextprev",
+    "a.author",
+    "span.author",
+    ".userattrs",
+    ".age",
+    "time",
+    "button",
+    "input",
+    "textarea",
+    "select",
+    "form",
+  ],
+  skipPhrases: [
+    "share",
+    "save",
+    "hide",
+    "report",
+    "reply",
+    "permalink",
+    "source",
+    "embed",
+    "give award",
+    "load more comments",
+    "continue this thread",
+    "sorted by",
+    "best",
+    "top",
+    "new",
+    "controversial",
+    "old",
+    "q&a",
+  ],
+  skipTextPatterns: [
+    /^u\/[A-Za-z0-9_-]{1,40}$/i,
+    /^r\/[A-Za-z0-9_-]{1,40}$/i,
+    /^[+-]?\d+(\.\d+)?[KMB\u4e07\u4ebf]?$/i,
+    /^\d+(\.\d+)?[KMB]?\s+(?:points?|comments?)$/i,
+    /^\(?[a-z0-9.-]+\.[a-z]{2,}\)?$/i,
+    /^(?:submitted\s+)?\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago(?:\s+by)?$/i,
+  ],
+};
+
 const X_POLICY: SiteGranularityPolicy = {
   domains: ["x.com", "twitter.com"],
   contentRules: [
@@ -401,7 +490,7 @@ const THREADS_POLICY: SiteGranularityPolicy = {
   ],
 };
 
-const SITE_POLICIES = [YOUTUBE_POLICY, REDDIT_POLICY, X_POLICY, THREADS_POLICY] as const;
+const SITE_POLICIES = [YOUTUBE_POLICY, OLD_REDDIT_POLICY, REDDIT_POLICY, X_POLICY, THREADS_POLICY] as const;
 
 export function resolveTextGranularity(
   element: HTMLElement,

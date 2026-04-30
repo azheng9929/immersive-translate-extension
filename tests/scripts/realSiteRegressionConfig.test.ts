@@ -1,9 +1,20 @@
 import { describe, expect, it } from "vitest";
-import {
+import * as regressionConfig from "../../scripts/real-site-regression-config.mjs";
+
+const {
   allRegressionSites,
   parseCsv,
   resolveRegressionSelection,
-} from "../../scripts/real-site-regression-config.mjs";
+} = regressionConfig;
+
+const { siteAccessGateReason } = regressionConfig as typeof regressionConfig & {
+  siteAccessGateReason: (site: { host: string }, metrics: {
+    title: string;
+    url: string;
+    bodyTextLength: number;
+    bodyTextPreview?: string;
+  }) => string | undefined;
+};
 
 describe("real-site regression selection", () => {
   it("parses comma separated filters without empty values", () => {
@@ -51,7 +62,7 @@ describe("real-site regression selection", () => {
 
     expect(selection.profile).toBe("all");
     expect(selection.dynamicModes).toEqual(["off", "normal"]);
-    expect(selection.selectedSites.map((site) => site.name)).toEqual(["Reddit", "Tactics Tools Hover"]);
+    expect(selection.selectedSites.map((site) => site.name)).toEqual(["Reddit", "Old Reddit", "Tactics Tools Hover"]);
   });
 
   it("keeps Inworld available as a focused landing-page regression target", () => {
@@ -63,6 +74,20 @@ describe("real-site regression selection", () => {
     });
 
     expect(selection.selectedSites.map((site) => site.name)).toEqual(["Inworld"]);
+  });
+
+  it("treats old Reddit network security blocks as an access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "old.reddit.com" },
+        {
+          title: "",
+          url: "https://old.reddit.com/r/TrueReddit/",
+          bodyTextLength: 143,
+          bodyTextPreview: "You've been blocked by network security. If you think you've been blocked by mistake.",
+        },
+      ),
+    ).toBe("network security block");
   });
 
   it("keeps all known sites available for the full profile", () => {

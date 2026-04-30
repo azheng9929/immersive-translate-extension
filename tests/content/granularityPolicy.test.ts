@@ -102,6 +102,85 @@ describe("resolveTextGranularity", () => {
     expect(resolveTextGranularity(share, share.textContent ?? "", { hostname: "www.reddit.com" }).skip).toBe(true);
   });
 
+  it("keeps old Reddit titles, sidebar rules, and comments while skipping chrome and metrics", () => {
+    mountFixture(`
+      <div id="header"><span>my subreddits</span></div>
+      <div class="thing link">
+        <span class="rank">1</span>
+        <div class="midcol"><div class="score">487</div></div>
+        <div class="entry">
+          <p class="title">
+            <span class="linkflairlabel">Politics</span>
+            <a class="title">A long article title worth translating on old Reddit</a>
+            <span class="domain">(example.com)</span>
+          </p>
+          <p class="tagline">submitted 6 hours ago by <a class="author">alice</a></p>
+          <ul class="flat-list buttons">
+            <li><a class="comments">23 comments</a></li>
+            <li><a>share</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="side">
+        <div class="md">
+          <h1>Rule 1: Be Polite</h1>
+          <p>Have great discussions, but follow reddiquette.</p>
+        </div>
+      </div>
+      <div class="comment">
+        <div class="usertext-body"><div class="md"><p>This comment adds useful context for old Reddit.</p></div></div>
+      </div>
+    `);
+
+    const title = document.querySelector<HTMLElement>("p.title > a.title")!;
+    const flair = document.querySelector<HTMLElement>(".linkflairlabel")!;
+    const sidebarRule = document.querySelector<HTMLElement>(".side .md h1")!;
+    const sidebarText = document.querySelector<HTMLElement>(".side .md p")!;
+    const comment = document.querySelector<HTMLElement>(".comment .usertext-body p")!;
+    const rank = document.querySelector<HTMLElement>(".rank")!;
+    const score = document.querySelector<HTMLElement>(".score")!;
+    const author = document.querySelector<HTMLElement>("a.author")!;
+    const comments = document.querySelector<HTMLElement>("a.comments")!;
+    const share = Array.from(document.querySelectorAll<HTMLElement>(".flat-list a")).find(
+      (element) => element.textContent === "share",
+    )!;
+    const domain = document.querySelector<HTMLElement>(".domain")!;
+    const header = document.querySelector<HTMLElement>("#header span")!;
+
+    expect(resolveTextGranularity(title, title.textContent ?? "", { hostname: "old.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "card-text",
+      root: title,
+    });
+    expect(resolveTextGranularity(flair, flair.textContent ?? "", { hostname: "old.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "label",
+      root: flair,
+    });
+    expect(resolveTextGranularity(sidebarRule, sidebarRule.textContent ?? "", { hostname: "old.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "heading",
+      root: sidebarRule,
+    });
+    expect(resolveTextGranularity(sidebarText, sidebarText.textContent ?? "", { hostname: "old.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "content-block",
+      root: sidebarText,
+    });
+    expect(resolveTextGranularity(comment, comment.textContent ?? "", { hostname: "old.reddit.com" })).toMatchObject({
+      skip: false,
+      category: "comment",
+      root: comment.closest(".comment .usertext-body .md"),
+    });
+    expect(resolveTextGranularity(rank, rank.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(score, score.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(author, author.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(comments, comments.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(share, share.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(domain, domain.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(header, header.textContent ?? "", { hostname: "old.reddit.com" }).skip).toBe(true);
+  });
+
   it("keeps X tweet text while skipping hover cards, controls, handles, and timestamps", () => {
     mountFixture(`
       <article>

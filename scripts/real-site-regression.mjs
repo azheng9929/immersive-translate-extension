@@ -5,7 +5,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { resolveRegressionSelection } from "./real-site-regression-config.mjs";
+import { resolveRegressionSelection, siteAccessGateReason } from "./real-site-regression-config.mjs";
 
 const rootDir = resolve(import.meta.dirname, "..");
 const extensionSourceDir = resolve(rootDir, ".output", "chrome-mv3");
@@ -179,6 +179,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
         title: document.title,
         readyState: document.readyState,
         bodyTextLength: document.body?.innerText?.length ?? 0,
+        bodyTextPreview: (document.body?.innerText ?? '').slice(0, 500),
         translatedBlocks: document.querySelectorAll('.imt-translation-block, .imt-translation-compact').length,
         translatedRoots: document.querySelectorAll('[data-imt-state="translated"]').length,
         floatingControl: Boolean(document.querySelector('[data-imt-control="root"]')),
@@ -669,27 +670,6 @@ function formatRuntimeError(exceptionDetails = {}) {
 function isExtensionError(error, extensionId) {
   const marker = `chrome-extension://${extensionId}/`;
   return error.url?.includes(marker) || error.stackTrace?.includes(marker) || error.text?.includes(marker);
-}
-
-function isXLoginWall(site, metrics) {
-  return site.host === "x.com" && (
-    metrics.url.includes("x.com/i/flow/login") ||
-    metrics.bodyTextLength < 100
-  );
-}
-
-function isRedditHumanityCheck(site, metrics) {
-  return site.host === "reddit.com" && (
-    /prove your humanity/i.test(metrics.title) ||
-    metrics.url.includes("js_challenge=1") ||
-    metrics.url.includes("/r/technology/?solution=")
-  );
-}
-
-function siteAccessGateReason(site, metrics) {
-  if (isXLoginWall(site, metrics)) return "login wall";
-  if (isRedditHumanityCheck(site, metrics)) return "humanity check";
-  return undefined;
 }
 
 function isIgnorableConsoleError(message) {

@@ -36,8 +36,8 @@ describe("sitePolicy", () => {
     }
   });
 
-  it("uses conservative dynamic defaults for YouTube and Reddit", () => {
-    for (const hostname of ["youtube.com", "www.youtube.com", "m.youtube.com", "reddit.com", "www.reddit.com", "old.reddit.com"]) {
+  it("uses conservative dynamic defaults for YouTube and new Reddit", () => {
+    for (const hostname of ["youtube.com", "www.youtube.com", "m.youtube.com", "reddit.com", "www.reddit.com"]) {
       const policy = resolveSitePolicy(hostname);
 
       expect(policy.dynamicMode).toBe("conservative");
@@ -46,6 +46,19 @@ describe("sitePolicy", () => {
       expect(policy.maxQueueSize).toBeLessThan(resolveSitePolicy("example.com").maxQueueSize);
       expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
     }
+  });
+
+  it("uses a static old Reddit policy with old layout selectors", () => {
+    const policy = resolveSitePolicy("old.reddit.com");
+
+    expect(policy.ruleId).toBe("old-reddit");
+    expect(policy.siteKey).toBe("old.reddit.com");
+    expect(policy.dynamicMode).toBe("normal");
+    expect(policy.dynamicModeSource).toBe("global");
+    expect(policy.isHighDynamic).toBe(false);
+    expect(policy.preferredScanRootSelectors).toContain("p.title > a.title");
+    expect(policy.excludeSelectors).toContain(".rank");
+    expect(policy.excludeSelectors).toContain(".score");
   });
 
   it("uses a wider fast policy for MetaTFT", () => {

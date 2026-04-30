@@ -291,6 +291,26 @@ describe("webTranslationRules", () => {
     expect(reddit.excludedDynamicSelectors).toContain("faceplate-tracker");
   });
 
+  it("uses old Reddit selectors instead of the new Reddit rule on old.reddit.com", () => {
+    const policy = resolveWebTranslationPolicy("https://old.reddit.com/r/TrueReddit/", "normal");
+
+    expect(policy).toMatchObject({
+      ruleId: "old-reddit",
+      siteKey: "old.reddit.com",
+      isHighDynamic: false,
+    });
+    expect(policy.preferredScanRootSelectors).toContain("p.title > a.title");
+    expect(policy.preferredScanRootSelectors).toContain(".comment .usertext-body .md");
+    expect(policy.preferredScanRootSelectors).toContain(".side .md p");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "p.title > a.title, .thing.link .entry a.title",
+      category: "card-text",
+    });
+    expect(policy.excludeSelectors).toContain(".rank");
+    expect(policy.excludeSelectors).toContain(".score");
+    expect(policy.excludeSelectors).toContain("a.author");
+  });
+
   it("covers newer YouTube lockup, attributed string, comment, and transcript text surfaces", () => {
     const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
 

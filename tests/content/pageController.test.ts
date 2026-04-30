@@ -352,6 +352,71 @@ describe("PageController", () => {
     expect(document.body.textContent).not.toContain("[zh-Hans] 1.2K");
   });
 
+  it("translates old Reddit content without translating chrome, authors, or scores", async () => {
+    document.body.innerHTML = `
+      <div id="header"><span>my subreddits</span></div>
+      <div class="content">
+        <div class="thing link">
+          <span class="rank">1</span>
+          <div class="midcol"><div class="score">487</div></div>
+          <div class="entry">
+            <p class="title">
+              <span class="linkflairlabel">Politics</span>
+              <a class="title">A long article title worth translating on old Reddit</a>
+              <span class="domain">(example.com)</span>
+            </p>
+            <p class="tagline">submitted 6 hours ago by <a class="author">alice</a></p>
+            <ul class="flat-list buttons">
+              <li><a class="comments">23 comments</a></li>
+              <li><a>share</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="md">
+          <h1>Rule 1: Be Polite</h1>
+          <p>Have great discussions, but follow reddiquette.</p>
+        </div>
+      </div>
+      <div class="comment">
+        <div class="usertext-body"><div class="md"><p>This comment adds useful context for old Reddit.</p></div></div>
+      </div>
+    `;
+    const policy = resolveWebTranslationPolicy("https://old.reddit.com/r/TrueReddit/", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      attributeNames: policy.attributeNames,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Politics",
+      "A long article title worth translating on old Reddit",
+      "Rule 1: Be Polite",
+      "Have great discussions, but follow reddiquette.",
+      "This comment adds useful context for old Reddit.",
+    ]);
+    expect(document.body.textContent).toContain("[zh-Hans] A long article title worth translating on old Reddit");
+    expect(document.body.textContent).toContain("[zh-Hans] Have great discussions, but follow reddiquette.");
+    expect(document.body.textContent).not.toContain("[zh-Hans] alice");
+    expect(document.body.textContent).not.toContain("[zh-Hans] 487");
+    expect(document.body.textContent).not.toContain("[zh-Hans] 23 comments");
+    expect(document.body.textContent).not.toContain("[zh-Hans] share");
+    expect(document.body.textContent).not.toContain("[zh-Hans] my subreddits");
+  });
+
   it("keys cached translations by page title context", async () => {
     document.body.innerHTML = `<main><p>Comps</p></main>`;
     const cache = new MemoryTranslationCache();
