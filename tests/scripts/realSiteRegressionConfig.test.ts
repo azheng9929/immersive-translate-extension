@@ -31,6 +31,7 @@ describe("real-site regression selection", () => {
     expect(selection.dynamicModes).toEqual(["conservative"]);
     expect(selection.selectedSites.map((site) => site.name)).toEqual([
       "X",
+      "Threads",
       "YouTube",
       "Reddit",
       "MetaTFT",

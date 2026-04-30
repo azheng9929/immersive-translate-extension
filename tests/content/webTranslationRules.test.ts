@@ -239,6 +239,31 @@ describe("webTranslationRules", () => {
     expect(policy.preferredScanRootSelectors).not.toContain("[role=dialog]");
   });
 
+  it("uses a dedicated Threads rule for both .com and .net social feeds", () => {
+    const threadsCom = resolveWebTranslationPolicy("https://www.threads.com/", "normal");
+    const threadsNet = resolveWebTranslationPolicy("https://www.threads.net/@openai", "normal");
+
+    expect(threadsCom).toMatchObject({
+      ruleId: "threads",
+      siteKey: "threads.com",
+      isHighDynamic: true,
+      dynamicMode: "conservative",
+      allowTooltip: false,
+      viewportSupplement: true,
+      maxRootsPerFlush: 12,
+    });
+    expect(threadsCom.preferredScanRootSelectors).toContain('[role="article"] div[dir="auto"]');
+    expect(threadsCom.preferredScanRootSelectors).toContain('[data-pressable-container="true"] div[dir="auto"]');
+    expect(threadsCom.contentSelectors).toContainEqual({
+      selector: '[role="article"] div[dir="auto"], article div[dir="auto"]',
+      category: "comment",
+    });
+    expect(threadsCom.excludeSelectors).toContain('a[href^="/@"]');
+    expect(threadsCom.excludeSelectors).toContain('[role="button"]');
+    expect(threadsCom.attributeNames).toEqual([]);
+    expect(threadsNet.ruleId).toBe("threads");
+  });
+
   it("keeps YouTube search result descriptions and Reddit side rail labels in site selectors", () => {
     const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
     const reddit = resolveWebTranslationPolicy(

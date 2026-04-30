@@ -28,6 +28,7 @@ type SiteGranularityPolicy = {
   skipSelectors: readonly string[];
   skipPhrases: readonly string[];
   skipTextPatterns: readonly RegExp[];
+  skipBeforeContent?: boolean;
 };
 
 const GLOBAL_SKIP_SELECTORS = [
@@ -341,7 +342,66 @@ const X_POLICY: SiteGranularityPolicy = {
   ],
 };
 
-const SITE_POLICIES = [YOUTUBE_POLICY, REDDIT_POLICY, X_POLICY] as const;
+const THREADS_POLICY: SiteGranularityPolicy = {
+  domains: ["threads.com", "threads.net"],
+  skipBeforeContent: true,
+  contentRules: [
+    { selector: '[role="article"] div[dir="auto"], article div[dir="auto"]', category: "comment" },
+    { selector: '[role="article"] span[dir="auto"], article span[dir="auto"]', category: "comment" },
+    { selector: '[data-pressable-container="true"] div[dir="auto"]', category: "comment" },
+    { selector: '[data-pressable-container="true"] span[dir="auto"]', category: "comment" },
+    { selector: '[role="dialog"] [role="article"] div[dir="auto"]', category: "comment" },
+    { selector: '[role="dialog"] [role="article"] span[dir="auto"]', category: "comment" },
+  ],
+  skipSelectors: [
+    "nav",
+    "header",
+    "footer",
+    "aside",
+    "menu",
+    "time",
+    "button",
+    '[role="button"]',
+    '[role="menu"]',
+    '[role="menuitem"]',
+    '[role="navigation"]',
+    '[aria-live="polite"]',
+    'a[href^="/@"]',
+    'a[href*="/@"]',
+    ".x1rg5ohu",
+    ".xat24cr.xdj266r a",
+    ".x6s0dn4.x40hh3e.xrvj5dj.xxfwaov",
+    ".x6s0dn4.x78zum5",
+    ".xpvyfi4.x1xdureb.x1agbcgv",
+    ".xpvyfi4.x1npkx4u.x1ms6mhf",
+  ],
+  skipPhrases: [
+    "for you",
+    "following",
+    "reply",
+    "repost",
+    "like",
+    "likes",
+    "share",
+    "send",
+    "follow",
+    "log in",
+    "sign up",
+    "view replies",
+    "show this thread",
+    "liked by",
+    "original author",
+  ],
+  skipTextPatterns: [
+    /^@\w[\w.-]{0,40}$/,
+    /^\d+(\.\d+)?[KMB\u4e07\u4ebf]?$/i,
+    /^\d+[smhdw]$/i,
+    /^\d+(\.\d+)?[KMB\u4e07\u4ebf]?\s+(?:likes?|replies?|reposts?|quotes?|views?)$/i,
+    /^(?:\d+\s+)?(?:replies?|likes?|reposts?|quotes?|views?)$/i,
+  ],
+};
+
+const SITE_POLICIES = [YOUTUBE_POLICY, REDDIT_POLICY, X_POLICY, THREADS_POLICY] as const;
 
 export function resolveTextGranularity(
   element: HTMLElement,
@@ -371,6 +431,11 @@ export function resolveTextGranularity(
   const policy = resolvePolicy(options.hostname);
   if (!policy) return { skip: false };
 
+  if (policy.skipBeforeContent) {
+    const skipDecision = resolveSiteSkipDecision(element, text, policy);
+    if (skipDecision) return skipDecision;
+  }
+
   const contentRule = findContentRule(element, policy.contentRules);
   if (contentRule) {
     return {
@@ -380,11 +445,7 @@ export function resolveTextGranularity(
     };
   }
 
-  if (matchesClosest(element, policy.skipSelectors)) return { skip: true, reason: "site-selector" };
-  if (matchesExactPhrase(text, policy.skipPhrases)) return { skip: true, reason: "site-phrase" };
-  if (matchesAnyPattern(text, policy.skipTextPatterns)) return { skip: true, reason: "site-text" };
-
-  return { skip: false };
+  return resolveSiteSkipDecision(element, text, policy) ?? { skip: false };
 }
 
 function globalSkipSelectors(options: GranularityOptions): readonly string[] {
@@ -428,4 +489,15 @@ function matchesExactPhrase(text: string, phrases: readonly string[]): boolean {
 
 function matchesAnyPattern(text: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+function resolveSiteSkipDecision(
+  element: HTMLElement,
+  text: string,
+  policy: SiteGranularityPolicy,
+): TextGranularityDecision | undefined {
+  if (matchesClosest(element, policy.skipSelectors)) return { skip: true, reason: "site-selector" };
+  if (matchesExactPhrase(text, policy.skipPhrases)) return { skip: true, reason: "site-phrase" };
+  if (matchesAnyPattern(text, policy.skipTextPatterns)) return { skip: true, reason: "site-text" };
+  return undefined;
 }

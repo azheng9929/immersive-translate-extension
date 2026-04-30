@@ -300,6 +300,58 @@ describe("PageController", () => {
     expect(document.querySelector("#action")?.textContent).toBe("[zh-Hans] Repeated sentence.");
   });
 
+  it("translates Threads feed text without translating authors, actions, or metrics", async () => {
+    document.body.innerHTML = `
+      <main>
+        <nav><span>For You</span></nav>
+        <div role="article">
+          <a href="/@alice"><span dir="auto">alice</span></a>
+          <time>2h</time>
+          <div class="thread-body"><div dir="auto">Only regret is not trying this sooner.</div></div>
+          <div role="button" aria-label="Reply"><span>Reply</span></div>
+          <div role="button" aria-label="Like"><span>1.2K</span></div>
+        </div>
+        <div role="dialog">
+          <div role="article">
+            <div class="thread-body"><div dir="auto">A dialog thread reply should translate too.</div></div>
+          </div>
+        </div>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.threads.com/", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      attributeNames: policy.attributeNames,
+      allowTooltip: policy.allowTooltip,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Only regret is not trying this sooner.",
+      "A dialog thread reply should translate too.",
+    ]);
+    expect(document.querySelector(".thread-body .imt-translation-block")?.textContent).toBe(
+      "[zh-Hans] Only regret is not trying this sooner.",
+    );
+    expect(document.body.textContent).toContain("alice");
+    expect(document.body.textContent).toContain("Reply");
+    expect(document.body.textContent).toContain("1.2K");
+    expect(document.body.textContent).not.toContain("[zh-Hans] alice");
+    expect(document.body.textContent).not.toContain("[zh-Hans] Reply");
+    expect(document.body.textContent).not.toContain("[zh-Hans] 1.2K");
+  });
+
   it("keys cached translations by page title context", async () => {
     document.body.innerHTML = `<main><p>Comps</p></main>`;
     const cache = new MemoryTranslationCache();

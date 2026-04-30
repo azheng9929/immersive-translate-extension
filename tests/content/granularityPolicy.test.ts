@@ -130,6 +130,39 @@ describe("resolveTextGranularity", () => {
     expect(resolveTextGranularity(hover, hover.textContent ?? "", { hostname: "x.com" }).skip).toBe(true);
   });
 
+  it("keeps Threads post text while skipping authors, controls, metrics, and timestamps", () => {
+    mountFixture(`
+      <main>
+        <nav><span>For You</span></nav>
+        <div role="article">
+          <a href="/@openai"><span dir="auto">openai</span></a>
+          <time>2h</time>
+          <div class="body"><div dir="auto">Shipping readable translation without moving the page layout.</div></div>
+          <div role="button" aria-label="Reply"><span>Reply</span></div>
+          <div role="button" aria-label="Like"><span>1.2K</span></div>
+        </div>
+      </main>
+    `);
+
+    const author = document.querySelector<HTMLElement>('a[href^="/@"] span')!;
+    const time = document.querySelector<HTMLElement>("time")!;
+    const post = document.querySelector<HTMLElement>(".body div")!;
+    const reply = document.querySelector<HTMLElement>('[aria-label="Reply"] span')!;
+    const likes = document.querySelector<HTMLElement>('[aria-label="Like"] span')!;
+    const nav = document.querySelector<HTMLElement>("nav span")!;
+
+    expect(resolveTextGranularity(post, post.textContent ?? "", { hostname: "www.threads.com" })).toMatchObject({
+      skip: false,
+      category: "comment",
+      root: post,
+    });
+    expect(resolveTextGranularity(author, author.textContent ?? "", { hostname: "www.threads.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(time, time.textContent ?? "", { hostname: "www.threads.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(reply, reply.textContent ?? "", { hostname: "www.threads.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(likes, likes.textContent ?? "", { hostname: "www.threads.com" }).skip).toBe(true);
+    expect(resolveTextGranularity(nav, nav.textContent ?? "", { hostname: "www.threads.com" }).skip).toBe(true);
+  });
+
   it("skips global icon, code, social share, and identifier-only fragments without hiding normal text", () => {
     mountFixture(`
       <p>Readable product documentation for normal pages.</p>

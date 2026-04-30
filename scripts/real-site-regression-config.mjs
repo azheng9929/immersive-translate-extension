@@ -1,5 +1,6 @@
 export const allRegressionSites = [
   { name: "X", host: "x.com", url: "https://x.com/explore" },
+  { name: "Threads", host: "threads.com", url: "https://www.threads.com/" },
   { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
   { name: "Inworld", host: "inworld.ai", url: "https://inworld.ai/" },
@@ -20,7 +21,7 @@ const regressionProfiles = {
   },
   "high-dynamic": {
     dynamicModes: ["conservative"],
-    siteFilter: ["x", "youtube", "reddit", "metatft", "metatft augments", "tactics"],
+    siteFilter: ["x", "threads", "youtube", "reddit", "metatft", "metatft augments", "tactics"],
   },
   all: {
     dynamicModes: ["conservative", "normal"],
