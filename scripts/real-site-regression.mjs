@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { resolveRegressionSelection } from "./real-site-regression-config.mjs";
 
 const rootDir = resolve(import.meta.dirname, "..");
 const extensionSourceDir = resolve(rootDir, ".output", "chrome-mv3");
@@ -16,31 +17,11 @@ const profileDir = join(runtimeDir, "profile");
 const reportDir = resolve(rootDir, ".tmp", "real-site-regression-reports");
 const reportPath = join(reportDir, `report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
 const provider = process.env.IMT_REGRESSION_PROVIDER ?? "fake";
-const dynamicModes = parseCsv(process.env.IMT_REGRESSION_DYNAMIC_MODES ?? "conservative,normal");
-
-const sites = [
-  { name: "X", host: "x.com", url: "https://x.com/explore" },
-  { name: "YouTube", host: "youtube.com", url: "https://www.youtube.com/results?search_query=openai" },
-  { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
-  { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
-  { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
-  {
-    name: "Tactics Tools Hover",
-    host: "tactics.tools",
-    url: "https://tactics.tools/team-compositions",
-    hoverTooltip: true,
-  },
-];
-const siteFilter = parseCsv(process.env.IMT_REGRESSION_SITE_FILTER ?? "").map((item) => item.toLowerCase());
-const selectedSites = siteFilter.length === 0
-  ? sites
-  : sites.filter((site) =>
-      siteFilter.some((filter) =>
-        site.name.toLowerCase().includes(filter) ||
-        site.host.toLowerCase().includes(filter) ||
-        site.url.toLowerCase().includes(filter),
-      )
-    );
+const regressionSelection = resolveRegressionSelection({
+  argv: process.argv.slice(2),
+  env: process.env,
+});
+const { profile, dynamicModes, siteFilter, selectedSites } = regressionSelection;
 
 const baseConfig = {
   targetLang: "zh-Hans",
@@ -103,6 +84,7 @@ async function main() {
     extensionDir,
     port,
     provider,
+    profile,
     dynamicModes,
     config: publicConfig(baseConfig),
     siteFilter,
@@ -712,10 +694,6 @@ function siteAccessGateReason(site, metrics) {
 
 function isIgnorableConsoleError(message) {
   return /favicon|net::ERR_BLOCKED_BY_CLIENT|net::ERR_CONNECTION_CLOSED|ResizeObserver loop/i.test(message);
-}
-
-function parseCsv(value) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
 function validateProviderConfig(config) {

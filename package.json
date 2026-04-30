@@ -7,7 +7,9 @@
     "dev": "wxt",
     "build": "wxt build",
     "test": "vitest run",
-    "test:real-sites": "npm run build && node scripts/real-site-regression.mjs",
+    "test:real-sites": "npm run build && node scripts/real-site-regression.mjs --profile=all",
+    "test:real-sites:smoke": "npm run build && node scripts/real-site-regression.mjs --profile=smoke",
+    "test:real-sites:high-dynamic": "npm run build && node scripts/real-site-regression.mjs --profile=high-dynamic",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
