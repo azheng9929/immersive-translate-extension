@@ -162,6 +162,55 @@ describe("DebugOverlay", () => {
 
     overlay.unmount();
   });
+
+  it("explains an unmarked clicked element when rule visualization is active", () => {
+    document.body.innerHTML = `
+      <main>
+        <p class="unmatched-title">This headline was missed by every configured selector.</p>
+      </main>
+    `;
+    const overlay = new DebugOverlay({
+      getStatus: () => createStatus(),
+      subscribeStatus: () => () => undefined,
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+    document.querySelector<HTMLElement>(".unmatched-title")?.click();
+
+    const inspectorText = document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent ?? "";
+    expect(inspectorText).toContain("未命中规则 selector");
+    expect(inspectorText).toContain("p.unmatched-title");
+    expect(inspectorText).toContain("文本: This headline was missed");
+
+    overlay.unmount();
+  });
+
+  it("explains an already translated root when clicked in rule visualization mode", () => {
+    document.body.innerHTML = `
+      <main>
+        <p class="body-text" data-imt-state="translated">
+          Hello world
+          <span class="imt-translation-block">你好，世界</span>
+        </p>
+      </main>
+    `;
+    const overlay = new DebugOverlay({
+      getStatus: () => createStatus(),
+      subscribeStatus: () => () => undefined,
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+    document.querySelector<HTMLElement>(".imt-translation-block")?.click();
+
+    const inspectorText = document.querySelector("[data-imt-rule-visualizer-inspector='true']")?.textContent ?? "";
+    expect(inspectorText).toContain("已翻译");
+    expect(inspectorText).toContain("content:comment");
+    expect(inspectorText).toContain("p.body-text");
+
+    overlay.unmount();
+  });
 });
 
 function createStatus(): PageTranslationStatus {

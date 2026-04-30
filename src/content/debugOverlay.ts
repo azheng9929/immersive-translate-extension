@@ -281,7 +281,7 @@ class RuleVisualizer {
   private legendElement: HTMLElement | undefined;
   private inspectorElement: HTMLElement | undefined;
   private readonly handleInspectClick = (event: MouseEvent): void => {
-    const element = visualizedElementFromEvent(event);
+    const element = inspectableElementFromEvent(event);
     if (!element || isExtensionElement(element)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -355,7 +355,7 @@ class RuleVisualizer {
     const inspector = document.createElement("aside");
     inspector.dataset.imtManaged = "true";
     inspector.dataset.imtRuleVisualizerInspector = "true";
-    inspector.textContent = element.getAttribute("data-imt-rule-visualization-reason") ?? "No rule reason";
+    inspector.textContent = elementInspectionText(element);
     const left = Math.min(Math.max(clientX + 12, 12), Math.max(window.innerWidth - 320, 12));
     const top = Math.min(Math.max(clientY + 12, 12), Math.max(window.innerHeight - 120, 12));
     Object.assign(inspector.style, {
@@ -453,6 +453,16 @@ function ruleReasonLabel(group: PageTranslationRuleVisualizationGroup, selector:
   return `${group}${labelSuffix}: ${selector}`;
 }
 
+function inspectableElementFromEvent(event: MouseEvent): Element | undefined {
+  const target = event.target;
+  if (!(target instanceof Element) || isExtensionElement(target)) return undefined;
+  const translatedRoot = target.closest("[data-imt-state='translated']");
+  if (translatedRoot && !isExtensionElement(translatedRoot)) return translatedRoot;
+  const visualizedRoot = visualizedElementFromEvent(event);
+  if (visualizedRoot) return visualizedRoot;
+  return target;
+}
+
 function visualizedElementFromEvent(event: MouseEvent): Element | undefined {
   for (const item of event.composedPath()) {
     if (item instanceof Element && item.hasAttribute("data-imt-rule-visualization")) return item;
@@ -460,6 +470,35 @@ function visualizedElementFromEvent(event: MouseEvent): Element | undefined {
   const target = event.target;
   if (!(target instanceof Element)) return undefined;
   return target.closest("[data-imt-rule-visualization]") ?? undefined;
+}
+
+function elementInspectionText(element: Element): string {
+  const translatedRoot = element.closest("[data-imt-state='translated']");
+  const ruleReason = element.getAttribute("data-imt-rule-visualization-reason") ??
+    element.closest("[data-imt-rule-visualization]")?.getAttribute("data-imt-rule-visualization-reason");
+  const rows = [
+    `状态: ${translatedRoot ? "已翻译" : "未翻译"}`,
+    `元素: ${elementLabel(element)}`,
+    `规则: ${ruleReason ?? "未命中规则 selector"}`,
+  ];
+  const textPreview = elementTextPreview(element);
+  if (textPreview) rows.push(`文本: ${textPreview}`);
+  return rows.join("\n");
+}
+
+function elementLabel(element: Element): string {
+  const tag = element.tagName.toLowerCase();
+  const id = element.id ? `#${element.id}` : "";
+  const classes = Array.from(element.classList)
+    .filter((className) => /^[\w-]+$/.test(className))
+    .slice(0, 3)
+    .map((className) => `.${className}`)
+    .join("");
+  return `${tag}${id}${classes}`;
+}
+
+function elementTextPreview(element: Element): string {
+  return (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTMLElement {
