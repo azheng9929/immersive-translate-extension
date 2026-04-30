@@ -4,7 +4,7 @@ import { geminiProvider } from "./providers/geminiProvider";
 import { runProviderRequestWithInflightDedupe } from "./inflightTranslationDedupe";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
-import { queryParagraphCache, setParagraphCache } from "./paragraphCache";
+import { clearParagraphCache, getParagraphCacheStats, queryParagraphCache, setParagraphCache } from "./paragraphCache";
 import { clearTranslationPermitQueues, withTranslationPermit } from "./translationPermit";
 import { getWebRulesForUrl } from "./webRuleStore";
 import type { ProviderRequest, ProviderResponseItem, TranslationProvider } from "./providers/providerTypes";
@@ -59,6 +59,13 @@ export async function handleBackgroundMessage(message: BackgroundMessage): Promi
   }
   if (message.type === "IMT_SET_PARAGRAPH_CACHE") {
     await setParagraphCache(message.entries);
+    return { ok: true };
+  }
+  if (message.type === "IMT_GET_PARAGRAPH_CACHE_STATS") {
+    return { ok: true, cacheStats: await getParagraphCacheStats() };
+  }
+  if (message.type === "IMT_CLEAR_PARAGRAPH_CACHE") {
+    await clearParagraphCache(message.options);
     return { ok: true };
   }
   if (message.type === "IMT_CLEAR_TRANSLATE_QUEUE") {

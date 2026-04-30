@@ -119,4 +119,41 @@ describe("TranslationCache", () => {
     expect(hits.get(metatftLookup.key)).toBe("TFT阵容");
     expect(hits.has(githubLookup.key)).toBe(false);
   });
+
+  it("reports cache stats and clears entries by provider", async () => {
+    const cache = new IndexedDbTranslationCache({
+      dbName: `imt-cache-${crypto.randomUUID()}`,
+      indexedDB: indexedDB as unknown as IDBFactory,
+    });
+    const first = createTranslationCacheLookup({
+      provider: "mock-a",
+      sourceLang: "auto",
+      targetLang: "zh-Hans",
+      normalizedText: "hello world",
+    });
+    const second = createTranslationCacheLookup({
+      provider: "mock-b",
+      sourceLang: "auto",
+      targetLang: "zh-Hans",
+      normalizedText: "good morning",
+    });
+
+    await cache.putMany([
+      { ...first, translatedText: "hello-world-zh" },
+      { ...second, translatedText: "good-morning-zh" },
+    ]);
+
+    await expect(cache.getStats()).resolves.toMatchObject({
+      entries: 2,
+      providers: ["mock-a", "mock-b"],
+      targetLangs: ["zh-hans"],
+    });
+
+    await cache.clear({ provider: "mock-a" });
+
+    const stats = await cache.getStats();
+    expect(stats.entries).toBe(1);
+    expect(stats.providers).toEqual(["mock-b"]);
+    await expect(cache.getMany([first, second])).resolves.toEqual(new Map([[second.key, "good-morning-zh"]]));
+  });
 });

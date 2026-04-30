@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleBackgroundMessage, toggleActiveTabTranslation } from "@/background/messageRouter";
+import { resetParagraphCacheForTests, setParagraphCache } from "@/background/paragraphCache";
+import { createTranslationCacheLookup } from "@/shared/translationCache";
 import { stubImportedRulesResource } from "../helpers/importedRulesResource";
 
 describe("handleBackgroundMessage", () => {
@@ -81,6 +83,40 @@ describe("handleBackgroundMessage", () => {
     expect(response.webRules.some((rule) => rule.selectorMatches?.length)).toBe(true);
 
     vi.unstubAllGlobals();
+  });
+
+  it("exposes paragraph cache stats and clear operations through background messages", async () => {
+    resetParagraphCacheForTests();
+    const lookup = createTranslationCacheLookup({
+      provider: "openai-compatible:gpt-5.4",
+      sourceLang: "auto",
+      targetLang: "zh-Hans",
+      pageTitle: "Example Page",
+      normalizedText: "Hello world.",
+    });
+    await setParagraphCache([{ ...lookup, translatedText: "hello-world-zh" }]);
+
+    await expect(handleBackgroundMessage({ type: "IMT_GET_PARAGRAPH_CACHE_STATS" })).resolves.toMatchObject({
+      ok: true,
+      cacheStats: {
+        entries: 1,
+        providers: ["openai-compatible:gpt-5.4"],
+        targetLangs: ["zh-hans"],
+      },
+    });
+
+    await expect(
+      handleBackgroundMessage({
+        type: "IMT_CLEAR_PARAGRAPH_CACHE",
+        options: { provider: "openai-compatible:gpt-5.4" },
+      }),
+    ).resolves.toEqual({ ok: true });
+    await expect(handleBackgroundMessage({ type: "IMT_GET_PARAGRAPH_CACHE_STATS" })).resolves.toMatchObject({
+      ok: true,
+      cacheStats: { entries: 0 },
+    });
+
+    resetParagraphCacheForTests();
   });
 
   it("forwards active tab page status requests from popup", async () => {

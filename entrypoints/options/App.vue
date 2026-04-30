@@ -21,6 +21,7 @@ import {
   type SiteAutoTranslateChoice,
   type SiteRule,
 } from "../../src/shared/siteRules";
+import type { TranslationCacheStats } from "../../src/shared/translationCache";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
@@ -35,6 +36,9 @@ const siteRuleDisplayMode = ref<DisplayMode | "global">("global");
 const siteRuleProvider = ref<ExtensionProvider | "global">("global");
 const siteRuleFallbackProvider = ref<FallbackProvider | "global">("global");
 const siteRuleError = ref("");
+const cacheStats = ref<TranslationCacheStats | undefined>();
+const cacheStatsError = ref("");
+const isClearingCache = ref(false);
 
 const siteRules = computed(() =>
   Object.keys(config.siteRules)
@@ -47,6 +51,19 @@ const siteRules = computed(() =>
     }))
     .sort((left, right) => left.siteKey.localeCompare(right.siteKey)),
 );
+
+const cacheStatsSummary = computed(() => {
+  if (cacheStatsError.value) return cacheStatsError.value;
+  if (!cacheStats.value) return "正在读取缓存";
+  return `${cacheStats.value.entries} 条缓存，约 ${formatBytes(cacheStats.value.estimatedBytes)}`;
+});
+
+const cacheStatsDetails = computed(() => {
+  if (!cacheStats.value) return "";
+  const providers = cacheStats.value.providers.length ? cacheStats.value.providers.join(", ") : "无";
+  const targetLangs = cacheStats.value.targetLangs.length ? cacheStats.value.targetLangs.join(", ") : "无";
+  return `服务：${providers}；目标语言：${targetLangs}`;
+});
 
 const updateConfig = async (patch: ExtensionConfigPatch) => {
   Object.assign(config, patch);
@@ -181,9 +198,34 @@ onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
   if (response.ok && "config" in response) Object.assign(config, response.config);
   if (!response.ok) console.warn(response.error);
+  await loadCacheStats();
   glossaryText.value = glossaryEntriesToText(config.glossary);
   isLoading.value = false;
 });
+
+const loadCacheStats = async () => {
+  const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_PARAGRAPH_CACHE_STATS" })) as MessageResponse;
+  if (response.ok && "cacheStats" in response) {
+    cacheStats.value = response.cacheStats;
+    cacheStatsError.value = "";
+  }
+  if (!response.ok) {
+    cacheStatsError.value = response.error;
+    console.warn(response.error);
+  }
+};
+
+const clearAllCache = async () => {
+  isClearingCache.value = true;
+  const response = (await chrome.runtime.sendMessage({ type: "IMT_CLEAR_PARAGRAPH_CACHE" })) as MessageResponse;
+  if (response.ok) {
+    await loadCacheStats();
+  } else {
+    cacheStatsError.value = response.error;
+    console.warn(response.error);
+  }
+  isClearingCache.value = false;
+};
 
 function numberInputValue(event: Event): number {
   return Number((event.target as HTMLInputElement).value);
@@ -217,6 +259,12 @@ function providerLabel(value: ExtensionProvider | FallbackProvider): string {
   if (value === "fake") return "本地测试";
   if (value === "none") return "不使用";
   return "Microsoft";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 </script>
 
@@ -519,6 +567,26 @@ function providerLabel(value: ExtensionProvider | FallbackProvider): string {
             @change="updateConfig({ useCache: ($event.target as HTMLInputElement).checked })"
           />
         </label>
+
+        <div class="cache-management" aria-label="缓存管理">
+          <div>
+            <strong>缓存状态</strong>
+            <p data-testid="cache-stats-summary">{{ cacheStatsSummary }}</p>
+            <p v-if="cacheStatsDetails" class="cache-details">{{ cacheStatsDetails }}</p>
+          </div>
+          <div class="action-row cache-actions">
+            <button data-testid="cache-stats-refresh" class="compact-button" type="button" @click="loadCacheStats">刷新</button>
+            <button
+              data-testid="cache-clear-all"
+              class="compact-button danger-button"
+              type="button"
+              :disabled="isClearingCache"
+              @click="clearAllCache"
+            >
+              清空缓存
+            </button>
+          </div>
+        </div>
 
         <label class="toggle-row">
           <span>翻译新内容</span>
@@ -848,6 +916,32 @@ p {
   font-weight: 650;
 }
 
+.cache-management {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 42, 95, 0.1);
+  border-radius: 8px;
+  background: #f9fbfd;
+}
+
+.cache-management strong {
+  display: block;
+  color: #102a5f;
+  font-size: 13px;
+}
+
+.cache-details {
+  font-size: 12px;
+}
+
+.cache-actions {
+  justify-content: flex-end;
+}
+
 .field > span {
   color: #52627a;
   font-size: 12px;
@@ -916,6 +1010,7 @@ textarea {
 
   .page-header,
   .panel-heading,
+  .cache-management,
   .openai-settings,
   .gemini-settings,
   .tuning-grid,

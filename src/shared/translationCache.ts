@@ -11,6 +11,20 @@ export type TranslationCacheWrite = TranslationCacheLookup & {
   translatedText: string;
 };
 
+export type TranslationCacheClearOptions = {
+  provider?: string;
+  sourceLang?: string;
+  targetLang?: string;
+  pageTitle?: string;
+};
+
+export type TranslationCacheStats = {
+  entries: number;
+  estimatedBytes: number;
+  providers: string[];
+  targetLangs: string[];
+};
+
 export type TranslationCache = {
   getMany(lookups: TranslationCacheLookup[]): Promise<Map<string, string>>;
   putMany(entries: TranslationCacheWrite[]): Promise<void>;
@@ -125,6 +139,41 @@ export class IndexedDbTranslationCache implements TranslationCache {
     await transactionDone(transaction);
   }
 
+  async getStats(): Promise<TranslationCacheStats> {
+    const entries = await this.getAllEntries();
+    const providers = uniqueSorted(entries.map((entry) => entry.provider));
+    const targetLangs = uniqueSorted(entries.map((entry) => entry.targetLang));
+    const estimatedBytes = entries.reduce((total, entry) => total + estimateStoredEntryBytes(entry), 0);
+
+    return {
+      entries: entries.length,
+      estimatedBytes,
+      providers,
+      targetLangs,
+    };
+  }
+
+  async clear(options: TranslationCacheClearOptions = {}): Promise<void> {
+    const db = await this.getDb();
+    const transaction = db.transaction(this.storeName, "readwrite");
+    const store = transaction.objectStore(this.storeName);
+
+    if (!hasClearFilter(options)) {
+      store.clear();
+      await transactionDone(transaction);
+      return;
+    }
+
+    const entries = await requestToPromise<StoredTranslation[]>(store.getAll());
+    for (const entry of entries) {
+      if (matchesClearOptions(entry, options)) {
+        store.delete(entry.key);
+      }
+    }
+
+    await transactionDone(transaction);
+  }
+
   private getDb(): Promise<IDBDatabase> {
     if (!this.indexedDB) {
       return Promise.reject(new Error("IndexedDB is not available"));
@@ -132,6 +181,15 @@ export class IndexedDbTranslationCache implements TranslationCache {
 
     this.dbPromise ??= openDatabase(this.indexedDB, this.dbName, this.storeName);
     return this.dbPromise;
+  }
+
+  private async getAllEntries(): Promise<StoredTranslation[]> {
+    const db = await this.getDb();
+    const transaction = db.transaction(this.storeName, "readonly");
+    const store = transaction.objectStore(this.storeName);
+    const entries = await requestToPromise<StoredTranslation[]>(store.getAll());
+    await transactionDone(transaction);
+    return entries;
   }
 }
 
@@ -182,4 +240,32 @@ function hashText(value: string): string {
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return `${hash.toString(36)}-${value.length}`;
+}
+
+function hasClearFilter(options: TranslationCacheClearOptions): boolean {
+  return Boolean(options.provider || options.sourceLang || options.targetLang || options.pageTitle);
+}
+
+function matchesClearOptions(entry: StoredTranslation, options: TranslationCacheClearOptions): boolean {
+  if (options.provider && entry.provider !== normalizeCachePart(options.provider)) return false;
+  if (options.sourceLang && entry.sourceLang !== normalizeCachePart(options.sourceLang)) return false;
+  if (options.targetLang && entry.targetLang !== normalizeCachePart(options.targetLang)) return false;
+  if (options.pageTitle && entry.pageTitle !== normalizeContext(options.pageTitle)) return false;
+  return true;
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function estimateStoredEntryBytes(entry: StoredTranslation): number {
+  return (
+    entry.key.length +
+    entry.provider.length +
+    entry.sourceLang.length +
+    entry.targetLang.length +
+    entry.pageTitle.length +
+    entry.normalizedText.length +
+    entry.translatedText.length
+  ) * 2;
 }

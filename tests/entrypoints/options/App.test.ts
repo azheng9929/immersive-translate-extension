@@ -89,6 +89,47 @@ describe("options App", () => {
     });
   });
 
+  it("shows cache stats and clears paragraph cache from settings", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG };
+    let cacheEntries = 3;
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_GET_PARAGRAPH_CACHE_STATS") {
+        return {
+          ok: true,
+          cacheStats: {
+            entries: cacheEntries,
+            estimatedBytes: 4096,
+            providers: ["openai-compatible:gpt-5.4"],
+            targetLangs: ["zh-hans"],
+          },
+        };
+      }
+      if (message.type === "IMT_CLEAR_PARAGRAPH_CACHE") {
+        cacheEntries = 0;
+        return { ok: true };
+      }
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='cache-stats-summary']").text()).toContain("3");
+    expect(wrapper.find("[data-testid='cache-stats-summary']").text()).toContain("4 KB");
+
+    await wrapper.find("[data-testid='cache-clear-all']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({ type: "IMT_CLEAR_PARAGRAPH_CACHE" });
+    expect(wrapper.find("[data-testid='cache-stats-summary']").text()).toContain("0");
+  });
+
   it("saves OpenAI-compatible API settings from the settings page", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
     const sendMessage = vi.fn(async (message) => {
