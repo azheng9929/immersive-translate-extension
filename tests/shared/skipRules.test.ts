@@ -8,9 +8,12 @@ describe("isSkippableElement", () => {
     expect(isSkippableElement(document.querySelector("code")!)).toBe(true);
   });
 
-  it("does not skip buttons because UI text should be translated", () => {
+  it("skips buttons and navigation by default", () => {
     document.body.innerHTML = "<button>Submit</button>";
-    expect(isSkippableElement(document.querySelector("button")!)).toBe(false);
+    expect(isSkippableElement(document.querySelector("button")!)).toBe(true);
+
+    document.body.innerHTML = '<nav><a href="/docs">Docs</a></nav>';
+    expect(isSkippableElement(document.querySelector("a")!)).toBe(true);
   });
 
   it("skips plugin-managed nodes", () => {

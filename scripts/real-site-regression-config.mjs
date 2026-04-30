@@ -126,7 +126,7 @@ const commonNegativeSelectors = [
 export const realSiteFixtureExpectations = {
   article: {
     positiveSelectors: ["article h1", "article h2", "article h3", "article p", "main h1", "main h2", "main p", "blockquote", "figcaption", "li"],
-    negativeSelectors: [...commonNegativeSelectors, "nav", "header", "footer", "[role='navigation']", "[aria-label*='share' i]", ".toc", "[class*='toc' i]"],
+    negativeSelectors: [...commonNegativeSelectors, "nav", "body > header", "footer", "[role='navigation']", "[aria-label*='share' i]", ".toc", "[class*='toc' i]"],
     minPositiveTranslated: 5,
     maxNegativeTranslated: 2,
     minUnits: 8,

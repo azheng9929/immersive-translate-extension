@@ -742,6 +742,7 @@ function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions):
 
 function collectBodyRuleRoots(root: ParentNode, options: ScanRootOptions): ParentNode[] {
   const bodyRule = options.bodyRule;
+  if (bodyRule?.enable === false) return [root];
   if (!hasBodyRuleSelectors(bodyRule)) return passesBodyRuleTextLength(root, bodyRule) ? [root] : [];
 
   const bodySelector = bodyRule?.bodySelector?.trim();
@@ -787,6 +788,7 @@ function shouldUseGenericRootScoring(options: ScanRootOptions): boolean {
 }
 
 function hasBodyRuleSelectors(bodyRule: WebTranslationBodyRule | undefined): boolean {
+  if (bodyRule?.enable === false) return false;
   return Boolean(bodyRule?.bodySelector?.trim() || bodyRule?.articleSelector?.trim());
 }
 

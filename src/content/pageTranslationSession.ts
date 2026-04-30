@@ -232,8 +232,28 @@ export class PageTranslationSession {
             dynamicRuns: 0,
             lastError: undefined,
           });
-          this.scheduleLazyRootDiscovery(root, operationId, firstWaveRoots);
-          if (firstWaveRoots.length > 0) void this.translateRoots(firstWaveRoots, false);
+          if (firstWaveRoots.length > 0) {
+            this.scheduleLazyRootDiscovery(root, operationId, firstWaveRoots);
+            void this.translateRoots(firstWaveRoots, false);
+          } else {
+            const fallbackRoots = this.controller.collectTranslatableRoots(root);
+            const maxEagerRoots = this.options.maxEagerLazyRoots ?? 120;
+            const eagerRoots = fallbackRoots.slice(0, maxEagerRoots);
+            const deferredRoots = fallbackRoots.slice(eagerRoots.length);
+            this.observeLazyRoots(deferredRoots, false);
+            this.setStatus({
+              ...EMPTY_SUMMARY,
+              phase: eagerRoots.length > 0 || fallbackRoots.length === 0 ? "updating" : "translated",
+              observation,
+              dynamicRuns: 0,
+              lastError: undefined,
+            });
+            if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
+            else if (fallbackRoots.length === 0) {
+              const rootElement = root instanceof HTMLElement ? root : root instanceof Document ? root.body : undefined;
+              if (rootElement) void this.translateRoots([rootElement], false);
+            }
+          }
           return this.getStatus();
         }
 

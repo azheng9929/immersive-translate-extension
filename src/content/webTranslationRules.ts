@@ -408,6 +408,113 @@ h4,
     isHighDynamic: true,
   },
   {
+    id: "bing-search",
+    siteKey: "bing.com",
+    matches: ["*://www.bing.com/search*", "*://bing.com/search*"],
+    selectors: [
+      "#b_results h2",
+      "#b_results h2 a",
+      ".b_algo h2",
+      ".b_algo h2 a",
+      ".b_algo .b_caption p",
+      ".b_algo .b_snippet",
+      ".b_gwaDlTitle",
+      ".b_gwaDlSnippet",
+    ],
+    contentSelectors: [
+      { selector: "#b_results h2, .b_algo h2", category: "heading" },
+      { selector: ".b_algo .b_caption p, .b_algo .b_snippet, .b_gwaDlSnippet", category: "card-text" },
+      { selector: ".b_gwaDlTitle", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "#sb_form",
+      "#b_header",
+      "#b_context",
+      "#b_footer",
+      ".b_attribution",
+      ".b_tpcn",
+      ".b_factrow",
+      ".b_ad",
+      ".b_pag",
+      "cite",
+      "[class*='url' i]",
+      "nav",
+      "header",
+      "footer",
+      "button",
+      "[role='button']",
+      "input",
+      "time",
+    ],
+    mutationExcludeSelectors: ["#sb_form", "#b_header", "#b_context", "#b_footer", ".b_pag"],
+    injectedCss: [
+      `
+#b_results h2,
+.b_algo .b_caption,
+.b_algo .b_snippet,
+.b_gwaDlTitle,
+.b_gwaDlSnippet {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+    observeUrlChange: true,
+    urlChangeDelay: 500,
+  },
+  {
+    id: "duckduckgo-search",
+    siteKey: "duckduckgo.com",
+    matches: ["*://duckduckgo.com/*"],
+    selectors: [
+      "article h2",
+      "article h3",
+      "article [data-testid='result-title-a']",
+      "article [data-testid='result-snippet']",
+      "article p",
+      "article li",
+    ],
+    contentSelectors: [
+      { selector: "article h2, article h3, article [data-testid='result-title-a']", category: "heading" },
+      { selector: "article [data-testid='result-snippet'], article p, article li", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "form",
+      "input",
+      "button",
+      "[role='button']",
+      "nav",
+      "header",
+      "footer",
+      "time",
+      "cite",
+      "[data-testid='result-extras-url-link']",
+      "[class*='url' i]",
+      "[class*='source' i]",
+      "[class*='breadcrumb' i]",
+      "[class*='menu' i]",
+    ],
+    mutationExcludeSelectors: ["form", "nav", "header", "button", "[role='button']"],
+    injectedCss: [
+      `
+article h2,
+article h3,
+article p {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+    observeUrlChange: true,
+    urlChangeDelay: 500,
+  },
+  {
     id: "x",
     siteKey: "x.com",
     matches: ["*://x.com/*", "*://*.x.com/*"],
@@ -1380,6 +1487,175 @@ span.comment-copy {
     detectParagraphLanguage: true,
   },
   {
+    id: "wikipedia",
+    siteKey: "wikipedia.org",
+    matches: ["*://*.wikipedia.org/wiki/*"],
+    excludeMatches: ["*://*.wikipedia.org/wiki/*.pdf"],
+    selectors: [
+      "#firstHeading",
+      ".mw-parser-output",
+    ],
+    contentSelectors: [
+      { selector: "#firstHeading, .mw-page-title-main, .mw-parser-output h2, .mw-parser-output h3", category: "heading" },
+      {
+        selector: ".mw-parser-output > p, .mw-parser-output > section > p, .mw-parser-output blockquote, .mw-parser-output > ul > li, .mw-parser-output > ol > li",
+        category: "content-block",
+      },
+      { selector: ".mw-parser-output figure figcaption", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "#mw-navigation",
+      "#mw-panel",
+      "#p-lang-btn",
+      "#toc",
+      ".toc",
+      ".vector-header-container",
+      ".vector-page-toolbar",
+      ".vector-toc",
+      ".mw-editsection",
+      ".reference",
+      ".reflist",
+      ".navbox",
+      ".infobox",
+      ".metadata",
+      ".mw-jump-link",
+      ".mw-footer",
+      "sup.reference",
+      "table",
+      "pre",
+      "code",
+      "math",
+    ],
+    mutationExcludeSelectors: ["#mw-navigation", "#mw-panel", ".vector-header-container", ".vector-toc"],
+    injectedCss: [
+      `
+.mw-parser-output > p,
+.mw-parser-output h2,
+.mw-parser-output h3,
+.mw-parser-output figure figcaption {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    bodyRule: { enable: false },
+    eagerLazyRootMargin: "2600px",
+    maxEagerLazyRoots: 140,
+    viewportSupplement: true,
+    viewportSupplementRootMargin: "1800px",
+    viewportSupplementMaxRoots: 40,
+    detectParagraphLanguage: true,
+  },
+  {
+    id: "mdn-docs",
+    siteKey: "developer.mozilla.org",
+    matches: ["*://developer.mozilla.org/*/docs/*", "*://developer.mozilla.org/docs/*"],
+    selectors: [
+      "main#content h1",
+      "main#content h2",
+      "main#content h3",
+      "main#content p",
+      "main#content li",
+      "main#content td",
+      "main#content th",
+      "main#content .notecard",
+      "article h1",
+      "article h2",
+      "article p",
+      "article li",
+    ],
+    contentSelectors: [
+      { selector: "main#content h1, main#content h2, main#content h3, article h1, article h2", category: "heading" },
+      { selector: "main#content p, main#content li, main#content td, main#content th, main#content .notecard, article p, article li", category: "content-block" },
+    ],
+    excludeSelectors: [
+      "header",
+      "footer",
+      "nav",
+      "aside",
+      ".sidebar",
+      ".left-sidebar",
+      ".right-sidebar",
+      ".document-toc-container",
+      ".breadcrumbs",
+      ".page-footer",
+      ".metadata",
+      ".article-actions-container",
+      "button",
+      "[role='button']",
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+    ],
+    mutationExcludeSelectors: ["header", "footer", "nav", "aside", ".sidebar", ".document-toc-container", "pre", "code"],
+    injectedCss: [
+      `
+main#content p,
+main#content li,
+main#content .notecard {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    bodyRule: { enable: false },
+    detectParagraphLanguage: true,
+  },
+  {
+    id: "react-docs",
+    siteKey: "react.dev",
+    matches: ["*://react.dev/*", "*://www.react.dev/*"],
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main p",
+      "main li",
+      "article h1",
+      "article h2",
+      "article p",
+      "article li",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3, article h1, article h2", category: "heading" },
+      { selector: "main p, main li, article p, article li", category: "content-block" },
+    ],
+    excludeSelectors: [
+      "nav",
+      "aside",
+      "body > header",
+      "footer",
+      "[class*='sidebar' i]",
+      "[class*='nav' i]",
+      "[aria-label='Table of contents']",
+      "button",
+      "[role='button']",
+      "pre",
+      "code",
+      "kbd",
+      "samp",
+    ],
+    mutationExcludeSelectors: ["nav", "aside", "body > header", "footer", "[class*='sidebar' i]", "pre", "code"],
+    injectedCss: [
+      `
+main p,
+main li {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    bodyRule: { enable: false },
+    detectParagraphLanguage: true,
+  },
+  {
     id: "apnews",
     siteKey: "apnews.com",
     matches: ["*://apnews.com/*", "*://*.apnews.com/*"],
@@ -1468,6 +1744,167 @@ h5 + p,
     isHighDynamic: true,
   },
   {
+    id: "alternativeto",
+    siteKey: "alternativeto.net",
+    matches: ["*://alternativeto.net/*", "*://www.alternativeto.net/*"],
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main p",
+      "article h2",
+      "article h3",
+      "article p",
+      ".md_Compact p",
+      "[class*='line-clamp']",
+      "a[href*='/software/'] h2",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3, article h2, article h3, a[href*='/software/'] h2", category: "heading" },
+      { selector: "main p, article p, .md_Compact p, [class*='line-clamp']", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "header",
+      "footer",
+      "nav",
+      "button",
+      "[role='button']",
+      "[aria-label*='lightbox' i]",
+      "[aria-label*='like' i]",
+      "[class*='screenshot' i]",
+      "[class*='likes' i]",
+      "[class*='vote' i]",
+      "time",
+      "input",
+      "textarea",
+      "select",
+    ],
+    mutationExcludeSelectors: ["header", "footer", "nav", "button", "[role='button']"],
+    injectedCss: [
+      `
+main h2,
+main h3,
+.md_Compact p,
+[class*='line-clamp'] {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+  },
+  {
+    id: "ebay",
+    siteKey: "ebay.com",
+    matches: ["*://www.ebay.com/sch/*", "*://www.ebay.com/itm/*", "*://ebay.com/sch/*", "*://ebay.com/itm/*"],
+    selectors: [
+      ".s-item__title",
+      ".s-item__subtitle",
+      ".s-item__dynamic",
+      "h1.x-item-title__mainTitle",
+      ".ux-layout-section__textual-display",
+      ".ux-labels-values__values-content",
+      ".d-item-description",
+    ],
+    contentSelectors: [
+      { selector: ".s-item__title, h1.x-item-title__mainTitle", category: "heading" },
+      { selector: ".s-item__subtitle, .s-item__dynamic", category: "card-text" },
+      { selector: ".ux-layout-section__textual-display, .ux-labels-values__values-content, .d-item-description", category: "content-block" },
+    ],
+    excludeSelectors: [
+      ".srp-rail__left",
+      ".x-refine__left__nav",
+      ".srp-controls",
+      ".s-item__price",
+      ".s-item__shipping",
+      ".s-item__bids",
+      ".s-item__time-left",
+      ".s-item__watchheart",
+      "[class*='price' i]",
+      "[class*='rating' i]",
+      "button",
+      "[role='button']",
+      "nav",
+      "header",
+      "footer",
+      "input",
+      "select",
+      "textarea",
+    ],
+    mutationExcludeSelectors: [".srp-rail__left", ".x-refine__left__nav", ".srp-controls", "button", "[role='button']"],
+    injectedCss: [
+      `
+.s-item__title,
+.s-item__subtitle,
+.s-item__dynamic,
+h1.x-item-title__mainTitle {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+  },
+  {
+    id: "etsy",
+    siteKey: "etsy.com",
+    matches: ["*://www.etsy.com/search*", "*://etsy.com/search*", "*://www.etsy.com/listing/*", "*://etsy.com/listing/*"],
+    selectors: [
+      "h1",
+      ".v2-listing-card__title",
+      "h3.v2-listing-card__title",
+      "[data-listing-card-listing-title]",
+      "#listing-page-cart h1",
+      ".listing-page-title",
+      "[data-id='description-text'] p",
+      "#wt-content-toggle-product-details-read-more p",
+    ],
+    contentSelectors: [
+      { selector: "h1, #listing-page-cart h1, .listing-page-title", category: "heading" },
+      { selector: ".v2-listing-card__title, h3.v2-listing-card__title, [data-listing-card-listing-title]", category: "card-text" },
+      { selector: "[data-id='description-text'] p, #wt-content-toggle-product-details-read-more p", category: "content-block" },
+    ],
+    excludeSelectors: [
+      "header",
+      "footer",
+      "nav",
+      "button",
+      "[role='button']",
+      "input",
+      "select",
+      "textarea",
+      ".n-listing-card__price",
+      "[class*='price' i]",
+      "[class*='rating' i]",
+      "[class*='shop-rating' i]",
+      ".streamline-spacing-shop-rating",
+      ".wt-screen-reader-only",
+      ".wt-popover",
+      ".listing-card-tooltip-container",
+      "clg-signal",
+      ".search-half-unit-mt",
+      ".wt-badge",
+    ],
+    mutationExcludeSelectors: ["header", "footer", "nav", "button", "[role='button']", ".wt-popover", ".listing-card-tooltip-container"],
+    injectedCss: [
+      `
+.v2-listing-card__title,
+[data-listing-card-listing-title],
+.listing-page-title {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    detectParagraphLanguage: true,
+  },
+  {
     id: "amazon",
     siteKey: "amazon.com",
     matches: ["*://www.amazon.*/*", "*://amazon.*/*"],
@@ -1479,10 +1916,16 @@ h5 + p,
       "[data-hook='review-title']",
       "[data-hook='review-body']",
       ".a-size-base-plus.a-color-base.a-text-normal",
-      "h2.a-size-mini",
+      "a.a-link-normal.s-line-clamp-4 h2 span",
+      "h2.a-size-base-plus.a-spacing-none span",
+      "[data-cy='title-recipe'] h2 span",
     ],
     contentSelectors: [
-      { selector: "#productTitle, h2.a-size-mini", category: "heading" },
+      {
+        selector:
+          "#productTitle, a.a-link-normal.s-line-clamp-4 h2, h2.a-size-base-plus.a-spacing-none, [data-cy='title-recipe'] h2",
+        category: "heading",
+      },
       { selector: "#feature-bullets li, #productDescription p, #bookDescription_feature_div", category: "content-block" },
       { selector: "[data-hook='review-title'], [data-hook='review-body'], .a-size-base-plus.a-color-base.a-text-normal", category: "card-text" },
     ],
@@ -1499,6 +1942,8 @@ h5 + p,
       "#nav-link-accountList",
       "#nav-orders",
       "#nav-cart",
+      ".a-color-secondary h2.a-size-mini",
+      "h2.a-size-mini.s-line-clamp-1",
       "button",
       "input",
       "textarea",
@@ -1793,6 +2238,69 @@ section div.bg-white.rounded-lg.p-6 {
 `,
     ],
     extraBlockSelectors: ["section div.prose", "section div.bg-white.rounded-lg.p-6"],
+    bodyRule: { enable: false },
+    detectParagraphLanguage: true,
+  },
+  {
+    id: "linear",
+    siteKey: "linear.app",
+    matches: ["*://linear.app/*", "*://www.linear.app/*"],
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main p",
+      "main li",
+      "main section p",
+      "[class*='Hero_'] h1",
+      "[class*='Hero_'] p",
+      "[class*='Feature'] h2",
+      "[class*='Feature'] p",
+      "[class*='Section'] h2",
+      "[class*='Section'] p",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3, [class*='Hero_'] h1, [class*='Feature'] h2, [class*='Section'] h2", category: "heading" },
+      { selector: "main p, main li, main section p, [class*='Hero_'] p, [class*='Feature'] p, [class*='Section'] p", category: "content-block" },
+    ],
+    excludeSelectors: [
+      "body > header",
+      "footer",
+      "nav",
+      "button",
+      "[role='button']",
+      "[class*='Header_']",
+      "[class*='Sidebar_']",
+      "[class*='Frame_']",
+      "[class*='IssueView_']",
+      "[class*='SharedViewStyles_']",
+      "[class*='CommandMenu']",
+      "[class*='Topbar']",
+      "[class*='Footer']",
+      "input",
+      "textarea",
+      "select",
+      "svg",
+      "canvas",
+    ],
+    mutationExcludeSelectors: ["body > header", "footer", "nav", "button", "[role='button']", "[class*='Sidebar_']", "[class*='Frame_']"],
+    injectedCss: [
+      `
+main h1,
+main h2,
+main h3,
+main p,
+[class*='Hero_'] h1,
+[class*='Hero_'] p,
+[class*='Feature'] p,
+[class*='Section'] p {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
     bodyRule: { enable: false },
     detectParagraphLanguage: true,
   },

@@ -4,7 +4,7 @@ import { createTranslationDiagnostics } from "@/content/translationDiagnostics";
 import { mountFixture } from "@/test/domFixtures";
 
 describe("scanDocumentText", () => {
-  it("finds article, button, navigation, and table text", () => {
+  it("finds article and table text while skipping controls and navigation", () => {
     mountFixture(`
       <main>
         <article><p>Hello <strong>world</strong>.</p></article>
@@ -19,8 +19,8 @@ describe("scanDocumentText", () => {
 
     expect(texts).toContain("Hello");
     expect(texts).toContain("world");
-    expect(texts).toContain("Submit");
-    expect(texts).toContain("Settings");
+    expect(texts).not.toContain("Submit");
+    expect(texts).not.toContain("Settings");
     expect(texts).toContain("Project name");
     expect(texts).not.toContain("2026-04-27");
   });
@@ -96,7 +96,7 @@ describe("scanDocumentText", () => {
     expect(texts).not.toContain("Skipped shadow text.");
   });
 
-  it("keeps short button and navigation text", () => {
+  it("skips short button and navigation text", () => {
     mountFixture(`
       <button>OK</button>
       <nav><a href="/start">Go</a></nav>
@@ -104,8 +104,8 @@ describe("scanDocumentText", () => {
 
     const texts = scanDocumentText(document.body).map((item) => item.text);
 
-    expect(texts).toContain("OK");
-    expect(texts).toContain("Go");
+    expect(texts).not.toContain("OK");
+    expect(texts).not.toContain("Go");
   });
 
   it("skips plaintext-only editable regions", () => {
@@ -263,7 +263,7 @@ describe("scanTranslatableAttributes", () => {
     ]);
   });
 
-  it("finds title and aria-label when explicitly enabled", () => {
+  it("finds title and aria-label when explicitly enabled outside skipped controls", () => {
     mountFixture(`
       <input placeholder="Search docs" aria-label="Search input" />
       <img alt="Product photo" />
@@ -275,7 +275,6 @@ describe("scanTranslatableAttributes", () => {
       "placeholder:Search docs",
       "aria-label:Search input",
       "alt:Product photo",
-      "title:Open settings",
     ]);
   });
 

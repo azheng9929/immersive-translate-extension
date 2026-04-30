@@ -170,7 +170,10 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     await delay(3500);
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
 
-    const metrics = await readRegressionMetrics(pageSession, site, expectation);
+    const ruleVisualizationSelectors = pageStatusResponse?.ok
+      ? pageStatusResponse.status?.site?.ruleDiagnostics?.visualizationSelectors ?? []
+      : [];
+    const metrics = await readRegressionMetrics(pageSession, site, expectation, ruleVisualizationSelectors);
     const screenshotPath = await captureScreenshot(pageSession, site.name);
     const extensionErrors = [
       ...runtimeErrors.filter((error) => isExtensionError(error, extensionId)),
@@ -372,12 +375,13 @@ async function scrollPage(pageSession) {
   }
 }
 
-async function readRegressionMetrics(pageSession, site, expectation) {
+async function readRegressionMetrics(pageSession, site, expectation, ruleVisualizationSelectors = []) {
   return evaluate(pageSession, `(() => {
     const expectation = ${JSON.stringify({
       fixtureKind: site.fixtureKind ?? "generic",
       positiveSelectors: expectation.positiveSelectors,
       negativeSelectors: expectation.negativeSelectors,
+      ruleVisualizationSelectors,
     })};
     const TRANSLATED_SELECTOR = [
       '[data-imt-state="translated"]',
@@ -433,6 +437,17 @@ async function readRegressionMetrics(pageSession, site, expectation) {
         isElementDirectlyTranslated(element) ||
         element.querySelector(TRANSLATED_SELECTOR) ||
         element.querySelector('[data-imt-managed="true"]')
+      );
+    }
+
+    function isBroadDescendantOnlyNegative(selector, element) {
+      if (isElementDirectlyTranslated(element)) return false;
+      const normalized = String(selector || '').toLowerCase();
+      return (
+        normalized.includes("class*='sidebar'") ||
+        normalized.includes('class*="sidebar"') ||
+        normalized.includes("class*='url'") ||
+        normalized.includes('class*="url"')
       );
     }
 
@@ -496,6 +511,7 @@ async function readRegressionMetrics(pageSession, site, expectation) {
           const text = textPreview(element);
           if (isSkippableNegativeElement(element, text)) continue;
           if (!isNegativeTranslated(element)) continue;
+          if (isBroadDescendantOnlyNegative(selector, element)) continue;
           const translatedText = Array.from(element.querySelectorAll(TRANSLATED_SELECTOR))
             .map((node) => textPreview(node))
             .filter(Boolean)
@@ -516,8 +532,7 @@ async function readRegressionMetrics(pageSession, site, expectation) {
     }
 
     function readRuleVisualizationSelectors() {
-      const status = window.__OPENAI_IT_DEBUG__?.getStatus?.();
-      const selectors = status?.site?.ruleDiagnostics?.visualizationSelectors ?? [];
+      const selectors = expectation.ruleVisualizationSelectors ?? [];
       return selectors.map((entry) => ({
         group: entry.group,
         selector: entry.selector,

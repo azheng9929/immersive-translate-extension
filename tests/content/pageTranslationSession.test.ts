@@ -824,6 +824,79 @@ describe("PageTranslationSession", () => {
     await waitFor(() => session!.getStatus().translated === 2);
     expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
   });
+
+  it("falls back to eager lazy roots when viewport-first discovery finds no first wave", async () => {
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="first">Fallback first paragraph.</p>
+        <p id="second">Fallback second paragraph.</p>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    class ViewportMissController extends PageController {
+      collectViewportTranslatableRoots(): HTMLElement[] {
+        return [];
+      }
+    }
+    const controller = new ViewportMissController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      viewportFirst: true,
+      maxEagerLazyRoots: 1,
+    });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().translated === 1);
+
+    expect(requestedTexts).toEqual(["Fallback first paragraph."]);
+    expect(document.querySelector("#first .imt-translation-block")?.textContent).toBe("[zh-Hans] Fallback first paragraph.");
+    expect(FakeIntersectionObserver.instances[0]?.observed.has(document.querySelector("#second")!)).toBe(true);
+  });
+
+  it("tries the observed root when viewport-first and eager root discovery both miss", async () => {
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `<main><p id="article">Recovered article paragraph.</p></main>`;
+    const requestedTexts: string[] = [];
+    class RootDiscoveryMissController extends PageController {
+      collectViewportTranslatableRoots(): HTMLElement[] {
+        return [];
+      }
+
+      collectTranslatableRoots(): HTMLElement[] {
+        return [];
+      }
+    }
+    const controller = new RootDiscoveryMissController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      viewportFirst: true,
+    });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().translated === 1);
+
+    expect(requestedTexts).toEqual(["Recovered article paragraph."]);
+    expect(document.querySelector("#article .imt-translation-block")?.textContent).toBe("[zh-Hans] Recovered article paragraph.");
+  });
 });
 
 function createFakeIntersectionObserver() {

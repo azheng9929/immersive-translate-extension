@@ -65,7 +65,7 @@ describe("PageController", () => {
     await controller.translatePage();
 
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
-    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+    expect(document.querySelector("button")?.textContent).toBe("Submit");
     expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("Search docs");
 
     controller.restorePage();
@@ -345,7 +345,7 @@ describe("PageController", () => {
 
     expect(batchCalls).toBe(1);
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
-    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+    expect(document.querySelector("button")?.textContent).toBe("Submit");
   });
 
   it("requests duplicate cache-key text only once and renders every matching unit", async () => {
@@ -370,14 +370,14 @@ describe("PageController", () => {
 
     expect(requestedTextsByCall).toEqual([["Repeated sentence."]]);
     expect(result).toEqual({
-      total: 3,
-      translated: 3,
+      total: 2,
+      translated: 2,
       failed: 0,
       skipped: 0,
     });
     expect(document.querySelector("#first .imt-translation-block")?.textContent).toBe("[zh-Hans] Repeated sentence.");
     expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Repeated sentence.");
-    expect(document.querySelector("#action")?.textContent).toBe("[zh-Hans] Repeated sentence.");
+    expect(document.querySelector("#action")?.textContent).toBe("Repeated sentence.");
   });
 
   it("translates Threads feed text without translating authors, actions, or metrics", async () => {
@@ -497,6 +497,82 @@ describe("PageController", () => {
     expect(document.body.textContent).not.toContain("[zh-Hans] my subreddits");
   });
 
+  it("uses the Wikipedia article container while leaving page chrome and tables original", async () => {
+    document.body.innerHTML = `
+      <main id="content">
+        <h1 id="firstHeading"><span class="mw-page-title-main">Machine translation</span></h1>
+        <nav class="vector-toc"><a>History</a><a>Approaches</a></nav>
+        <div class="mw-content-ltr mw-parser-output">
+          <p class="mw-empty-elt"></p>
+          <p>Machine translation is the use of computational techniques to translate text or speech.</p>
+          <h2>History <span class="mw-editsection">edit</span></h2>
+          <blockquote>Why does a translator need a whole workday to translate five pages?</blockquote>
+          <figure><figcaption>A mobile phone app translating Spanish text into English.</figcaption></figure>
+          <table><tbody><tr><td>1954</td><td>Georgetown experiment</td></tr></tbody></table>
+        </div>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://en.wikipedia.org/wiki/Machine_translation", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      attributeNames: policy.attributeNames,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Machine translation",
+      "Machine translation is the use of computational techniques to translate text or speech.",
+      "History",
+      "Why does a translator need a whole workday to translate five pages?",
+      "A mobile phone app translating Spanish text into English.",
+    ]);
+    expect(document.body.textContent).toContain("[zh-Hans] Machine translation is the use of computational techniques");
+    expect(document.body.textContent).not.toContain("[zh-Hans] edit");
+    expect(document.body.textContent).not.toContain("[zh-Hans] Georgetown experiment");
+  });
+
+  it("ignores merged bodyRule selectors when bodyRule is disabled", async () => {
+    document.body.innerHTML = `
+      <main id="content">
+        <div id="bodyContent">
+          <div class="mw-parser-output">
+            <p>Imported scope selectors should not empty an explicitly disabled body rule.</p>
+          </div>
+        </div>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      mainFrameSelector: "#bodyContent",
+      bodyRule: { enable: false, bodySelector: "#content", articleSelector: "#bodyContent" },
+      preferredScanRootSelectors: [".mw-parser-output"],
+      contentSelectors: [{ selector: ".mw-parser-output > p", category: "content-block" }],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Imported scope selectors should not empty an explicitly disabled body rule."]);
+    expect(document.querySelector(".imt-translation-block")?.textContent).toBe(
+      "[zh-Hans] Imported scope selectors should not empty an explicitly disabled body rule.",
+    );
+  });
+
   it("lets explicit content selectors survive broad hovercard link exclusions", async () => {
     document.body.innerHTML = `
       <main>
@@ -582,7 +658,7 @@ describe("PageController", () => {
   });
 
   it("returns a page translation summary for the control UI", async () => {
-    document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
+    document.body.innerHTML = `<main><p>Hello world.</p><p>Submit</p></main>`;
     const controller = new PageController({
       targetLang: "zh-Hans",
       translateBatch: async (items) =>
@@ -691,7 +767,7 @@ describe("PageController", () => {
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
   });
 
-  it("keeps fragile UI as replacement in bilingual display mode", async () => {
+  it("keeps buttons original in bilingual display mode", async () => {
     document.body.innerHTML = `<main><p>Hello world.</p><button>Submit</button></main>`;
     const controller = new PageController({
       targetLang: "zh-Hans",
@@ -703,7 +779,7 @@ describe("PageController", () => {
     await controller.translatePage();
 
     expect(document.querySelector(".imt-translation-block")?.textContent).toBe("[zh-Hans] Hello world.");
-    expect(document.querySelector("button")?.textContent).toBe("[zh-Hans] Submit");
+    expect(document.querySelector("button")?.textContent).toBe("Submit");
   });
 
   it("translates newly added content without re-translating existing translated units", async () => {

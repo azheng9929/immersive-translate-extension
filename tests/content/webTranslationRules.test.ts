@@ -591,6 +591,24 @@ describe("webTranslationRules", () => {
         excludes: [".c-header", ".c-article-author-list"],
       },
       {
+        url: "https://en.wikipedia.org/wiki/Machine_translation",
+        ruleId: "wikipedia",
+        selectors: ["#firstHeading", ".mw-parser-output"],
+        excludes: [".vector-toc", ".infobox"],
+      },
+      {
+        url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
+        ruleId: "mdn-docs",
+        selectors: ["main#content h1", "main#content p", "main#content li"],
+        excludes: ["aside", ".document-toc-container"],
+      },
+      {
+        url: "https://react.dev/reference/react",
+        ruleId: "react-docs",
+        selectors: ["main h1", "main p", "main li"],
+        excludes: ["nav", "aside"],
+      },
+      {
         url: "https://apnews.com/article/example",
         ruleId: "apnews",
         selectors: ["article h1", "article p", "[data-key='article'] p"],
@@ -609,16 +627,46 @@ describe("webTranslationRules", () => {
         excludes: [".styles_buttons__kKy_S", ".styles_count___6_8F"],
       },
       {
+        url: "https://alternativeto.net/",
+        ruleId: "alternativeto",
+        selectors: ["main h2", ".md_Compact p", "[class*='line-clamp']"],
+        excludes: ["[aria-label*='lightbox' i]", "[role='button']"],
+      },
+      {
         url: "https://news.google.com/home",
         ruleId: "googleNews",
         selectors: ["article h3", "article h4", ".gPFEn", ".JtKRv"],
         excludes: ["time", "[role='button']"],
       },
       {
+        url: "https://www.bing.com/search?q=openai",
+        ruleId: "bing-search",
+        selectors: ["#b_results h2", ".b_algo .b_caption p", ".b_gwaDlTitle"],
+        excludes: ["#sb_form", ".b_attribution"],
+      },
+      {
+        url: "https://duckduckgo.com/?q=openai",
+        ruleId: "duckduckgo-search",
+        selectors: ["article h2", "article p", "article [data-testid='result-title-a']"],
+        excludes: ["form", "[data-testid='result-extras-url-link']"],
+      },
+      {
         url: "https://www.amazon.com/dp/example",
         ruleId: "amazon",
         selectors: ["#productTitle", "#feature-bullets li", "#productDescription p"],
         excludes: ["#navFooter", ".a-price"],
+      },
+      {
+        url: "https://www.ebay.com/sch/i.html?_nkw=kindle",
+        ruleId: "ebay",
+        selectors: [".s-item__title", ".s-item__subtitle", "h1.x-item-title__mainTitle"],
+        excludes: [".srp-rail__left", ".s-item__price"],
+      },
+      {
+        url: "https://www.etsy.com/search?q=planner",
+        ruleId: "etsy",
+        selectors: [".v2-listing-card__title", "[data-listing-card-listing-title]", "#listing-page-cart h1"],
+        excludes: [".n-listing-card__price", "[class*='price' i]"],
       },
       {
         url: "https://shopee.com/product/123/456",
@@ -637,6 +685,12 @@ describe("webTranslationRules", () => {
         ruleId: "tiktok",
         selectors: ["[data-e2e='browse-video-desc']", "[data-e2e='video-desc']", "[data-e2e='comment-level-1']"],
         excludes: ["[data-e2e*='-count']", "[data-e2e='nav-foryou']"],
+      },
+      {
+        url: "https://linear.app/",
+        ruleId: "linear",
+        selectors: ["main h1", "main p", "[class*='Hero_'] h1"],
+        excludes: ["[class*='Header_']", "[class*='Sidebar_']"],
       },
       {
         url: "https://www.youporn.com/watch/123/example/",

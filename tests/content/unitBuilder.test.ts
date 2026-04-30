@@ -21,7 +21,7 @@ describe("buildTranslationUnits", () => {
     expect(units[0]!.originalText).toBe("Hello settings page and save.");
   });
 
-  it("keeps button text as a separate UI unit", () => {
+  it("skips button text by default", () => {
     mountFixture(`<div><button>Submit</button><p>Submit your report.</p></div>`);
     const units = buildTranslationUnits({
       scannedTexts: scanDocumentText(document.body),
@@ -31,7 +31,7 @@ describe("buildTranslationUnits", () => {
       targetLang: "zh-Hans",
     });
 
-    expect(units.map((unit) => unit.category)).toEqual(["button", "content-block"]);
+    expect(units.map((unit) => unit.category)).toEqual(["content-block"]);
   });
 
   it("does not prefer nested UI controls over readable content blocks", () => {
@@ -51,11 +51,11 @@ describe("buildTranslationUnits", () => {
     expect(units).toHaveLength(1);
     expect(units[0]).toMatchObject({
       category: "content-block",
-      originalText: "Review the Detailed report before changing the rollout plan.",
+      originalText: "Review the before changing the rollout plan.",
     });
   });
 
-  it("classifies menu links as menu units", () => {
+  it("skips menu links by default", () => {
     mountFixture(`<menu><a href="/open">Open</a></menu>`);
     const units = buildTranslationUnits({
       scannedTexts: scanDocumentText(document.body),
@@ -65,8 +65,7 @@ describe("buildTranslationUnits", () => {
       targetLang: "zh-Hans",
     });
 
-    expect(units).toHaveLength(1);
-    expect(units[0]!.category).toBe("menu");
+    expect(units).toHaveLength(0);
   });
 
   it("uses stay-original placeholders for skipped inline code", () => {

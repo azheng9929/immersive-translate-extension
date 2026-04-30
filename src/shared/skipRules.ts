@@ -22,6 +22,9 @@ const SKIP_TAGS = new Set([
   "VIDEO",
   "AUDIO",
   "IFRAME",
+  "BUTTON",
+  "NAV",
+  "MENU",
 ]);
 
 const UI_CATEGORIES = new Set<UnitCategory>([
@@ -45,6 +48,7 @@ export function isSkippableElement(element: Element, options: SkipRuleOptions = 
   if (element.closest('[data-imt-state="translated"]')) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
   if (!options.allowTooltip && element.closest('[role="tooltip"], [popover]')) return true;
+  if (element.closest('[role="button"], [role="menu"], [role="menuitem"], [role="navigation"]')) return true;
   if (
     element.closest(
       [
