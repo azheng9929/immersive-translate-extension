@@ -143,7 +143,7 @@ export function prepareImportedWebTranslationRules(rules: readonly WebTranslatio
   const prepared: WebTranslationRule[] = [];
 
   for (const rule of rules) {
-    const supported = sanitizeImportedRule(pickSupportedRuleFields(rule));
+    const supported = normalizeAiRuleForWebRuntime(sanitizeImportedRule(pickSupportedRuleFields(rule)));
     if (!isRuntimeWebPageRule(supported)) continue;
     const capability = analyzeWebTranslationRuleCapability(supported);
     prepared.push({
@@ -186,6 +186,116 @@ function sanitizeImportedRule(rule: WebTranslationRule): WebTranslationRule {
   }
 
   return output;
+}
+
+function normalizeAiRuleForWebRuntime(rule: WebTranslationRule): WebTranslationRule {
+  const aiRule = aiRuleRecord(rule.aiRule);
+  if (!aiRule) return rule;
+
+  const messageWrapperSelector = stringValue(aiRule.messageWrapperSelector);
+  const messageContainerSelector = stringValue(aiRule.messageContainerSelector);
+  const streamingSelector = stringValue(aiRule.streamingSelector);
+  const primarySelector = messageContainerSelector ?? messageWrapperSelector;
+  if (!primarySelector) return rule;
+
+  const selectorAdditions = uniqueStrings([
+    primarySelector,
+    ...(messageWrapperSelector && messageWrapperSelector !== primarySelector ? [messageWrapperSelector] : []),
+    ...(streamingSelector && selectorIncludesSelector(streamingSelector, primarySelector) ? [streamingSelector] : []),
+  ]);
+  const excludeSelectors = stripAiMessageWrapperExcludes(rule.excludeSelectors, [
+    primarySelector,
+    ...(messageWrapperSelector ? [messageWrapperSelector] : []),
+  ]);
+  const streamingDelayTime = numericValue(aiRule.streamingDelayTime);
+  const output: WebTranslationRule = {
+    ...rule,
+    selectors: appendStringDeltas(rule.selectors, selectorAdditions),
+    contentSelectors: appendArrayDeltas(rule.contentSelectors, [{ selector: primarySelector, category: "comment" as const }]),
+    dynamicPreset: rule.dynamicPreset ?? "chat-stream",
+    isHighDynamic: rule.isHighDynamic ?? true,
+    allowTooltip: rule.allowTooltip ?? false,
+    observeUrlChange: rule.observeUrlChange ?? true,
+    ...(streamingDelayTime !== undefined ? { debounceMs: streamingDelayTime } : {}),
+    fallbackProfile: rule.fallbackProfile ?? "social",
+  };
+
+  if (excludeSelectors === undefined) delete output.excludeSelectors;
+  else output.excludeSelectors = excludeSelectors;
+
+  return output;
+}
+
+function aiRuleRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function stringValue(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function numericValue(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return value;
+}
+
+function selectorIncludesSelector(selector: string, expected: string): boolean {
+  return normalizeSelectorText(selector).includes(normalizeSelectorText(expected));
+}
+
+function stripAiMessageWrapperExcludes(
+  excludeSelectors: WebTranslationRule["excludeSelectors"],
+  messageSelectors: readonly string[],
+): WebTranslationRule["excludeSelectors"] {
+  const stripped = arrayValue(excludeSelectors).filter((selector) =>
+    !isAiMessageWrapperDescendantExclude(String(selector), messageSelectors),
+  );
+  if (stripped.length === 0) return undefined;
+  return stripped;
+}
+
+function isAiMessageWrapperDescendantExclude(selector: string, messageSelectors: readonly string[]): boolean {
+  const normalized = normalizeSelectorText(selector);
+  return messageSelectors.some((messageSelector) => normalized === `${normalizeSelectorText(messageSelector)} *`);
+}
+
+function appendStringDeltas(
+  value: WebTranslationRule["selectors"],
+  additions: readonly string[],
+): NonNullable<WebTranslationRule["selectors"]> {
+  return appendArrayDeltas(value, additions);
+}
+
+function appendArrayDeltas<T>(
+  value: T | readonly T[] | { replace?: T | readonly T[]; add?: T | readonly T[]; remove?: T | readonly T[] } | undefined,
+  additions: readonly T[],
+): { replace?: T | readonly T[]; add: readonly T[]; remove?: T | readonly T[] } {
+  if (isArrayOperation(value)) {
+    return {
+      ...(value.replace !== undefined ? { replace: value.replace } : {}),
+      add: uniqueGeneric([...listValue(value.add), ...additions]),
+      ...(value.remove !== undefined ? { remove: value.remove } : {}),
+    };
+  }
+  return {
+    ...(value !== undefined ? { replace: listValue(value) } : {}),
+    add: uniqueGeneric(additions),
+  };
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return uniqueGeneric(values).filter(Boolean);
+}
+
+function uniqueGeneric<T>(values: readonly T[]): T[] {
+  return [...new Map(values.map((value) => [JSON.stringify(value), value])).values()];
+}
+
+function normalizeSelectorText(selector: string): string {
+  return selector.trim().replace(/\s+/g, " ");
 }
 
 function setOrDelete<Key extends keyof WebTranslationRule>(

@@ -35,6 +35,8 @@ When a non-`content-ready` imported rule matches a page, content script does not
 
 This is the key guardrail learned from the newer Immersive Translate package: imported rules are useful knowledge, but many of them are deltas rather than complete extraction strategies.
 
+Imported `aiRule` entries are treated as web translation rules when they expose a message wrapper or message container selector. The runtime converts those selectors into normal scan roots, strips upstream child-exclude selectors that would block the message body, and applies the `chat-stream` scheduling preset. This covers AI chat pages such as ChatGPT, Claude, Poe, JanitorAI, ChatPDF, and Yodayo without adding a separate product surface.
+
 ## Priority
 
 - Core rules remain authoritative for high-value sites such as X, YouTube, Reddit, MetaTFT, and tactics.tools.

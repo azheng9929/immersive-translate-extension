@@ -112,4 +112,63 @@ describe("importedWebRuleRuntime", () => {
       },
     });
   });
+
+  it("turns imported aiRule message wrappers into executable web translation selectors", () => {
+    const rules: WebTranslationRule[] = [
+      {
+        id: "chatOpenai",
+        siteKey: "chatgpt.com",
+        matches: ["chatgpt.com"],
+        excludeSelectors: [
+          "nav",
+          ".markdown *",
+          ".code-block__code",
+        ],
+        aiRule: {
+          streamingSelector: ".result-streaming.markdown",
+          messageWrapperSelector: ".markdown",
+          streamingChange: true,
+          streamingDelayTime: 1000,
+        },
+      },
+      {
+        id: "claudeAi",
+        siteKey: "claude.ai",
+        matches: ["claude.ai"],
+        excludeSelectors: [".contents *", ".code-block__code"],
+        aiRule: {
+          messageWrapperSelector: ".contents",
+          messageContainerSelector: ".ReactMarkdown",
+          streamingChange: true,
+        },
+      },
+    ];
+
+    const prepared = prepareImportedWebTranslationRules(rules);
+
+    expect(prepared[0]).toMatchObject({
+      id: "chatOpenai",
+      ruleCapability: "content-ready",
+      fallbackProfile: "social",
+      dynamicPreset: "chat-stream",
+      isHighDynamic: true,
+      allowTooltip: false,
+      observeUrlChange: true,
+    });
+    expect(prepared[0]?.selectors).toEqual({
+      add: [".markdown", ".result-streaming.markdown"],
+    });
+    expect(prepared[0]?.contentSelectors).toEqual({
+      add: [{ selector: ".markdown", category: "comment" }],
+    });
+    expect(prepared[0]?.excludeSelectors).toEqual(["nav", ".code-block__code"]);
+
+    expect(prepared[1]?.selectors).toEqual({
+      add: [".ReactMarkdown", ".contents"],
+    });
+    expect(prepared[1]?.contentSelectors).toEqual({
+      add: [{ selector: ".ReactMarkdown", category: "comment" }],
+    });
+    expect(prepared[1]?.excludeSelectors).toEqual([".code-block__code"]);
+  });
 });

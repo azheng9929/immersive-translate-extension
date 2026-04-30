@@ -78,7 +78,8 @@ export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): W
       rule.urlChangeDelay !== undefined ||
       rule.dynamicPreset ||
       rule.isHighDynamic ||
-      rule.advanceMergeConfig?.length,
+      rule.advanceMergeConfig?.length ||
+      hasAiMessageAnchor(rule),
   );
   const derivedCapability = deriveCapability({
     hasContentAnchors,
@@ -126,10 +127,13 @@ function countContentAnchors(rule: WebTranslationRule): number {
     rule.mainFrameSelector,
     rule.bodyRule?.bodySelector,
     rule.bodyRule?.articleSelector,
+    aiMessageAnchorSelector(rule),
   ].filter(Boolean).length;
 }
 
 function inferFallbackProfile(rule: WebTranslationRule): WebTranslationFallbackProfile {
+  if (hasAiMessageAnchor(rule)) return "social";
+
   const text = [
     rule.id,
     rule.siteKey,
@@ -147,6 +151,28 @@ function inferFallbackProfile(rule: WebTranslationRule): WebTranslationFallbackP
 
 function hasHint(text: string, hints: readonly string[]): boolean {
   return hints.some((hint) => text.includes(hint));
+}
+
+function hasAiMessageAnchor(rule: WebTranslationRule): boolean {
+  return Boolean(aiMessageAnchorSelector(rule));
+}
+
+function aiMessageAnchorSelector(rule: WebTranslationRule): string | undefined {
+  const aiRule = rule.aiRule;
+  if (!aiRule || typeof aiRule !== "object" || Array.isArray(aiRule)) return undefined;
+  return firstNonEmptyString(
+    (aiRule as Record<string, unknown>).messageContainerSelector,
+    (aiRule as Record<string, unknown>).messageWrapperSelector,
+  );
+}
+
+function firstNonEmptyString(...values: readonly unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
 }
 
 function hasAnyArrayValue(value: RuleArrayValue<unknown> | undefined): boolean {

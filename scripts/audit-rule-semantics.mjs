@@ -68,8 +68,8 @@ const SEMANTIC_GROUPS = [
     group: "ai streaming",
     purpose: "Special-case streaming AI message pages where one DOM node is incrementally rewritten.",
     fields: ["aiRule"],
-    runtime: "deferred",
-    action: "Keep imported metadata but do not activate yet. Needs a separate streaming-message controller.",
+    runtime: "implemented",
+    action: "Convert messageWrapperSelector/messageContainerSelector into executable scan roots and apply chat-stream scheduling.",
   },
   {
     group: "mobile userscript",

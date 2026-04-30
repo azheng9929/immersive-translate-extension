@@ -55,6 +55,7 @@ function analyze(rule) {
     rule.mainFrameSelector,
     rule.bodyRule?.bodySelector,
     rule.bodyRule?.articleSelector,
+    aiMessageAnchorSelector(rule),
   ].filter(Boolean).length;
   const hasContentAnchors = contentAnchorCount > 0;
   const hasLayoutHints = hasRecordValue(rule.globalStyles) || arrayValue(rule.injectedCss).length > 0;
@@ -72,7 +73,8 @@ function analyze(rule) {
       rule.urlChangeDelay !== undefined ||
       rule.dynamicPreset ||
       rule.isHighDynamic ||
-      rule.advanceMergeConfig?.length,
+      rule.advanceMergeConfig?.length ||
+      aiMessageAnchorSelector(rule),
   );
 
   return {
@@ -117,6 +119,8 @@ function deriveCapability(hasContentAnchors, hasLayoutHints, hasStructureHints, 
 }
 
 function inferFallbackProfile(rule) {
+  if (aiMessageAnchorSelector(rule)) return "social";
+
   const text = [rule.id, rule.siteKey, ...(rule.matches ?? []), ...(rule.selectorMatches ?? [])].join("\n").toLowerCase();
   if (hasHint(text, VIDEO_HINTS)) return "video";
   if (hasHint(text, FORUM_HINTS)) return "forum";
@@ -124,6 +128,21 @@ function inferFallbackProfile(rule) {
   if (hasHint(text, COMMERCE_HINTS)) return "commerce";
   if (hasHint(text, ARTICLE_HINTS)) return "article";
   return "generic";
+}
+
+function aiMessageAnchorSelector(rule) {
+  const aiRule = rule.aiRule;
+  if (!aiRule || typeof aiRule !== "object" || Array.isArray(aiRule)) return undefined;
+  return firstNonEmptyString(aiRule.messageContainerSelector, aiRule.messageWrapperSelector);
+}
+
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
 }
 
 function hasHint(text, hints) {
