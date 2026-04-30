@@ -2,10 +2,12 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
+  displayModeToPageRenderState,
   type DisplayMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
+  type PageRenderState,
 } from "../../src/shared/config";
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
@@ -64,8 +66,24 @@ const setGeminiModel = (event: Event) => {
   void updateConfig({ geminiModel: (event.target as HTMLInputElement).value });
 };
 
+const setActiveTabRenderState = async (renderState: PageRenderState) => {
+  const response = (await chrome.runtime.sendMessage({
+    type: "IMT_POPUP_SET_ACTIVE_TAB_RENDER_STATE",
+    renderState,
+  })) as MessageResponse;
+  if (!response.ok) console.warn(response.error);
+  await loadPageStatus();
+};
+
 const setDisplayMode = (displayMode: DisplayMode) => {
-  void updateConfig({ displayMode });
+  void (async () => {
+    await updateConfig({ displayMode });
+    await setActiveTabRenderState(displayModeToPageRenderState(displayMode));
+  })();
+};
+
+const showOriginal = () => {
+  void setActiveTabRenderState("original");
 };
 
 const setCurrentSiteAutoTranslate = async (enabled: boolean) => {
@@ -381,9 +399,10 @@ function endpointSummary(value: string): string {
       <div class="field">
         <span>显示方式</span>
         <div class="segmented" role="group" aria-label="显示方式">
-          <button type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">智能</button>
-          <button type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">双语</button>
-          <button type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">仅译文</button>
+          <button data-testid="display-mode-smart" type="button" :class="{ active: config.displayMode === 'smart' }" @click="setDisplayMode('smart')">智能</button>
+          <button data-testid="display-mode-bilingual" type="button" :class="{ active: config.displayMode === 'bilingual' }" @click="setDisplayMode('bilingual')">双语</button>
+          <button data-testid="display-mode-translation" type="button" :class="{ active: config.displayMode === 'translation-only' }" @click="setDisplayMode('translation-only')">译文</button>
+          <button data-testid="display-mode-original" type="button" @click="showOriginal">原文</button>
         </div>
       </div>
       <label class="toggle-row">
@@ -602,7 +621,7 @@ select {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid rgba(15, 42, 95, 0.12);

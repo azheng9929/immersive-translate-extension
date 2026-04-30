@@ -3,7 +3,7 @@ import { removeTranslationLoading, renderTranslation, renderTranslationLoading }
 import { restoreAll, restoreRecords } from "./restoreEngine";
 import { buildTranslationUnits } from "./unitBuilder";
 import { decideRenderMode } from "./renderDecider";
-import type { DisplayMode } from "../shared/config";
+import { displayModeToPageRenderState, type DisplayMode, type PageRenderState } from "../shared/config";
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
@@ -31,8 +31,6 @@ type ViewportRootOptions = {
   rootMargin?: string;
   maxRoots?: number;
 };
-export type PageRenderState = "smart" | "bilingual" | "translation" | "original";
-
 type ControllerOptions = {
   targetLang: string;
   hostname?: string;
@@ -70,7 +68,7 @@ export class PageController {
   private renderState: PageRenderState;
 
   constructor(private readonly options: ControllerOptions) {
-    this.renderState = renderStateFromDisplayMode(options.displayMode);
+    this.renderState = displayModeToPageRenderState(options.displayMode ?? "smart");
   }
 
   async translatePage(
@@ -480,12 +478,6 @@ function resolveRenderModeForState(unit: TranslationUnit, renderState: PageRende
   if (renderState === "translation") return translationOnlyMode(unit);
   if (renderState === "bilingual") return bilingualMode(unit);
   return decideRenderMode(unit.category, unit.root, unit.originalText);
-}
-
-function renderStateFromDisplayMode(displayMode: DisplayMode | undefined): PageRenderState {
-  if (displayMode === "translation-only") return "translation";
-  if (displayMode === "bilingual") return "bilingual";
-  return "smart";
 }
 
 function bilingualMode(unit: TranslationUnit): RenderMode {

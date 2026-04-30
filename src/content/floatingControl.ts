@@ -1,6 +1,7 @@
 import type { TranslationPageSummary } from "./pageController";
 import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
 import type { DiagnosticReasonCounts, TranslationDiagnostics } from "./translationDiagnostics";
+import type { PageRenderState } from "../shared/config";
 
 type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed" | "paused" | "suspended";
 type FloatingStatus = TranslationPageSummary | PageTranslationStatus;
@@ -8,6 +9,7 @@ type FloatingStatus = TranslationPageSummary | PageTranslationStatus;
 type FloatingTranslationControlOptions = {
   translatePage: () => Promise<FloatingStatus>;
   restorePage: () => void;
+  setRenderState?: (renderState: PageRenderState) => void;
   getStatus?: () => PageTranslationStatus;
   subscribeStatus?: (listener: (status: PageTranslationStatus) => void) => () => void;
 };
@@ -319,6 +321,36 @@ const STYLE_TEXT = `
   font-size: 11px;
   line-height: 1.35;
 }
+.imt-floating-render-modes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 14px 12px;
+  padding: 4px;
+  border: 1px solid rgba(16, 36, 63, 0.1);
+  border-radius: 10px;
+  background: #ffffff;
+}
+.imt-floating-render-button {
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+  color: #52627a;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+.imt-floating-render-button:hover {
+  background: #f4f8fd;
+  color: var(--imt-ink);
+}
+.imt-floating-render-button[data-active="true"] {
+  color: #ffffff;
+  background: var(--imt-accent);
+}
 .imt-floating-details {
   display: grid;
   gap: 5px;
@@ -407,6 +439,7 @@ export class FloatingTranslationControl {
   private summary: FloatingStatus | undefined;
   private error: string | undefined;
   private detailsExpanded = false;
+  private renderState: PageRenderState = "smart";
   private unsubscribeStatus: (() => void) | undefined;
 
   constructor(private readonly options: FloatingTranslationControlOptions) {}
@@ -587,6 +620,7 @@ export class FloatingTranslationControl {
       createMetric("pending", metricValues.pending, "待处理"),
     );
 
+    const renderModes = this.createRenderModes();
     const actions = document.createElement("div");
     actions.className = "imt-floating-actions";
 
@@ -598,7 +632,7 @@ export class FloatingTranslationControl {
     const restoreButton = this.createButton("恢复", "restore", "imt-floating-button", () => this.restore());
 
     actions.append(translateButton, restoreButton);
-    panel.append(header, summary, progress, metrics);
+    panel.append(header, summary, progress, metrics, renderModes);
     const diagnostics = diagnosticsLabel(this.summary);
     if (diagnostics) {
       const diagnosticsNode = document.createElement("p");
@@ -654,9 +688,42 @@ export class FloatingTranslationControl {
     return button;
   }
 
+  private createRenderModes(): HTMLElement {
+    const modes = document.createElement("div");
+    modes.className = "imt-floating-render-modes";
+    modes.dataset.imtControl = "render-modes";
+    modes.setAttribute("role", "group");
+    modes.setAttribute("aria-label", "显示方式");
+    modes.append(
+      this.createRenderModeButton("智能", "smart"),
+      this.createRenderModeButton("双语", "bilingual"),
+      this.createRenderModeButton("译文", "translation"),
+      this.createRenderModeButton("原文", "original"),
+    );
+    return modes;
+  }
+
+  private createRenderModeButton(label: string, renderState: PageRenderState): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "imt-floating-render-button";
+    button.dataset.imtAction = `render-${renderState}`;
+    button.dataset.active = String(this.renderState === renderState);
+    button.textContent = label;
+    button.addEventListener("click", () => this.setRenderState(renderState));
+    return button;
+  }
+
+  private setRenderState(renderState: PageRenderState): void {
+    this.renderState = renderState;
+    this.options.setRenderState?.(renderState);
+    this.render();
+  }
+
   private applyStatus(status: FloatingStatus): void {
     this.summary = status;
     this.error = "lastError" in status ? status.lastError : undefined;
+    if ("renderState" in status && status.renderState) this.renderState = status.renderState;
     this.state = "phase" in status ? floatingStateFromStatus(status) : stateFromSummary(status);
     this.render();
   }

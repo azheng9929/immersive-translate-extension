@@ -350,6 +350,37 @@ describe("FloatingTranslationControl", () => {
     expect(document.querySelector("[data-imt-control='summary']")?.textContent).toBe("暂无整页翻译");
   });
 
+  it("switches page render state from the floating panel without restoring translations", () => {
+    const setRenderState = vi.fn();
+    const restorePage = vi.fn();
+    const control = new FloatingTranslationControl({
+      translatePage: async () => ({ total: 1, translated: 1, failed: 0, skipped: 0 }),
+      restorePage,
+      setRenderState,
+      getStatus: () => ({
+        phase: "translated",
+        observation: "observing",
+        pendingRoots: 0,
+        observedRoots: 0,
+        total: 1,
+        translated: 1,
+        failed: 0,
+        skipped: 0,
+        dynamicRuns: 0,
+        lastError: undefined,
+        renderState: "bilingual",
+      }),
+    });
+    control.mount(document.body);
+    document.querySelector<HTMLButtonElement>("[data-imt-control='ball']")?.click();
+
+    document.querySelector<HTMLButtonElement>("[data-imt-action='render-original']")?.click();
+
+    expect(setRenderState).toHaveBeenCalledWith("original");
+    expect(restorePage).not.toHaveBeenCalled();
+    expect(document.querySelector<HTMLButtonElement>("[data-imt-action='render-original']")?.dataset.active).toBe("true");
+  });
+
   it("hides the floating control for the current page session", () => {
     const control = new FloatingTranslationControl({
       translatePage: async () => ({ total: 0, translated: 0, failed: 0, skipped: 0 }),

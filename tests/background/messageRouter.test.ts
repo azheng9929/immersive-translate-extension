@@ -114,6 +114,29 @@ describe("handleBackgroundMessage", () => {
     vi.unstubAllGlobals();
   });
 
+  it("forwards active tab render-state requests from popup", async () => {
+    const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("chrome", {
+      tabs: {
+        query: tabsQuery,
+        sendMessage,
+      },
+    });
+
+    const response = await handleBackgroundMessage({
+      type: "IMT_POPUP_SET_ACTIVE_TAB_RENDER_STATE",
+      renderState: "original",
+    });
+
+    expect(response).toEqual({ ok: true });
+    expect(sendMessage).toHaveBeenCalledWith(12, {
+      type: "IMT_SET_PAGE_RENDER_STATE",
+      renderState: "original",
+    });
+    vi.unstubAllGlobals();
+  });
+
   it("toggles the active tab between translation and restore for keyboard shortcuts", async () => {
     const tabsQuery = vi.fn().mockResolvedValue([{ id: 12 }]);
     const sendMessage = vi.fn(async (_tabId, message) => {

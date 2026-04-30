@@ -17,6 +17,7 @@ import { SelectionTranslator } from "./selectionTranslator";
 import { resolveSitePolicy, type SitePolicy } from "./sitePolicy";
 import {
   DEFAULT_EXTENSION_CONFIG,
+  displayModeToPageRenderState,
   normalizeExtensionConfig,
   resolveSiteConfig,
   type ExtensionConfig,
@@ -43,6 +44,7 @@ export async function runContentMain(): Promise<void> {
     const floatingControl = new FloatingTranslationControl({
       translatePage: () => pageSession.translatePage(),
       restorePage: () => pageSession.restorePage(),
+      setRenderState: (renderState) => pageSession.setRenderState(renderState),
       getStatus: () => pageSession.getStatus(),
       subscribeStatus: (listener) => pageSession.subscribe(listener),
     });
@@ -63,15 +65,27 @@ export async function runContentMain(): Promise<void> {
         pageSession.restorePage();
         sendResponse({ ok: true });
       }
+      if (message?.type === "IMT_SET_PAGE_RENDER_STATE") {
+        pageSession.setRenderState(message.renderState);
+        sendResponse({ ok: true });
+      }
       if (message?.type === "IMT_GET_PAGE_STATUS") {
         sendResponse({ ok: true, status: pageSession.getStatus() });
       }
       if (message?.type === "IMT_CONFIG_UPDATED") {
         void (async () => {
+          const nextConfig = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
+          if (isDisplayModeOnlyConfigChange(config, nextConfig)) {
+            config = nextConfig;
+            pageSession.setRenderState(displayModeToPageRenderState(config.displayMode));
+            sendResponse({ ok: true });
+            return;
+          }
+
           cancelAutoTranslate?.();
           pageSession.restorePage();
           pageSession.dispose();
-          config = resolveSiteConfig(normalizeExtensionConfig(message.config), window.location.hostname);
+          config = nextConfig;
           pageRules = await loadWebRules(window.location.href);
           injectSitePolicyCss(resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules }));
           pageSession = createPageSession(config, pageRules);
@@ -190,6 +204,7 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
     observeUrlChange: sitePolicy.observeUrlChange,
     urlChangeDelay: sitePolicy.urlChangeDelay,
     tooltipDebounceMs: 120,
+    renderState: displayModeToPageRenderState(config.displayMode),
     site: {
       hostname: sitePolicy.hostname,
       siteKey: sitePolicy.siteKey,
@@ -198,6 +213,17 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
       isHighDynamic: sitePolicy.isHighDynamic,
     },
   });
+}
+
+function isDisplayModeOnlyConfigChange(previous: ExtensionConfig, next: ExtensionConfig): boolean {
+  const keys = Object.keys(DEFAULT_EXTENSION_CONFIG) as Array<keyof ExtensionConfig>;
+  return keys.every((key) => key === "displayMode" || configValueEquals(previous[key], next[key]));
+}
+
+function configValueEquals(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function injectSitePolicyCss(sitePolicy: SitePolicy): void {

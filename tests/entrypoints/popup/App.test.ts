@@ -313,4 +313,40 @@ describe("popup App", () => {
       patch: { siteRules: { "youtube.com": { autoTranslate: true } } },
     });
   });
+
+  it("switches active page render state from the popup display controls", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, displayMode: "bilingual" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find("[data-testid='display-mode-original']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_POPUP_SET_ACTIVE_TAB_RENDER_STATE",
+      renderState: "original",
+    });
+
+    await wrapper.find("[data-testid='display-mode-translation']").trigger("click");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { displayMode: "translation-only" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_POPUP_SET_ACTIVE_TAB_RENDER_STATE",
+      renderState: "translation",
+    });
+  });
 });

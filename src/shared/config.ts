@@ -8,6 +8,7 @@ import {
 export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini";
 export type FallbackProvider = "none" | ExtensionProvider;
 export type DisplayMode = "smart" | "bilingual" | "translation-only";
+export type PageRenderState = "smart" | "bilingual" | "translation" | "original";
 export type DynamicMode = "off" | "conservative" | "normal";
 export type RequestProfile = "stable" | "balanced" | "fast" | "high-dynamic";
 export type SiteDynamicModeOverrides = Record<string, DynamicMode>;
@@ -225,6 +226,11 @@ export function requestProfilePatch(value: unknown): ExtensionConfigPatch {
     geminiMaxBatchChars: preset.maxBatchChars,
     geminiRequestTimeoutMs: preset.requestTimeoutMs,
   };
+}
+
+export function displayModeToPageRenderState(displayMode: DisplayMode): PageRenderState {
+  if (displayMode === "translation-only") return "translation";
+  return displayMode;
 }
 
 export function resolveSiteConfig(config: ExtensionConfig, hostname: string): ExtensionConfig {

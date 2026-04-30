@@ -697,7 +697,11 @@ function isXLoginWall(site, metrics) {
 }
 
 function isRedditHumanityCheck(site, metrics) {
-  return site.host === "reddit.com" && /prove your humanity/i.test(metrics.title);
+  return site.host === "reddit.com" && (
+    /prove your humanity/i.test(metrics.title) ||
+    metrics.url.includes("js_challenge=1") ||
+    metrics.url.includes("/r/technology/?solution=")
+  );
 }
 
 function siteAccessGateReason(site, metrics) {

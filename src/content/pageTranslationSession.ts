@@ -2,6 +2,7 @@ import type { PageController, TranslationPageSummary, TranslationProgressDelta }
 import { DEFAULT_EXCLUDED_DYNAMIC_SELECTORS, type DynamicModeSource, type DynamicTranslationMode } from "./sitePolicy";
 import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText } from "../shared/skipRules";
+import type { PageRenderState } from "../shared/config";
 import type { TranslationDiagnostics } from "./translationDiagnostics";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
@@ -22,6 +23,7 @@ export type PageTranslationStatus = TranslationPageSummary & {
   observedRoots: number;
   dynamicRuns: number;
   lastError: string | undefined;
+  renderState?: PageRenderState;
   diagnostics?: TranslationDiagnostics;
   site?: PageTranslationSiteStatus;
 };
@@ -47,6 +49,7 @@ type PageTranslationSessionOptions = {
   observeUrlChange?: boolean;
   urlChangeDelay?: number;
   tooltipDebounceMs?: number;
+  renderState?: PageRenderState;
   site?: PageTranslationSiteStatus;
 };
 
@@ -96,11 +99,15 @@ export class PageTranslationSession {
   private urlChangeTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly handleVisibilityChangeBound = () => this.handleVisibilityChange();
   private readonly handleUrlChangeBound = () => this.handleUrlChange();
+  private renderState: PageRenderState;
 
   constructor(
     private readonly controller: PageController,
     private readonly options: PageTranslationSessionOptions = {},
-  ) {}
+  ) {
+    this.renderState = options.renderState ?? "smart";
+    this.status = { ...this.status, renderState: this.renderState };
+  }
 
   getStatus(): PageTranslationStatus {
     return {
@@ -202,6 +209,13 @@ export class PageTranslationSession {
       dynamicRuns: 0,
       lastError: undefined,
     });
+  }
+
+  setRenderState(renderState: PageRenderState): PageTranslationStatus {
+    this.renderState = renderState;
+    this.controller.setRenderState(renderState);
+    this.setStatus({ ...this.status });
+    return this.getStatus();
   }
 
   dispose(): void {
@@ -694,7 +708,7 @@ export class PageTranslationSession {
     this.listeningForUrlChange = false;
   }
 
-  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics" | "site"> & {
+  private setStatus(status: Omit<PageTranslationStatus, "pendingRoots" | "observedRoots" | "diagnostics" | "site" | "renderState"> & {
     diagnostics?: TranslationDiagnostics;
     site?: PageTranslationSiteStatus;
   }): void {
@@ -703,6 +717,7 @@ export class PageTranslationSession {
       ...status,
       pendingRoots: this.pendingRoots.size,
       observedRoots: this.lazyObservedRoots.size,
+      renderState: this.renderState,
       diagnostics: status.diagnostics ?? this.controller.getDiagnostics(),
       ...(site ? { site } : {}),
     };
