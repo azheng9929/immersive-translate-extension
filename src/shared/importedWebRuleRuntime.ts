@@ -70,7 +70,7 @@ const SUPPORTED_DELTA_FIELDS = [
   "attributeNames",
 ];
 
-const NON_WEB_RULE_ID_PATTERN = /pdf|ebook|subtitle|ocr|vtt|text-track|ebutt|notranslate/i;
+const NON_WEB_RULE_ID_PATTERN = /^(?:is)?ebook(?:builder)?$|pdf|subtitle|ocr|(?:^|[-_.])vtt(?:$|[-_.])|text-track|ebutt|notranslate/i;
 const NON_WEB_RULE_TEXT_PATTERN = /immersive-translate-(pdf|ebook|subtitle)|application\/pdf|download-subtitle|\.vtt\b/i;
 
 const STABLE_RUNTIME_FIELDS = [
