@@ -86,7 +86,7 @@ export function analyzeWebTranslationRuleCapability(rule: WebTranslationRule): W
     hasStructureHints,
     hasDynamicHints,
   });
-  const capability = rule.ruleCapability ?? derivedCapability;
+  const capability = hasContentAnchors ? "content-ready" : rule.ruleCapability ?? derivedCapability;
   const fallbackProfile = rule.fallbackProfile ?? inferFallbackProfile(rule);
 
   return {

@@ -309,6 +309,56 @@ describe("webTranslationRules", () => {
     expect(policy.injectedCss.join("\n")).toContain("span.title");
   });
 
+  it("uses a dedicated Xvideos rule so homepage video titles are preferred scan roots", () => {
+    const policy = resolveWebTranslationPolicy("https://www.xvideos.com/", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "xvideos.com",
+      ruleId: "xvideos",
+      ruleCapability: "content-ready",
+      fallbackProfile: "video",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("#content .mozaique .thumb-under p.title");
+    expect(policy.preferredScanRootSelectors).toContain("h2.page-title");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "#content .mozaique .thumb-under p.title",
+      category: "card-text",
+    });
+    expect(policy.buildContainerSelectors).toEqual(["#content .mozaique", "#content"]);
+    expect(policy.excludeSelectors).toContain("#content .mozaique .thumb-under p.metadata");
+    expect(policy.filterRule.extraBlockSelectors).toEqual(["#content .mozaique .thumb-under p.title"]);
+    expect(policy.injectedCss.join("\n")).toContain(".thumb-under p.title");
+  });
+
+  it("keeps Xvideos core capability when imported style-only rule is merged", () => {
+    const policy = resolveWebTranslationPolicy("https://www.xvideos.com/", "normal", {
+      rules: [
+        {
+          id: "xvideos",
+          siteKey: "www.xvideos.com",
+          matches: ["https://www.xvideos.com/*"],
+          ruleSource: "imported-stable",
+          ruleCapability: "modifier-only",
+          fallbackProfile: "video",
+          excludeSelectors: [".video-hd-mark"],
+          globalStyles: {
+            ".title": "-webkit-line-clamp:unset;max-height:unset;",
+          },
+        },
+      ],
+    });
+
+    expect(policy).toMatchObject({
+      ruleId: "xvideos",
+      ruleSource: "core+imported",
+      ruleCapability: "content-ready",
+      fallbackProfile: "video",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("#content .mozaique .thumb-under p.title");
+    expect(policy.excludeSelectors).toContain(".video-hd-mark");
+    expect(policy.injectedCss.join("\n")).toContain(".title");
+  });
+
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

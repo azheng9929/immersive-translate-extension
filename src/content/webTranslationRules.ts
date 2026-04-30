@@ -609,6 +609,62 @@ shreddit-comment,
     isHighDynamic: true,
   },
   {
+    id: "xvideos",
+    siteKey: "xvideos.com",
+    matches: ["*://xvideos.com/*", "*://*.xvideos.com/*"],
+    selectors: [
+      "#content .mozaique .thumb-under p.title",
+      "#content .mozaique .thumb-under p.title > a",
+      "#content .mozaique .thumb-under .title",
+      "h1",
+      "h2.page-title",
+      ".page-title",
+      ".video-title",
+    ],
+    contentSelectors: [
+      { selector: "h1, h2.page-title, .page-title, .video-title", category: "heading" },
+      { selector: "#content .mozaique .thumb-under p.title", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "button",
+      '[role="button"]',
+      "input",
+      "textarea",
+      "select",
+      "nav",
+      "header",
+      "footer",
+      "#content .mozaique .thumb-under p.metadata",
+      ".metadata",
+      ".duration",
+      ".views",
+      ".rating",
+      ".profile",
+    ],
+    injectedCss: [
+      `
+#content .mozaique .thumb-under p.title,
+#content .mozaique .thumb-under p.title > a,
+.video-title,
+.page-title {
+  height: unset !important;
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+  white-space: normal !important;
+}
+`,
+    ],
+    buildContainerSelectors: ["#content .mozaique", "#content"],
+    extraBlockSelectors: ["#content .mozaique .thumb-under p.title"],
+    detectParagraphLanguage: true,
+    paragraphMinTextCount: 1,
+    paragraphMinWordCount: 1,
+    blockMinTextCount: 0,
+    blockMinWordCount: 0,
+  },
+  {
     id: "pornhub",
     siteKey: "pornhub.com",
     matches: ["*://pornhub.com/*", "*://*.pornhub.com/*"],

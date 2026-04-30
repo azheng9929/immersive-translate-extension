@@ -695,7 +695,8 @@ function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions):
       continue;
     }
   }
-  return roots;
+  if (roots.length > 0) return roots;
+  return isDocumentScanRoot(root) ? [] : [root];
 }
 
 function applyGenericRootScoring(root: ParentNode, options: ScanRootOptions): ParentNode[] {

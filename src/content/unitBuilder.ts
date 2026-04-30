@@ -4,6 +4,7 @@ import { shouldSkipForTargetLanguage } from "../shared/languageHeuristics";
 import { isSkippableElement } from "../shared/skipRules";
 import type { TranslatableAttribute, TranslationUnit, UnitCategory } from "../shared/types";
 import {
+  classifyElementForTranslation,
   findTranslationRoot,
   isStayOriginalElement,
   type CompiledFilterRule,
@@ -120,6 +121,7 @@ function collectUnitText(
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
       if (isSkippableElement(parent, options)) return NodeFilter.FILTER_REJECT;
+      if (isExcludedFromUnitText(parent, options, filterRule)) return NodeFilter.FILTER_REJECT;
       if (filterRule && isStayOriginalElement(parent, filterRule)) return NodeFilter.FILTER_REJECT;
       if (!isVisibleElement(parent)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
@@ -133,6 +135,7 @@ function collectUnitText(
     const parent = node.parentElement;
     if (
       parent &&
+      !isExcludedFromUnitText(parent, options, filterRule) &&
       !(filterRule && isStayOriginalElement(parent, filterRule)) &&
       !resolveTextGranularity(parent, normalizeVisibleText(nodeText), options).skip
     ) {
@@ -145,9 +148,34 @@ function collectUnitText(
   const normalizedRawText = normalizeVisibleText(rawText);
   if (shouldSkipForTargetLanguage(normalizedRawText, options.targetLang)) return { text: "", skipReason: "target-language" };
   const text = normalizeCollectedText(textParts);
-  if (text) return { text };
+  if (text) {
+    if (shouldSkipForTargetLanguage(text, options.targetLang)) return { text: "", skipReason: "target-language" };
+    return { text };
+  }
   const fallbackText = normalizeVisibleText(fallbackTextNodes.map((node) => node.textContent ?? "").join(" "));
+  if (shouldSkipForTargetLanguage(fallbackText, options.targetLang)) return { text: "", skipReason: "target-language" };
   return fallbackText ? { text: fallbackText } : { text: "", skipReason: "empty" };
+}
+
+function isExcludedFromUnitText(
+  element: HTMLElement,
+  options: GranularityOptions,
+  filterRule?: CompiledFilterRule,
+): boolean {
+  if (matchesClosestSelector(element, options.excludeSelectors)) return true;
+  return filterRule ? classifyElementForTranslation(element, filterRule).kind === "excluded" : false;
+}
+
+function matchesClosestSelector(element: HTMLElement, selectors: readonly string[] | undefined): boolean {
+  if (!selectors?.length) return false;
+  for (const selector of selectors) {
+    try {
+      if (element.closest(selector)) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 function normalizeCollectedText(parts: readonly string[]): string {

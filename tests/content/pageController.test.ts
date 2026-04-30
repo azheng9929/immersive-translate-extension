@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PageController } from "@/content/pageController";
+import { resolveWebTranslationPolicy } from "@/content/webTranslationRules";
 import type { TranslationCache, TranslationCacheLookup, TranslationCacheWrite } from "@/shared/translationCache";
 
 class MemoryTranslationCache implements TranslationCache {
@@ -927,6 +928,54 @@ describe("PageController", () => {
 
     expect(requestedTexts).toEqual(["Readable article paragraph."]);
     expect(document.querySelector(".recommendations")?.textContent?.trim()).toBe("Recommended story teaser.");
+  });
+
+  it("keeps Xvideos homepage title units separate from localized metadata", async () => {
+    document.body.innerHTML = `
+      <div id="content">
+        <div class="mozaique">
+          <div class="thumb-block">
+            <div class="thumb-under">
+              <p class="title"><a>English video title that needs translation <span class="duration">10分钟</span></a></p>
+              <p class="metadata">11分钟 Channel - 63.7k 观看次数 -</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.xvideos.com/", "normal");
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      hostname: policy.hostname,
+      preferredScanRootSelectors: policy.preferredScanRootSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      contentSelectors: policy.contentSelectors,
+      filterRule: policy.filterRule,
+      buildContainerSelectors: policy.buildContainerSelectors,
+      skipBuildContainerSelectors: policy.skipBuildContainerSelectors,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const titleRoot = document.querySelector<HTMLElement>("#content .mozaique .thumb-under p.title")!;
+    const result = await controller.translateNewContent(titleRoot);
+
+    expect(requestedTexts).toEqual(["English video title that needs translation"]);
+    expect(result).toEqual({
+      total: 1,
+      translated: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(document.querySelector("#content .mozaique .thumb-under p.title .imt-translation-compact")?.textContent).toBe(
+      "[zh-Hans] English video title that needs translation",
+    );
+    expect(
+      document.querySelector("#content .mozaique .thumb-under > .imt-translation-block, #content .mozaique .thumb-under > .imt-translation-compact"),
+    ).toBeNull();
   });
 
   it("does not send Chinese text with English terminology to the translator when target is Chinese", async () => {
