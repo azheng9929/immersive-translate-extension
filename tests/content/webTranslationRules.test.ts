@@ -228,6 +228,17 @@ describe("webTranslationRules", () => {
     });
   });
 
+  it("absorbs safe X selectors from Immersive rules without enabling hover cards", () => {
+    const policy = resolveWebTranslationPolicy("https://x.com/home", "normal");
+
+    expect(policy.preferredScanRootSelectors).toContain("[data-testid='twitterArticleReadView']");
+    expect(policy.preferredScanRootSelectors).toContain("[data-testid='inlinePrompt']");
+    expect(policy.excludeSelectors).toContain("[data-testid=tweet-text-show-more-link]");
+    expect(policy.excludeSelectors).toContain("[role='tab']");
+    expect(policy.preferredScanRootSelectors).not.toContain("[data-testid='HoverCard'] div[dir=auto]");
+    expect(policy.preferredScanRootSelectors).not.toContain("[role=dialog]");
+  });
+
   it("keeps YouTube search result descriptions and Reddit side rail labels in site selectors", () => {
     const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
     const reddit = resolveWebTranslationPolicy(
@@ -253,6 +264,35 @@ describe("webTranslationRules", () => {
     });
     expect(reddit.excludeSelectors).not.toContain("faceplate-tracker");
     expect(reddit.excludedDynamicSelectors).toContain("faceplate-tracker");
+  });
+
+  it("covers newer YouTube lockup, attributed string, comment, and transcript text surfaces", () => {
+    const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
+
+    expect(youtube.preferredScanRootSelectors).toContain("yt-formatted-string[slot=content].ytd-comment-renderer");
+    expect(youtube.preferredScanRootSelectors).toContain(".ytLockupMetadataViewModelTitle");
+    expect(youtube.preferredScanRootSelectors).toContain(".shortsLockupViewModelHostOutsideMetadataTitle");
+    expect(youtube.preferredScanRootSelectors).toContain(".yt-core-attributed-string");
+    expect(youtube.preferredScanRootSelectors).toContain(".ytwTranscriptSegmentViewModelHost");
+    expect(youtube.excludeSelectors).toContain("yt-content-metadata-view-model");
+    expect(youtube.excludeSelectors).toContain("yt-description-preview-view-model button");
+    expect(youtube.injectedCss.join("\n")).toContain(".ytLockupMetadataViewModelTitle");
+    expect(youtube.urlChangeDelay).toBe(800);
+  });
+
+  it("covers newer Reddit rich text, list, and recommendation surfaces", () => {
+    const reddit = resolveWebTranslationPolicy(
+      "https://www.reddit.com/r/XiaomiGlobal/comments/1sxkzhf/xiaomi_mimo_orbit_program/",
+      "normal",
+    );
+
+    expect(reddit.preferredScanRootSelectors).toContain("[slot=comment]");
+    expect(reddit.preferredScanRootSelectors).toContain("[slot=text-body]");
+    expect(reddit.preferredScanRootSelectors).toContain(".RichTextJSON-root");
+    expect(reddit.preferredScanRootSelectors).toContain("#subgrid-container h1, #subgrid-container h2");
+    expect(reddit.preferredScanRootSelectors).toContain(".i18n-subreddit-description");
+    expect(reddit.excludeSelectors).toContain("shreddit-comment-action-row");
+    expect(reddit.injectedCss.join("\n")).toContain(".RichTextJSON-root");
   });
 
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
