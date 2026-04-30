@@ -238,6 +238,63 @@ export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
 
 export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
   {
+    id: "googleSearch",
+    siteKey: "www.google.*",
+    matches: ["www.google.*/search*"],
+    selectors: [
+      "#search a h3",
+      "#search [role='heading']",
+      "#search [role='heading'] span",
+      "#search .VwiC3b",
+      "#search .VwiC3b span",
+      "#search .IsZvec",
+      "#search .IsZvec span",
+      "#search .aCOpRe",
+      "#search .aCOpRe span",
+    ],
+    contentSelectors: [
+      { selector: "#search a h3, #search [role='heading']", category: "heading" },
+      { selector: "#search .VwiC3b, #search .IsZvec, #search .aCOpRe", category: "card-text" },
+    ],
+    excludeSelectors: [
+      "#searchform",
+      "#result-stats",
+      "#sfooter",
+      "[role='navigation']",
+      "g-menu",
+      ".commercial-unit-desktop-top",
+      ".commercial-unit-desktop-rhs",
+    ],
+    mutationExcludeSelectors: [
+      "#searchform",
+      "[role='navigation']",
+      "g-menu",
+    ],
+    extraBlockSelectors: [
+      "#search [role='heading']",
+      "#search .VwiC3b",
+      "#search .IsZvec",
+      "#search .aCOpRe",
+    ],
+    injectedCss: [
+      `
+#search [role='heading'],
+#search .VwiC3b,
+#search .IsZvec,
+#search .aCOpRe {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    attributeNames: [],
+    observeUrlChange: true,
+    urlChangeDelay: 500,
+    detectParagraphLanguage: true,
+  },
+  {
     id: "x",
     siteKey: "x.com",
     matches: ["*://x.com/*", "*://*.x.com/*"],
@@ -1572,7 +1629,7 @@ export function resolveWebTranslationRule(
     mergedRuleIds: ["general"],
   });
   const base = match.id === "twitter"
-    ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, CORE_WEB_TRANSLATION_RULES[0]!)
+    ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, coreWebTranslationRule("x"))
     : GENERAL_WEB_TRANSLATION_RULE;
   return withRuleMetadata(mergeWebTranslationRules(base, match), {
     ruleId: match.id,
@@ -1944,7 +2001,7 @@ function toResolvedRule(rule: WebTranslationRule): ResolvedWebTranslationRule {
     globalStyles: recordValue(rule.globalStyles),
     globalAttributes: recordValue(rule.globalAttributes),
     translationClasses: arrayValue(rule.translationClasses),
-    contentSelectors: arrayValue(rule.contentSelectors),
+    contentSelectors: arrayValue(rule.contentSelectors, contentSelectorKey),
     attributeNames: arrayValue(rule.attributeNames),
   };
 }
@@ -1999,10 +2056,19 @@ function mergeArray<T>(
   return unique(next, keyOf);
 }
 
-function arrayValue<T>(value: RuleArrayValue<T> | undefined): readonly T[] {
+function arrayValue<T>(
+  value: RuleArrayValue<T> | undefined,
+  keyOf: (item: T) => string = (item) => String(item),
+): readonly T[] {
   if (!value) return [];
-  if (!isRuleArrayOperation(value)) return unique(listValue(value));
-  return unique(value.replace !== undefined ? listValue(value.replace) : listValue(value.add));
+  if (!isRuleArrayOperation(value)) return unique(listValue(value), keyOf);
+  return unique(value.replace !== undefined ? listValue(value.replace) : listValue(value.add), keyOf);
+}
+
+function coreWebTranslationRule(id: string): WebTranslationRule {
+  const rule = CORE_WEB_TRANSLATION_RULES.find((entry) => entry.id === id);
+  if (!rule) throw new Error(`Missing core web translation rule: ${id}`);
+  return rule;
 }
 
 function addOnly<T>(value: RuleArrayValue<T> | undefined): RuleArrayValue<T> | undefined {

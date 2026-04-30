@@ -380,6 +380,49 @@ describe("webTranslationRules", () => {
     expect(threadsNet.ruleId).toBe("threads");
   });
 
+  it("keeps Google search result span text anchored to rule selectors", () => {
+    document.body.innerHTML = `
+      <div id="search">
+        <div class="g">
+          <a href="https://openai.com/">
+            <div role="heading" aria-level="3"><span>OpenAI official site</span></div>
+          </a>
+          <div class="VwiC3b"><span>OpenAI creates AI models and products.</span></div>
+        </div>
+      </div>
+    `;
+    const policy = resolveWebTranslationPolicy("https://www.google.com/search?q=openai", "normal", {
+      rules: [
+        {
+          id: "googleSearch",
+          siteKey: "www.google.*",
+          matches: ["www.google.*/search*"],
+          ruleSource: "imported-stable",
+          ruleCapability: "modifier-only",
+          fallbackProfile: "generic",
+          excludeSelectors: ["#searchform", "#result-stats", "[role=navigation]"],
+          extraBlockSelectors: ["[role=heading]"],
+        },
+      ],
+    });
+
+    expect(policy).toMatchObject({
+      ruleId: "googleSearch",
+      siteKey: "www.google.*",
+      ruleCapability: "content-ready",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("#search [role='heading'] span");
+    expect(policy.preferredScanRootSelectors).toContain("#search .VwiC3b span");
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "#search a h3, #search [role='heading']",
+      category: "heading",
+    });
+    expect(policy.contentSelectors).toContainEqual({
+      selector: "#search .VwiC3b, #search .IsZvec, #search .aCOpRe",
+      category: "card-text",
+    });
+  });
+
   it("keeps YouTube search result descriptions and Reddit side rail labels in site selectors", () => {
     const youtube = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal");
     const reddit = resolveWebTranslationPolicy(
