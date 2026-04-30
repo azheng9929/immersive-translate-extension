@@ -3,6 +3,7 @@ import {
   classifyContentScriptUrl,
   decideContentMainLoad,
   isVisibleFrameMetrics,
+  shouldRetryHiddenFrameMetrics,
   type FrameVisibilityMetrics,
 } from "@/content/contentGuard";
 
@@ -65,5 +66,22 @@ describe("contentGuard", () => {
       load: true,
       reason: "iframe-visibility-unknown",
     });
+  });
+
+  it("retries hidden iframe metrics when layout may not have settled yet", () => {
+    expect(shouldRetryHiddenFrameMetrics({
+      width: 0,
+      height: 0,
+      rectWidth: 0,
+      rectHeight: 0,
+      visibleByViewport: true,
+    })).toBe(true);
+    expect(shouldRetryHiddenFrameMetrics({
+      width: 320,
+      height: 180,
+      rectWidth: 320,
+      rectHeight: 180,
+      visibleByViewport: false,
+    })).toBe(false);
   });
 });

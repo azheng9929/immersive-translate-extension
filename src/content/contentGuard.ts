@@ -77,6 +77,19 @@ export function isVisibleFrameMetrics(metrics: FrameVisibilityMetrics): boolean 
   );
 }
 
+export function shouldRetryHiddenFrameMetrics(metrics: FrameVisibilityMetrics): boolean {
+  return (
+    metrics.visibleByViewport &&
+    !isVisibleFrameMetrics(metrics) &&
+    (
+      metrics.width < MIN_VISIBLE_FRAME_SIZE ||
+      metrics.height < MIN_VISIBLE_FRAME_SIZE ||
+      metrics.rectWidth < MIN_VISIBLE_FRAME_SIZE ||
+      metrics.rectHeight < MIN_VISIBLE_FRAME_SIZE
+    )
+  );
+}
+
 export function measureFrameElement(
   element: Element | null | undefined,
   viewport: { width: number; height: number } = {

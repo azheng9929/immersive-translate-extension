@@ -2,6 +2,7 @@ import {
   classifyContentScriptUrl,
   decideContentMainLoad,
   measureFrameElement,
+  shouldRetryHiddenFrameMetrics,
   type FrameVisibilityMetrics,
 } from "../src/content/contentGuard";
 
@@ -22,13 +23,22 @@ export default defineContentScript({
     if (classification.blocked) return;
 
     const isTopFrame = window.top === window;
-    const frameMetrics = isTopFrame ? undefined : await readCurrentFrameMetrics();
+    let frameMetrics = isTopFrame ? undefined : await readCurrentFrameMetrics();
 
-    const decision = decideContentMainLoad({
+    let decision = decideContentMainLoad({
       href: window.location.href,
       isTopFrame,
       ...(frameMetrics ? { frameMetrics } : {}),
     });
+    if (!decision.load && decision.reason === "hidden-iframe" && frameMetrics && shouldRetryHiddenFrameMetrics(frameMetrics)) {
+      await delay(240);
+      frameMetrics = await readCurrentFrameMetrics();
+      decision = decideContentMainLoad({
+        href: window.location.href,
+        isTopFrame,
+        ...(frameMetrics ? { frameMetrics } : {}),
+      });
+    }
 
     if (!decision.load) return;
     await loadContentMain();
@@ -93,6 +103,10 @@ function askParentForFrameMetrics(timeoutMs = 180): Promise<FrameVisibilityMetri
     window.addEventListener("message", handleMessage);
     window.parent.postMessage({ type: IFRAME_VISIBILITY_REQUEST, id }, "*");
   });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function findSourceFrame(source: MessageEventSource | null): HTMLIFrameElement | undefined {
