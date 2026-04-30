@@ -2,6 +2,7 @@ import type { TranslationPageSummary } from "./pageController";
 import type { PageTranslationPhase, PageTranslationStatus } from "./pageTranslationSession";
 import type { DiagnosticReasonCounts, TranslationDiagnostics } from "./translationDiagnostics";
 import { RuleTargetInspector } from "./ruleTargetInspector";
+import { diagnosticReasonLabel } from "./diagnosticLabels";
 import type { PageRenderState } from "../shared/config";
 
 type FloatingState = "idle" | "translating" | "translated" | "updating" | "partial" | "failed" | "paused" | "suspended";
@@ -1058,19 +1059,9 @@ function collectSkippedReasons(diagnostics: TranslationDiagnostics): Map<string,
 function addReasonCounts(target: Map<string, number>, reasons: DiagnosticReasonCounts): void {
   for (const [reason, count] of Object.entries(reasons)) {
     if (!count) continue;
-    const label = reasonLabel(reason);
+    const label = diagnosticReasonLabel(reason);
     target.set(label, (target.get(label) ?? 0) + count);
   }
-}
-
-function reasonLabel(reason: string): string {
-  if (reason === "target-language") return "目标语言";
-  if (reason === "global-selector" || reason === "site-selector") return "插件或站点界面";
-  if (reason === "global-text" || reason === "site-text" || reason === "site-phrase") return "元数据或控件文本";
-  if (reason === "not-meaningful") return "短文本";
-  if (reason === "hidden") return "隐藏文本";
-  if (reason === "empty") return "空文本";
-  return reason.replaceAll("-", " ");
 }
 
 function observationLabel(observation: PageTranslationStatus["observation"]): string {

@@ -39,12 +39,16 @@ export type SkipRuleOptions = {
 };
 
 export function isSkippableElement(element: Element, options: SkipRuleOptions = {}): boolean {
-  if (element.closest('[data-imt-managed="true"]')) return true;
-  if (element.closest('[data-imt-skip="true"]')) return true;
-  if (element.closest('[data-imt-state="loading"]')) return true;
-  if (element.closest('[data-imt-state="translated"]')) return true;
-  if (element.closest("[translate='no'], .notranslate")) return true;
-  if (!options.allowTooltip && element.closest('[role="tooltip"], [popover]')) return true;
+  return explainSkippableElement(element, options) !== undefined;
+}
+
+export function explainSkippableElement(element: Element, options: SkipRuleOptions = {}): string | undefined {
+  if (element.closest('[data-imt-managed="true"]')) return "managed";
+  if (element.closest('[data-imt-skip="true"]')) return "explicit-skip";
+  if (element.closest('[data-imt-state="loading"]')) return "loading";
+  if (element.closest('[data-imt-state="translated"]')) return "translated";
+  if (element.closest("[translate='no'], .notranslate")) return "notranslate";
+  if (!options.allowTooltip && element.closest('[role="tooltip"], [popover]')) return "tooltip";
   if (
     element.closest(
       [
@@ -71,7 +75,7 @@ export function isSkippableElement(element: Element, options: SkipRuleOptions = 
       ].join(","),
     )
   ) {
-    return true;
+    return "site-ui";
   }
 
   let current: Element | null = element;
@@ -80,13 +84,13 @@ export function isSkippableElement(element: Element, options: SkipRuleOptions = 
       current.hasAttribute("contenteditable") &&
       current.getAttribute("contenteditable")?.trim().toLowerCase() !== "false"
     ) {
-      return true;
+      return "editable";
     }
-    if (SKIP_TAGS.has(current.tagName)) return true;
+    if (SKIP_TAGS.has(current.tagName)) return "tag";
     current = current.parentElement;
   }
 
-  return false;
+  return undefined;
 }
 
 export function isMeaningfulText(value: string, category: UnitCategory): boolean {

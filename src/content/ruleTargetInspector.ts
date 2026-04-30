@@ -2,6 +2,9 @@ import type {
   PageTranslationRuleVisualizationSelector,
   PageTranslationStatus,
 } from "./pageTranslationSession";
+import { isVisibleElement } from "./visibility";
+import { normalizeVisibleText } from "../shared/normalize";
+import { explainSkippableElement, isMeaningfulText } from "../shared/skipRules";
 
 type RuleTargetInspectorOptions = {
   getStatus: () => PageTranslationStatus | undefined;
@@ -110,6 +113,7 @@ export function buildRuleTargetExplanation(
   const rows = [
     `状态: ${translatedRoot ? "已翻译" : "未翻译"}`,
     `元素: ${elementLabel(inspectionRoot)}`,
+    ...(translatedRoot ? [] : [`原因: ${untranslatedReasonLabel(inspectionRoot, input)}`]),
     `规则: ${rules.length > 0 ? rules.join(" | ") : "未命中规则 selector"}`,
   ];
   const text = elementTextPreview(inspectionRoot);
@@ -133,12 +137,7 @@ function matchingRuleLabels(
   element: Element,
   selectors: readonly PageTranslationRuleVisualizationSelector[],
 ): string[] {
-  const labels: string[] = [];
-  for (const entry of selectors) {
-    if (!matchesSelectorContext(element, entry.selector)) continue;
-    labels.push(ruleLabel(entry));
-  }
-  return [...new Set(labels)];
+  return [...new Set(matchingRuleEntries(element, selectors).map((entry) => ruleLabel(entry)))];
 }
 
 function matchesSelectorContext(element: Element, selector: string): boolean {
@@ -162,6 +161,37 @@ function ruleLabel(entry: PageTranslationRuleVisualizationSelector): string {
   return entry.label ? `${entry.group}:${entry.label}` : entry.group;
 }
 
+function untranslatedReasonLabel(
+  element: Element,
+  input: {
+    status?: PageTranslationStatus;
+    textCandidates?: readonly HTMLElement[];
+  },
+): string {
+  const selectors = input.status?.site?.ruleDiagnostics?.visualizationSelectors ?? [];
+  const matchedEntries = matchingRuleEntries(element, selectors);
+  if (matchedEntries.some((entry) => entry.group === "exclude")) {
+    return "命中排除规则，当前元素或祖先在排除范围内";
+  }
+  if (matchedEntries.some((entry) => entry.group === "dynamic-exclude")) {
+    return "命中动态排除规则，动态补翻会跳过这里";
+  }
+  if (matchedEntries.some((entry) => entry.group === "skip-build-container")) {
+    return "命中跳过构建容器规则，扫描根构建时会跳过这里";
+  }
+  if (!isVisibleElement(element)) {
+    return "元素隐藏或祖先隐藏，扫描时会跳过";
+  }
+  const allowTooltip = input.status?.site?.ruleDiagnostics?.allowTooltip ?? false;
+  const skippableReason = explainSkippableElement(element, { allowTooltip });
+  if (skippableReason) return skippableReasonLabel(skippableReason);
+  const text = normalizeVisibleText(element.textContent ?? "");
+  if (text && !isMeaningfulText(text, classifyInspectionCategory(element))) {
+    return "文本更像短文本、编号、链接或标识符，当前启发式会跳过";
+  }
+  return "没有命中内容规则或实际翻译候选根";
+}
+
 function elementLabel(element: Element): string {
   const tag = element.tagName.toLowerCase();
   const id = element.id ? `#${element.id}` : "";
@@ -175,6 +205,51 @@ function elementLabel(element: Element): string {
 
 function elementTextPreview(element: Element): string {
   return (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function matchingRuleEntries(
+  element: Element,
+  selectors: readonly PageTranslationRuleVisualizationSelector[],
+): PageTranslationRuleVisualizationSelector[] {
+  const labels: PageTranslationRuleVisualizationSelector[] = [];
+  for (const entry of selectors) {
+    if (!matchesSelectorContext(element, entry.selector)) continue;
+    labels.push(entry);
+  }
+  return labels;
+}
+
+function classifyInspectionCategory(
+  element: Element,
+): "button" | "nav" | "menu" | "label" | "table-cell" | "fallback" {
+  if (element.closest("button")) return "button";
+  if (element.closest("nav")) return "nav";
+  if (element.closest("menu")) return "menu";
+  if (element.closest("label")) return "label";
+  if (element.closest("td, th")) return "table-cell";
+  return "fallback";
+}
+
+function skippableReasonLabel(reason: string): string {
+  if (reason === "managed" || reason === "loading" || reason === "translated") {
+    return "当前元素属于插件管理区域，不参与扫描";
+  }
+  if (reason === "explicit-skip" || reason === "notranslate") {
+    return "页面显式标记为不翻译";
+  }
+  if (reason === "tooltip") {
+    return "当前元素位于 tooltip/popover，默认不翻译";
+  }
+  if (reason === "site-ui") {
+    return "当前元素更像站点界面、分享区或代码展示区域";
+  }
+  if (reason === "editable") {
+    return "当前元素位于可编辑区域，默认不翻译";
+  }
+  if (reason === "tag") {
+    return "当前元素位于代码、媒体或其它默认跳过的标签中";
+  }
+  return "当前元素命中了默认跳过规则";
 }
 
 function isExtensionElement(element: Element): boolean {
