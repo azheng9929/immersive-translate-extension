@@ -295,6 +295,20 @@ describe("webTranslationRules", () => {
     expect(reddit.injectedCss.join("\n")).toContain(".RichTextJSON-root");
   });
 
+  it("uses a dedicated Pornhub rule so short video titles are preferred scan roots", () => {
+    const policy = resolveWebTranslationPolicy("https://www.pornhub.com/view_video.php?viewkey=test", "normal");
+
+    expect(policy).toMatchObject({
+      siteKey: "pornhub.com",
+      ruleId: "pornhub",
+    });
+    expect(policy.preferredScanRootSelectors).toContain("h1.title");
+    expect(policy.preferredScanRootSelectors).toContain(".title-container h1");
+    expect(policy.preferredScanRootSelectors).toContain("span.title");
+    expect(policy.contentSelectors).toContainEqual({ selector: "h1.title, .title-container h1, #videoTitle", category: "heading" });
+    expect(policy.injectedCss.join("\n")).toContain("span.title");
+  });
+
   it("turns globalStyles into injected CSS and exposes compiled filter metadata", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

@@ -603,6 +603,73 @@ shreddit-comment,
     allowTooltip: true,
     isHighDynamic: true,
   },
+  {
+    id: "pornhub",
+    siteKey: "pornhub.com",
+    matches: ["*://pornhub.com/*", "*://*.pornhub.com/*"],
+    excludeMatches: ["*://pornhub.com/insights/*", "*://*.pornhub.com/insights/*"],
+    selectors: [
+      "h1.title",
+      ".title-container h1",
+      "#videoTitle",
+      ".video-title",
+      ".videoTitle",
+      "span.title",
+      ".pcVideoListItem span.title",
+      ".pcVideoListItem .title a",
+      ".entry-title > a",
+      ".searchItem .title",
+      ".trendingNow .title",
+    ],
+    contentSelectors: [
+      { selector: "h1.title, .title-container h1, #videoTitle", category: "heading" },
+      {
+        selector:
+          ".video-title, .videoTitle, span.title, .pcVideoListItem span.title, .pcVideoListItem .title a, .entry-title > a, .searchItem .title, .trendingNow .title",
+        category: "card-text",
+      },
+    ],
+    excludeSelectors: [
+      "button",
+      '[role="button"]',
+      "input",
+      "textarea",
+      "select",
+      "nav",
+      "header",
+      "footer",
+      ".duration",
+      ".views",
+      ".ratingInfo",
+      ".username",
+      ".usernameWrap",
+      ".userInfo",
+    ],
+    injectedCss: [
+      `
+span.title,
+.title-container h1,
+h1.title,
+.detailedInfo,
+.pcVideoListItem,
+.wrap,
+.entry-header,
+.entry-title > a {
+  height: unset !important;
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    extraBlockSelectors: [".trendingNow", ".searchItem"],
+    detectParagraphLanguage: true,
+    paragraphMinTextCount: 1,
+    paragraphMinWordCount: 1,
+    blockMinTextCount: 0,
+    blockMinWordCount: 0,
+  },
 ] as const;
 
 export const BUILTIN_WEB_TRANSLATION_RULES = CORE_WEB_TRANSLATION_RULES;
