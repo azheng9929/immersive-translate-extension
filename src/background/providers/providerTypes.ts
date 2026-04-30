@@ -1,6 +1,6 @@
 import type { UnitCategory } from "../../shared/types";
 
-export type ProviderId = "fake" | "microsoft" | "openai-compatible" | "gemini";
+export type ProviderId = "fake" | "microsoft" | "openai-compatible" | "gemini" | "deepseek" | "anthropic" | "openrouter";
 
 export type ProviderRequestItem = {
   id: string;
@@ -18,6 +18,7 @@ export type ProviderRequest = {
   maxBatchItems?: number;
   maxBatchChars?: number;
   requestTimeoutMs?: number;
+  maxOutputTokens?: number;
   systemPrompt?: string;
   sourceLang?: string;
   targetLang: string;

@@ -66,6 +66,42 @@ const setGeminiModel = (event: Event) => {
   void updateConfig({ geminiModel: (event.target as HTMLInputElement).value });
 };
 
+const setDeepSeekEndpoint = (event: Event) => {
+  void updateConfig({ deepseekEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setDeepSeekApiKey = (event: Event) => {
+  void updateConfig({ deepseekApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setDeepSeekModel = (event: Event) => {
+  void updateConfig({ deepseekModel: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicEndpoint = (event: Event) => {
+  void updateConfig({ anthropicEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicApiKey = (event: Event) => {
+  void updateConfig({ anthropicApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicModel = (event: Event) => {
+  void updateConfig({ anthropicModel: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterEndpoint = (event: Event) => {
+  void updateConfig({ openrouterEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterApiKey = (event: Event) => {
+  void updateConfig({ openrouterApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterModel = (event: Event) => {
+  void updateConfig({ openrouterModel: (event.target as HTMLInputElement).value });
+};
+
 const setActiveTabRenderState = async (renderState: PageRenderState) => {
   const response = (await chrome.runtime.sendMessage({
     type: "IMT_POPUP_SET_ACTIVE_TAB_RENDER_STATE",
@@ -147,6 +183,27 @@ const geminiStatus = computed(() => {
 });
 
 const geminiEndpointSummary = computed(() => endpointSummary(config.geminiEndpoint));
+
+const deepSeekStatus = computed(() => {
+  if (config.provider !== "deepseek") return "未选择";
+  return config.deepseekApiKey ? `就绪 - ${config.deepseekModel}` : "需要 API Key";
+});
+
+const deepSeekEndpointSummary = computed(() => endpointSummary(config.deepseekEndpoint));
+
+const anthropicStatus = computed(() => {
+  if (config.provider !== "anthropic") return "未选择";
+  return config.anthropicApiKey ? `就绪 - ${config.anthropicModel}` : "需要 API Key";
+});
+
+const anthropicEndpointSummary = computed(() => endpointSummary(config.anthropicEndpoint));
+
+const openRouterStatus = computed(() => {
+  if (config.provider !== "openrouter") return "未选择";
+  return config.openrouterApiKey ? `就绪 - ${config.openrouterModel}` : "需要 API Key";
+});
+
+const openRouterEndpointSummary = computed(() => endpointSummary(config.openrouterEndpoint));
 
 onMounted(async () => {
   const response = (await chrome.runtime.sendMessage({ type: "IMT_GET_CONFIG" })) as MessageResponse;
@@ -296,6 +353,9 @@ function endpointSummary(value: string): string {
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="anthropic">Claude</option>
+          <option value="openrouter">OpenRouter</option>
           <option value="fake">本地测试</option>
         </select>
       </label>
@@ -392,6 +452,78 @@ function endpointSummary(value: string): string {
               :value="config.geminiModel"
               @input="setGeminiModel"
             />
+          </label>
+        </div>
+      </div>
+
+      <div v-if="config.provider === 'deepseek'" class="openai-quick" aria-label="DeepSeek API 设置">
+        <div class="openai-quick-header">
+          <div>
+            <h2>DeepSeek</h2>
+            <p data-testid="popup-deepseek-status">{{ deepSeekStatus }}</p>
+          </div>
+          <p class="openai-endpoint">{{ deepSeekEndpointSummary }}</p>
+        </div>
+        <label class="field">
+          <span>接口地址</span>
+          <input data-testid="popup-deepseek-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.deepseekEndpoint" @input="setDeepSeekEndpoint" />
+        </label>
+        <div class="openai-grid">
+          <label class="field">
+            <span>API Key</span>
+            <input data-testid="popup-deepseek-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.deepseekApiKey" @input="setDeepSeekApiKey" />
+          </label>
+          <label class="field">
+            <span>模型</span>
+            <input data-testid="popup-deepseek-model" type="text" autocomplete="off" spellcheck="false" :value="config.deepseekModel" @input="setDeepSeekModel" />
+          </label>
+        </div>
+      </div>
+
+      <div v-if="config.provider === 'anthropic'" class="openai-quick" aria-label="Claude API 设置">
+        <div class="openai-quick-header">
+          <div>
+            <h2>Claude</h2>
+            <p data-testid="popup-anthropic-status">{{ anthropicStatus }}</p>
+          </div>
+          <p class="openai-endpoint">{{ anthropicEndpointSummary }}</p>
+        </div>
+        <label class="field">
+          <span>接口地址</span>
+          <input data-testid="popup-anthropic-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.anthropicEndpoint" @input="setAnthropicEndpoint" />
+        </label>
+        <div class="openai-grid">
+          <label class="field">
+            <span>API Key</span>
+            <input data-testid="popup-anthropic-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.anthropicApiKey" @input="setAnthropicApiKey" />
+          </label>
+          <label class="field">
+            <span>模型</span>
+            <input data-testid="popup-anthropic-model" type="text" autocomplete="off" spellcheck="false" :value="config.anthropicModel" @input="setAnthropicModel" />
+          </label>
+        </div>
+      </div>
+
+      <div v-if="config.provider === 'openrouter'" class="openai-quick" aria-label="OpenRouter API 设置">
+        <div class="openai-quick-header">
+          <div>
+            <h2>OpenRouter</h2>
+            <p data-testid="popup-openrouter-status">{{ openRouterStatus }}</p>
+          </div>
+          <p class="openai-endpoint">{{ openRouterEndpointSummary }}</p>
+        </div>
+        <label class="field">
+          <span>接口地址</span>
+          <input data-testid="popup-openrouter-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.openrouterEndpoint" @input="setOpenRouterEndpoint" />
+        </label>
+        <div class="openai-grid">
+          <label class="field">
+            <span>API Key</span>
+            <input data-testid="popup-openrouter-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.openrouterApiKey" @input="setOpenRouterApiKey" />
+          </label>
+          <label class="field">
+            <span>模型</span>
+            <input data-testid="popup-openrouter-model" type="text" autocomplete="off" spellcheck="false" :value="config.openrouterModel" @input="setOpenRouterModel" />
           </label>
         </div>
       </div>

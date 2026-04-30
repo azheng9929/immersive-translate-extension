@@ -147,6 +147,106 @@ const setGeminiSystemPrompt = (event: Event) => {
   void updateConfig({ geminiSystemPrompt: (event.target as HTMLTextAreaElement).value });
 };
 
+const setDeepSeekEndpoint = (event: Event) => {
+  void updateConfig({ deepseekEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setDeepSeekApiKey = (event: Event) => {
+  void updateConfig({ deepseekApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setDeepSeekModel = (event: Event) => {
+  void updateConfig({ deepseekModel: (event.target as HTMLInputElement).value });
+};
+
+const setDeepSeekMaxConcurrentRequests = (event: Event) => {
+  void updateConfig({ deepseekMaxConcurrentRequests: numberInputValue(event) });
+};
+
+const setDeepSeekMaxBatchItems = (event: Event) => {
+  void updateConfig({ deepseekMaxBatchItems: numberInputValue(event) });
+};
+
+const setDeepSeekMaxBatchChars = (event: Event) => {
+  void updateConfig({ deepseekMaxBatchChars: numberInputValue(event) });
+};
+
+const setDeepSeekRequestTimeoutMs = (event: Event) => {
+  void updateConfig({ deepseekRequestTimeoutMs: numberInputValue(event) });
+};
+
+const setDeepSeekSystemPrompt = (event: Event) => {
+  void updateConfig({ deepseekSystemPrompt: (event.target as HTMLTextAreaElement).value });
+};
+
+const setAnthropicEndpoint = (event: Event) => {
+  void updateConfig({ anthropicEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicApiKey = (event: Event) => {
+  void updateConfig({ anthropicApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicModel = (event: Event) => {
+  void updateConfig({ anthropicModel: (event.target as HTMLInputElement).value });
+};
+
+const setAnthropicMaxConcurrentRequests = (event: Event) => {
+  void updateConfig({ anthropicMaxConcurrentRequests: numberInputValue(event) });
+};
+
+const setAnthropicMaxBatchItems = (event: Event) => {
+  void updateConfig({ anthropicMaxBatchItems: numberInputValue(event) });
+};
+
+const setAnthropicMaxBatchChars = (event: Event) => {
+  void updateConfig({ anthropicMaxBatchChars: numberInputValue(event) });
+};
+
+const setAnthropicRequestTimeoutMs = (event: Event) => {
+  void updateConfig({ anthropicRequestTimeoutMs: numberInputValue(event) });
+};
+
+const setAnthropicMaxOutputTokens = (event: Event) => {
+  void updateConfig({ anthropicMaxOutputTokens: numberInputValue(event) });
+};
+
+const setAnthropicSystemPrompt = (event: Event) => {
+  void updateConfig({ anthropicSystemPrompt: (event.target as HTMLTextAreaElement).value });
+};
+
+const setOpenRouterEndpoint = (event: Event) => {
+  void updateConfig({ openrouterEndpoint: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterApiKey = (event: Event) => {
+  void updateConfig({ openrouterApiKey: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterModel = (event: Event) => {
+  void updateConfig({ openrouterModel: (event.target as HTMLInputElement).value });
+};
+
+const setOpenRouterMaxConcurrentRequests = (event: Event) => {
+  void updateConfig({ openrouterMaxConcurrentRequests: numberInputValue(event) });
+};
+
+const setOpenRouterMaxBatchItems = (event: Event) => {
+  void updateConfig({ openrouterMaxBatchItems: numberInputValue(event) });
+};
+
+const setOpenRouterMaxBatchChars = (event: Event) => {
+  void updateConfig({ openrouterMaxBatchChars: numberInputValue(event) });
+};
+
+const setOpenRouterRequestTimeoutMs = (event: Event) => {
+  void updateConfig({ openrouterRequestTimeoutMs: numberInputValue(event) });
+};
+
+const setOpenRouterSystemPrompt = (event: Event) => {
+  void updateConfig({ openrouterSystemPrompt: (event.target as HTMLTextAreaElement).value });
+};
+
 const setTranslateNewContent = (event: Event) => {
   void updateConfig({ dynamicMode: (event.target as HTMLInputElement).checked ? "normal" : "off" });
 };
@@ -256,6 +356,9 @@ function displayModeLabel(value: DisplayMode): string {
 function providerLabel(value: ExtensionProvider | FallbackProvider): string {
   if (value === "openai-compatible") return "OpenAI API";
   if (value === "gemini") return "Google Gemini";
+  if (value === "deepseek") return "DeepSeek";
+  if (value === "anthropic") return "Claude";
+  if (value === "openrouter") return "OpenRouter";
   if (value === "fake") return "本地测试";
   if (value === "none") return "不使用";
   return "Microsoft";
@@ -293,6 +396,9 @@ function formatBytes(bytes: number): string {
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="anthropic">Claude</option>
+          <option value="openrouter">OpenRouter</option>
           <option value="fake">本地测试</option>
         </select>
       </label>
@@ -304,6 +410,9 @@ function formatBytes(bytes: number): string {
           <option value="microsoft">Microsoft</option>
           <option value="openai-compatible">OpenAI API</option>
           <option value="gemini">Google Gemini</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="anthropic">Claude</option>
+          <option value="openrouter">OpenRouter</option>
           <option value="fake">本地测试</option>
         </select>
       </label>
@@ -517,6 +626,133 @@ function formatBytes(bytes: number): string {
           />
         </label>
       </div>
+
+      <div v-if="config.provider === 'deepseek'" class="deepseek-settings">
+        <label class="field">
+          <span>DeepSeek API 地址</span>
+          <input data-testid="deepseek-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.deepseekEndpoint" @input="setDeepSeekEndpoint" />
+        </label>
+        <label class="field">
+          <span>API Key</span>
+          <input data-testid="deepseek-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.deepseekApiKey" @input="setDeepSeekApiKey" />
+        </label>
+        <label class="field">
+          <span>模型</span>
+          <input data-testid="deepseek-model" type="text" autocomplete="off" spellcheck="false" :value="config.deepseekModel" @input="setDeepSeekModel" />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'deepseek'" class="deepseek-advanced" aria-label="DeepSeek API 请求设置">
+        <h3>DeepSeek 请求设置</h3>
+        <div class="tuning-grid">
+          <label class="field">
+            <span>并发数</span>
+            <input data-testid="deepseek-max-concurrent" type="number" min="1" max="8" step="1" :value="config.deepseekMaxConcurrentRequests" @input="setDeepSeekMaxConcurrentRequests" />
+          </label>
+          <label class="field">
+            <span>每批段落</span>
+            <input data-testid="deepseek-max-batch-items" type="number" min="1" max="80" step="1" :value="config.deepseekMaxBatchItems" @input="setDeepSeekMaxBatchItems" />
+          </label>
+          <label class="field">
+            <span>每批字符</span>
+            <input data-testid="deepseek-max-batch-chars" type="number" min="500" max="30000" step="500" :value="config.deepseekMaxBatchChars" @input="setDeepSeekMaxBatchChars" />
+          </label>
+          <label class="field">
+            <span>超时毫秒</span>
+            <input data-testid="deepseek-request-timeout" type="number" min="5000" max="180000" step="5000" :value="config.deepseekRequestTimeoutMs" @input="setDeepSeekRequestTimeoutMs" />
+          </label>
+        </div>
+        <label class="field prompt-field">
+          <span>系统提示词</span>
+          <textarea data-testid="deepseek-system-prompt" spellcheck="false" :value="config.deepseekSystemPrompt" @input="setDeepSeekSystemPrompt" />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'anthropic'" class="anthropic-settings">
+        <label class="field">
+          <span>Claude API 地址</span>
+          <input data-testid="anthropic-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.anthropicEndpoint" @input="setAnthropicEndpoint" />
+        </label>
+        <label class="field">
+          <span>API Key</span>
+          <input data-testid="anthropic-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.anthropicApiKey" @input="setAnthropicApiKey" />
+        </label>
+        <label class="field">
+          <span>模型</span>
+          <input data-testid="anthropic-model" type="text" autocomplete="off" spellcheck="false" :value="config.anthropicModel" @input="setAnthropicModel" />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'anthropic'" class="anthropic-advanced" aria-label="Claude API 请求设置">
+        <h3>Claude 请求设置</h3>
+        <div class="tuning-grid">
+          <label class="field">
+            <span>并发数</span>
+            <input data-testid="anthropic-max-concurrent" type="number" min="1" max="8" step="1" :value="config.anthropicMaxConcurrentRequests" @input="setAnthropicMaxConcurrentRequests" />
+          </label>
+          <label class="field">
+            <span>每批段落</span>
+            <input data-testid="anthropic-max-batch-items" type="number" min="1" max="80" step="1" :value="config.anthropicMaxBatchItems" @input="setAnthropicMaxBatchItems" />
+          </label>
+          <label class="field">
+            <span>每批字符</span>
+            <input data-testid="anthropic-max-batch-chars" type="number" min="500" max="30000" step="500" :value="config.anthropicMaxBatchChars" @input="setAnthropicMaxBatchChars" />
+          </label>
+          <label class="field">
+            <span>超时毫秒</span>
+            <input data-testid="anthropic-request-timeout" type="number" min="5000" max="180000" step="5000" :value="config.anthropicRequestTimeoutMs" @input="setAnthropicRequestTimeoutMs" />
+          </label>
+          <label class="field">
+            <span>最大输出 tokens</span>
+            <input data-testid="anthropic-max-output-tokens" type="number" min="256" max="16000" step="256" :value="config.anthropicMaxOutputTokens" @input="setAnthropicMaxOutputTokens" />
+          </label>
+        </div>
+        <label class="field prompt-field">
+          <span>系统提示词</span>
+          <textarea data-testid="anthropic-system-prompt" spellcheck="false" :value="config.anthropicSystemPrompt" @input="setAnthropicSystemPrompt" />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'openrouter'" class="openrouter-settings">
+        <label class="field">
+          <span>OpenRouter API 地址</span>
+          <input data-testid="openrouter-endpoint" type="url" autocomplete="off" spellcheck="false" :value="config.openrouterEndpoint" @input="setOpenRouterEndpoint" />
+        </label>
+        <label class="field">
+          <span>API Key</span>
+          <input data-testid="openrouter-api-key" type="password" autocomplete="off" spellcheck="false" :value="config.openrouterApiKey" @input="setOpenRouterApiKey" />
+        </label>
+        <label class="field">
+          <span>模型</span>
+          <input data-testid="openrouter-model" type="text" autocomplete="off" spellcheck="false" :value="config.openrouterModel" @input="setOpenRouterModel" />
+        </label>
+      </div>
+
+      <div v-if="config.provider === 'openrouter'" class="openrouter-advanced" aria-label="OpenRouter API 请求设置">
+        <h3>OpenRouter 请求设置</h3>
+        <div class="tuning-grid">
+          <label class="field">
+            <span>并发数</span>
+            <input data-testid="openrouter-max-concurrent" type="number" min="1" max="8" step="1" :value="config.openrouterMaxConcurrentRequests" @input="setOpenRouterMaxConcurrentRequests" />
+          </label>
+          <label class="field">
+            <span>每批段落</span>
+            <input data-testid="openrouter-max-batch-items" type="number" min="1" max="80" step="1" :value="config.openrouterMaxBatchItems" @input="setOpenRouterMaxBatchItems" />
+          </label>
+          <label class="field">
+            <span>每批字符</span>
+            <input data-testid="openrouter-max-batch-chars" type="number" min="500" max="30000" step="500" :value="config.openrouterMaxBatchChars" @input="setOpenRouterMaxBatchChars" />
+          </label>
+          <label class="field">
+            <span>超时毫秒</span>
+            <input data-testid="openrouter-request-timeout" type="number" min="5000" max="180000" step="5000" :value="config.openrouterRequestTimeoutMs" @input="setOpenRouterRequestTimeoutMs" />
+          </label>
+        </div>
+        <label class="field prompt-field">
+          <span>系统提示词</span>
+          <textarea data-testid="openrouter-system-prompt" spellcheck="false" :value="config.openrouterSystemPrompt" @input="setOpenRouterSystemPrompt" />
+        </label>
+      </div>
     </section>
 
     <section class="panel" aria-label="交互入口设置" :aria-busy="isLoading">
@@ -688,6 +924,9 @@ function formatBytes(bytes: number): string {
             <option value="microsoft">Microsoft</option>
             <option value="openai-compatible">OpenAI API</option>
             <option value="gemini">Google Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="anthropic">Claude</option>
+            <option value="openrouter">OpenRouter</option>
             <option value="fake">本地测试</option>
           </select>
         </label>
@@ -699,6 +938,9 @@ function formatBytes(bytes: number): string {
             <option value="microsoft">Microsoft</option>
             <option value="openai-compatible">OpenAI API</option>
             <option value="gemini">Google Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="anthropic">Claude</option>
+            <option value="openrouter">OpenRouter</option>
             <option value="fake">本地测试</option>
           </select>
         </label>
@@ -980,14 +1222,20 @@ textarea {
 }
 
 .openai-settings,
-.gemini-settings {
+.gemini-settings,
+.deepseek-settings,
+.anthropic-settings,
+.openrouter-settings {
   display: grid;
   grid-template-columns: 1.4fr 1fr 0.8fr;
   gap: 12px;
 }
 
 .openai-advanced,
-.gemini-advanced {
+.gemini-advanced,
+.deepseek-advanced,
+.anthropic-advanced,
+.openrouter-advanced {
   display: grid;
   gap: 12px;
   padding-top: 4px;
@@ -1013,6 +1261,9 @@ textarea {
   .cache-management,
   .openai-settings,
   .gemini-settings,
+  .deepseek-settings,
+  .anthropic-settings,
+  .openrouter-settings,
   .tuning-grid,
   .import-grid,
   .site-rule-editor {

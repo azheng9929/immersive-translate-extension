@@ -1,9 +1,12 @@
 import { createConfigStore } from "./configStore";
+import { anthropicProvider } from "./providers/anthropicProvider";
+import { deepseekProvider } from "./providers/deepseekProvider";
 import { fakeProvider } from "./providers/fakeProvider";
 import { geminiProvider } from "./providers/geminiProvider";
 import { runProviderRequestWithInflightDedupe } from "./inflightTranslationDedupe";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
+import { openrouterProvider } from "./providers/openrouterProvider";
 import { clearParagraphCache, getParagraphCacheStats, queryParagraphCache, setParagraphCache } from "./paragraphCache";
 import { clearTranslationPermitQueues, withTranslationPermit } from "./translationPermit";
 import { getWebRulesForUrl } from "./webRuleStore";
@@ -15,6 +18,9 @@ const providers: Record<ProviderRequest["provider"], TranslationProvider> = {
   microsoft: microsoftProvider,
   "openai-compatible": openaiProvider,
   gemini: geminiProvider,
+  deepseek: deepseekProvider,
+  anthropic: anthropicProvider,
+  openrouter: openrouterProvider,
 };
 
 export async function sendToActiveTab(message: ContentMessage): Promise<MessageResponse> {

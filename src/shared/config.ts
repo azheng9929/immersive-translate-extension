@@ -5,7 +5,7 @@ import {
   type SiteRules,
 } from "./siteRules";
 
-export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini";
+export type ExtensionProvider = "fake" | "microsoft" | "openai-compatible" | "gemini" | "deepseek" | "anthropic" | "openrouter";
 export type FallbackProvider = "none" | ExtensionProvider;
 export type DisplayMode = "smart" | "bilingual" | "translation-only";
 export type PageRenderState = "smart" | "bilingual" | "translation" | "original";
@@ -29,6 +29,9 @@ Return only the requested JSON object. For every input item, return one output i
 export const DEFAULT_OPENAI_SYSTEM_PROMPT = DEFAULT_LLM_TRANSLATION_SYSTEM_PROMPT;
 
 export const DEFAULT_GEMINI_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
+export const DEFAULT_DEEPSEEK_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
+export const DEFAULT_ANTHROPIC_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
+export const DEFAULT_OPENROUTER_SYSTEM_PROMPT = DEFAULT_OPENAI_SYSTEM_PROMPT;
 
 export type ExtensionConfig = {
   targetLang: string;
@@ -54,6 +57,31 @@ export type ExtensionConfig = {
   geminiMaxBatchChars: number;
   geminiRequestTimeoutMs: number;
   geminiSystemPrompt: string;
+  deepseekEndpoint: string;
+  deepseekApiKey: string;
+  deepseekModel: string;
+  deepseekMaxConcurrentRequests: number;
+  deepseekMaxBatchItems: number;
+  deepseekMaxBatchChars: number;
+  deepseekRequestTimeoutMs: number;
+  deepseekSystemPrompt: string;
+  anthropicEndpoint: string;
+  anthropicApiKey: string;
+  anthropicModel: string;
+  anthropicMaxConcurrentRequests: number;
+  anthropicMaxBatchItems: number;
+  anthropicMaxBatchChars: number;
+  anthropicRequestTimeoutMs: number;
+  anthropicMaxOutputTokens: number;
+  anthropicSystemPrompt: string;
+  openrouterEndpoint: string;
+  openrouterApiKey: string;
+  openrouterModel: string;
+  openrouterMaxConcurrentRequests: number;
+  openrouterMaxBatchItems: number;
+  openrouterMaxBatchChars: number;
+  openrouterRequestTimeoutMs: number;
+  openrouterSystemPrompt: string;
   glossary: GlossaryEntry[];
   siteRules: SiteRules;
   siteDynamicModes: SiteDynamicModeOverrides;
@@ -89,6 +117,31 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   geminiMaxBatchChars: 1200,
   geminiRequestTimeoutMs: 45000,
   geminiSystemPrompt: DEFAULT_GEMINI_SYSTEM_PROMPT,
+  deepseekEndpoint: "https://api.deepseek.com/chat/completions",
+  deepseekApiKey: "",
+  deepseekModel: "deepseek-v4-flash",
+  deepseekMaxConcurrentRequests: 4,
+  deepseekMaxBatchItems: 4,
+  deepseekMaxBatchChars: 1200,
+  deepseekRequestTimeoutMs: 45000,
+  deepseekSystemPrompt: DEFAULT_DEEPSEEK_SYSTEM_PROMPT,
+  anthropicEndpoint: "https://api.anthropic.com/v1/messages",
+  anthropicApiKey: "",
+  anthropicModel: "claude-sonnet-4-5",
+  anthropicMaxConcurrentRequests: 3,
+  anthropicMaxBatchItems: 3,
+  anthropicMaxBatchChars: 1200,
+  anthropicRequestTimeoutMs: 60000,
+  anthropicMaxOutputTokens: 4096,
+  anthropicSystemPrompt: DEFAULT_ANTHROPIC_SYSTEM_PROMPT,
+  openrouterEndpoint: "https://openrouter.ai/api/v1/chat/completions",
+  openrouterApiKey: "",
+  openrouterModel: "openai/gpt-4o-mini",
+  openrouterMaxConcurrentRequests: 4,
+  openrouterMaxBatchItems: 4,
+  openrouterMaxBatchChars: 1200,
+  openrouterRequestTimeoutMs: 45000,
+  openrouterSystemPrompt: DEFAULT_OPENROUTER_SYSTEM_PROMPT,
   glossary: [],
   siteRules: {},
   siteDynamicModes: {},
@@ -98,8 +151,25 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   useCache: true,
 };
 
-const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>(["fake", "microsoft", "openai-compatible", "gemini"]);
-const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>(["none", "fake", "microsoft", "openai-compatible", "gemini"]);
+const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>([
+  "fake",
+  "microsoft",
+  "openai-compatible",
+  "gemini",
+  "deepseek",
+  "anthropic",
+  "openrouter",
+]);
+const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>([
+  "none",
+  "fake",
+  "microsoft",
+  "openai-compatible",
+  "gemini",
+  "deepseek",
+  "anthropic",
+  "openrouter",
+]);
 const SUPPORTED_DISPLAY_MODES = new Set<DisplayMode>(["smart", "bilingual", "translation-only"]);
 const SUPPORTED_DYNAMIC_MODES = new Set<DynamicMode>(["off", "conservative", "normal"]);
 const SUPPORTED_REQUEST_PROFILES = new Set<RequestProfile>(["stable", "balanced", "fast", "high-dynamic"]);
@@ -168,6 +238,31 @@ export function normalizeExtensionConfig(value: unknown): ExtensionConfig {
     geminiMaxBatchChars: normalizeInteger(input.geminiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.geminiMaxBatchChars, 500, 30000),
     geminiRequestTimeoutMs: normalizeInteger(input.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000),
     geminiSystemPrompt: normalizeString(input.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt),
+    deepseekEndpoint: normalizeString(input.deepseekEndpoint, DEFAULT_EXTENSION_CONFIG.deepseekEndpoint),
+    deepseekApiKey: normalizeString(input.deepseekApiKey, DEFAULT_EXTENSION_CONFIG.deepseekApiKey),
+    deepseekModel: normalizeString(input.deepseekModel, DEFAULT_EXTENSION_CONFIG.deepseekModel),
+    deepseekMaxConcurrentRequests: normalizeInteger(input.deepseekMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.deepseekMaxConcurrentRequests, 1, 8),
+    deepseekMaxBatchItems: normalizeInteger(input.deepseekMaxBatchItems, DEFAULT_EXTENSION_CONFIG.deepseekMaxBatchItems, 1, 80),
+    deepseekMaxBatchChars: normalizeInteger(input.deepseekMaxBatchChars, DEFAULT_EXTENSION_CONFIG.deepseekMaxBatchChars, 500, 30000),
+    deepseekRequestTimeoutMs: normalizeInteger(input.deepseekRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.deepseekRequestTimeoutMs, 5000, 180000),
+    deepseekSystemPrompt: normalizeString(input.deepseekSystemPrompt, DEFAULT_EXTENSION_CONFIG.deepseekSystemPrompt),
+    anthropicEndpoint: normalizeString(input.anthropicEndpoint, DEFAULT_EXTENSION_CONFIG.anthropicEndpoint),
+    anthropicApiKey: normalizeString(input.anthropicApiKey, DEFAULT_EXTENSION_CONFIG.anthropicApiKey),
+    anthropicModel: normalizeString(input.anthropicModel, DEFAULT_EXTENSION_CONFIG.anthropicModel),
+    anthropicMaxConcurrentRequests: normalizeInteger(input.anthropicMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.anthropicMaxConcurrentRequests, 1, 8),
+    anthropicMaxBatchItems: normalizeInteger(input.anthropicMaxBatchItems, DEFAULT_EXTENSION_CONFIG.anthropicMaxBatchItems, 1, 80),
+    anthropicMaxBatchChars: normalizeInteger(input.anthropicMaxBatchChars, DEFAULT_EXTENSION_CONFIG.anthropicMaxBatchChars, 500, 30000),
+    anthropicRequestTimeoutMs: normalizeInteger(input.anthropicRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.anthropicRequestTimeoutMs, 5000, 180000),
+    anthropicMaxOutputTokens: normalizeInteger(input.anthropicMaxOutputTokens, DEFAULT_EXTENSION_CONFIG.anthropicMaxOutputTokens, 256, 16000),
+    anthropicSystemPrompt: normalizeString(input.anthropicSystemPrompt, DEFAULT_EXTENSION_CONFIG.anthropicSystemPrompt),
+    openrouterEndpoint: normalizeString(input.openrouterEndpoint, DEFAULT_EXTENSION_CONFIG.openrouterEndpoint),
+    openrouterApiKey: normalizeString(input.openrouterApiKey, DEFAULT_EXTENSION_CONFIG.openrouterApiKey),
+    openrouterModel: normalizeString(input.openrouterModel, DEFAULT_EXTENSION_CONFIG.openrouterModel),
+    openrouterMaxConcurrentRequests: normalizeInteger(input.openrouterMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.openrouterMaxConcurrentRequests, 1, 8),
+    openrouterMaxBatchItems: normalizeInteger(input.openrouterMaxBatchItems, DEFAULT_EXTENSION_CONFIG.openrouterMaxBatchItems, 1, 80),
+    openrouterMaxBatchChars: normalizeInteger(input.openrouterMaxBatchChars, DEFAULT_EXTENSION_CONFIG.openrouterMaxBatchChars, 500, 30000),
+    openrouterRequestTimeoutMs: normalizeInteger(input.openrouterRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.openrouterRequestTimeoutMs, 5000, 180000),
+    openrouterSystemPrompt: normalizeString(input.openrouterSystemPrompt, DEFAULT_EXTENSION_CONFIG.openrouterSystemPrompt),
     glossary: normalizeGlossaryEntries(input.glossary),
     siteRules: normalizeSiteRules(input.siteRules),
     siteDynamicModes: normalizeSiteDynamicModes(input.siteDynamicModes),
@@ -205,6 +300,31 @@ export function normalizeExtensionConfigPatch(value: unknown): ExtensionConfigPa
   if ("geminiMaxBatchChars" in value) patch.geminiMaxBatchChars = normalizeInteger(value.geminiMaxBatchChars, DEFAULT_EXTENSION_CONFIG.geminiMaxBatchChars, 500, 30000);
   if ("geminiRequestTimeoutMs" in value) patch.geminiRequestTimeoutMs = normalizeInteger(value.geminiRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.geminiRequestTimeoutMs, 5000, 180000);
   if ("geminiSystemPrompt" in value) patch.geminiSystemPrompt = normalizeString(value.geminiSystemPrompt, DEFAULT_EXTENSION_CONFIG.geminiSystemPrompt);
+  if ("deepseekEndpoint" in value) patch.deepseekEndpoint = normalizeString(value.deepseekEndpoint, DEFAULT_EXTENSION_CONFIG.deepseekEndpoint);
+  if ("deepseekApiKey" in value) patch.deepseekApiKey = normalizeString(value.deepseekApiKey, DEFAULT_EXTENSION_CONFIG.deepseekApiKey);
+  if ("deepseekModel" in value) patch.deepseekModel = normalizeString(value.deepseekModel, DEFAULT_EXTENSION_CONFIG.deepseekModel);
+  if ("deepseekMaxConcurrentRequests" in value) patch.deepseekMaxConcurrentRequests = normalizeInteger(value.deepseekMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.deepseekMaxConcurrentRequests, 1, 8);
+  if ("deepseekMaxBatchItems" in value) patch.deepseekMaxBatchItems = normalizeInteger(value.deepseekMaxBatchItems, DEFAULT_EXTENSION_CONFIG.deepseekMaxBatchItems, 1, 80);
+  if ("deepseekMaxBatchChars" in value) patch.deepseekMaxBatchChars = normalizeInteger(value.deepseekMaxBatchChars, DEFAULT_EXTENSION_CONFIG.deepseekMaxBatchChars, 500, 30000);
+  if ("deepseekRequestTimeoutMs" in value) patch.deepseekRequestTimeoutMs = normalizeInteger(value.deepseekRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.deepseekRequestTimeoutMs, 5000, 180000);
+  if ("deepseekSystemPrompt" in value) patch.deepseekSystemPrompt = normalizeString(value.deepseekSystemPrompt, DEFAULT_EXTENSION_CONFIG.deepseekSystemPrompt);
+  if ("anthropicEndpoint" in value) patch.anthropicEndpoint = normalizeString(value.anthropicEndpoint, DEFAULT_EXTENSION_CONFIG.anthropicEndpoint);
+  if ("anthropicApiKey" in value) patch.anthropicApiKey = normalizeString(value.anthropicApiKey, DEFAULT_EXTENSION_CONFIG.anthropicApiKey);
+  if ("anthropicModel" in value) patch.anthropicModel = normalizeString(value.anthropicModel, DEFAULT_EXTENSION_CONFIG.anthropicModel);
+  if ("anthropicMaxConcurrentRequests" in value) patch.anthropicMaxConcurrentRequests = normalizeInteger(value.anthropicMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.anthropicMaxConcurrentRequests, 1, 8);
+  if ("anthropicMaxBatchItems" in value) patch.anthropicMaxBatchItems = normalizeInteger(value.anthropicMaxBatchItems, DEFAULT_EXTENSION_CONFIG.anthropicMaxBatchItems, 1, 80);
+  if ("anthropicMaxBatchChars" in value) patch.anthropicMaxBatchChars = normalizeInteger(value.anthropicMaxBatchChars, DEFAULT_EXTENSION_CONFIG.anthropicMaxBatchChars, 500, 30000);
+  if ("anthropicRequestTimeoutMs" in value) patch.anthropicRequestTimeoutMs = normalizeInteger(value.anthropicRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.anthropicRequestTimeoutMs, 5000, 180000);
+  if ("anthropicMaxOutputTokens" in value) patch.anthropicMaxOutputTokens = normalizeInteger(value.anthropicMaxOutputTokens, DEFAULT_EXTENSION_CONFIG.anthropicMaxOutputTokens, 256, 16000);
+  if ("anthropicSystemPrompt" in value) patch.anthropicSystemPrompt = normalizeString(value.anthropicSystemPrompt, DEFAULT_EXTENSION_CONFIG.anthropicSystemPrompt);
+  if ("openrouterEndpoint" in value) patch.openrouterEndpoint = normalizeString(value.openrouterEndpoint, DEFAULT_EXTENSION_CONFIG.openrouterEndpoint);
+  if ("openrouterApiKey" in value) patch.openrouterApiKey = normalizeString(value.openrouterApiKey, DEFAULT_EXTENSION_CONFIG.openrouterApiKey);
+  if ("openrouterModel" in value) patch.openrouterModel = normalizeString(value.openrouterModel, DEFAULT_EXTENSION_CONFIG.openrouterModel);
+  if ("openrouterMaxConcurrentRequests" in value) patch.openrouterMaxConcurrentRequests = normalizeInteger(value.openrouterMaxConcurrentRequests, DEFAULT_EXTENSION_CONFIG.openrouterMaxConcurrentRequests, 1, 8);
+  if ("openrouterMaxBatchItems" in value) patch.openrouterMaxBatchItems = normalizeInteger(value.openrouterMaxBatchItems, DEFAULT_EXTENSION_CONFIG.openrouterMaxBatchItems, 1, 80);
+  if ("openrouterMaxBatchChars" in value) patch.openrouterMaxBatchChars = normalizeInteger(value.openrouterMaxBatchChars, DEFAULT_EXTENSION_CONFIG.openrouterMaxBatchChars, 500, 30000);
+  if ("openrouterRequestTimeoutMs" in value) patch.openrouterRequestTimeoutMs = normalizeInteger(value.openrouterRequestTimeoutMs, DEFAULT_EXTENSION_CONFIG.openrouterRequestTimeoutMs, 5000, 180000);
+  if ("openrouterSystemPrompt" in value) patch.openrouterSystemPrompt = normalizeString(value.openrouterSystemPrompt, DEFAULT_EXTENSION_CONFIG.openrouterSystemPrompt);
   if ("glossary" in value) patch.glossary = normalizeGlossaryEntries(value.glossary);
   if ("siteRules" in value) patch.siteRules = normalizeSiteRules(value.siteRules);
   if ("siteDynamicModes" in value) patch.siteDynamicModes = normalizeSiteDynamicModes(value.siteDynamicModes);
@@ -229,6 +349,18 @@ export function requestProfilePatch(value: unknown): ExtensionConfigPatch {
     geminiMaxBatchItems: preset.maxBatchItems,
     geminiMaxBatchChars: preset.maxBatchChars,
     geminiRequestTimeoutMs: preset.requestTimeoutMs,
+    deepseekMaxConcurrentRequests: preset.maxConcurrentRequests,
+    deepseekMaxBatchItems: preset.maxBatchItems,
+    deepseekMaxBatchChars: preset.maxBatchChars,
+    deepseekRequestTimeoutMs: preset.requestTimeoutMs,
+    anthropicMaxConcurrentRequests: Math.min(preset.maxConcurrentRequests, 4),
+    anthropicMaxBatchItems: preset.maxBatchItems,
+    anthropicMaxBatchChars: preset.maxBatchChars,
+    anthropicRequestTimeoutMs: Math.max(preset.requestTimeoutMs, 60000),
+    openrouterMaxConcurrentRequests: preset.maxConcurrentRequests,
+    openrouterMaxBatchItems: preset.maxBatchItems,
+    openrouterMaxBatchChars: preset.maxBatchChars,
+    openrouterRequestTimeoutMs: preset.requestTimeoutMs,
   };
 }
 

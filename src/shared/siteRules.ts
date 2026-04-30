@@ -15,8 +15,25 @@ export type SiteRules = Record<string, SiteRule>;
 
 const CANONICAL_SITE_KEYS = ["x.com", "twitter.com", "youtube.com", "reddit.com"] as const;
 const SUPPORTED_DISPLAY_MODES = new Set<DisplayMode>(["smart", "bilingual", "translation-only"]);
-const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>(["fake", "microsoft", "openai-compatible", "gemini"]);
-const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>(["none", "fake", "microsoft", "openai-compatible", "gemini"]);
+const SUPPORTED_PROVIDERS = new Set<ExtensionProvider>([
+  "fake",
+  "microsoft",
+  "openai-compatible",
+  "gemini",
+  "deepseek",
+  "anthropic",
+  "openrouter",
+]);
+const SUPPORTED_FALLBACK_PROVIDERS = new Set<FallbackProvider>([
+  "none",
+  "fake",
+  "microsoft",
+  "openai-compatible",
+  "gemini",
+  "deepseek",
+  "anthropic",
+  "openrouter",
+]);
 
 export function normalizeSiteRuleKey(value: string): string {
   let host = value.trim().toLowerCase();

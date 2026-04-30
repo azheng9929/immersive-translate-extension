@@ -271,6 +271,98 @@ describe("options App", () => {
     });
   });
 
+  it("saves DeepSeek API settings from the settings page", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "deepseek" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find<HTMLInputElement>("[data-testid='deepseek-endpoint']").element.value).toBe("https://api.deepseek.com/chat/completions");
+    expect(wrapper.find<HTMLInputElement>("[data-testid='deepseek-model']").element.value).toBe("deepseek-v4-flash");
+
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-endpoint']").setValue("https://api.deepseek.com/chat/completions");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-api-key']").setValue("ds-test");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-model']").setValue("deepseek-v4-pro");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-max-concurrent']").setValue("5");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-max-batch-items']").setValue("10");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-max-batch-chars']").setValue("7000");
+    await wrapper.find<HTMLInputElement>("[data-testid='deepseek-request-timeout']").setValue("55000");
+    await wrapper.find<HTMLTextAreaElement>("[data-testid='deepseek-system-prompt']").setValue("DeepSeek custom prompt");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekApiKey: "ds-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekModel: "deepseek-v4-pro" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekMaxConcurrentRequests: 5 },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekSystemPrompt: "DeepSeek custom prompt" },
+    });
+  });
+
+  it("saves Claude and OpenRouter settings from the settings page", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "anthropic" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.find<HTMLInputElement>("[data-testid='anthropic-api-key']").setValue("claude-test");
+    await wrapper.find<HTMLInputElement>("[data-testid='anthropic-model']").setValue("claude-sonnet-4-5");
+    await wrapper.find<HTMLInputElement>("[data-testid='anthropic-max-output-tokens']").setValue("3000");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { anthropicApiKey: "claude-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { anthropicMaxOutputTokens: 3000 },
+    });
+
+    await wrapper.find<HTMLSelectElement>("select").setValue("openrouter");
+    await flushPromises();
+
+    await wrapper.find<HTMLInputElement>("[data-testid='openrouter-api-key']").setValue("or-test");
+    await wrapper.find<HTMLInputElement>("[data-testid='openrouter-model']").setValue("anthropic/claude-sonnet-4-5");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { provider: "openrouter" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { openrouterApiKey: "or-test" },
+    });
+  });
+
   it("saves fallback provider without exposing request presets", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
     const sendMessage = vi.fn(async (message) => {

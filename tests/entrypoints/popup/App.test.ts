@@ -139,6 +139,41 @@ describe("popup App", () => {
     });
   });
 
+  it("shows and saves additional AI provider settings from the popup", async () => {
+    let config: ExtensionConfig = {
+      ...DEFAULT_EXTENSION_CONFIG,
+      provider: "deepseek",
+      deepseekApiKey: "",
+    };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find("[data-testid='popup-deepseek-status']").text()).toBe("需要 API Key");
+
+    await wrapper.find<HTMLInputElement>("[data-testid='popup-deepseek-api-key']").setValue("ds-test");
+    await wrapper.find<HTMLInputElement>("[data-testid='popup-deepseek-model']").setValue("deepseek-v4-pro");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekApiKey: "ds-test" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { deepseekModel: "deepseek-v4-pro" },
+    });
+  });
+
   it("shows current page diagnostics from the active tab", async () => {
     const config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, dynamicMode: "normal" };
     const sendMessage = vi.fn(async (message) => {

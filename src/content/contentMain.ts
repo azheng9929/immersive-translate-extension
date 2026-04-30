@@ -337,6 +337,46 @@ function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProv
     };
   }
 
+  if (provider === "deepseek") {
+    return {
+      endpoint: config.deepseekEndpoint,
+      apiKey: config.deepseekApiKey,
+      model: config.deepseekModel,
+      maxConcurrentRequests: config.deepseekMaxConcurrentRequests,
+      maxBatchItems: config.deepseekMaxBatchItems,
+      maxBatchChars: config.deepseekMaxBatchChars,
+      requestTimeoutMs: config.deepseekRequestTimeoutMs,
+      systemPrompt: buildGlossarySystemPrompt(config.deepseekSystemPrompt, config.glossary),
+    };
+  }
+
+  if (provider === "anthropic") {
+    return {
+      endpoint: config.anthropicEndpoint,
+      apiKey: config.anthropicApiKey,
+      model: config.anthropicModel,
+      maxConcurrentRequests: config.anthropicMaxConcurrentRequests,
+      maxBatchItems: config.anthropicMaxBatchItems,
+      maxBatchChars: config.anthropicMaxBatchChars,
+      requestTimeoutMs: config.anthropicRequestTimeoutMs,
+      maxOutputTokens: config.anthropicMaxOutputTokens,
+      systemPrompt: buildGlossarySystemPrompt(config.anthropicSystemPrompt, config.glossary),
+    };
+  }
+
+  if (provider === "openrouter") {
+    return {
+      endpoint: config.openrouterEndpoint,
+      apiKey: config.openrouterApiKey,
+      model: config.openrouterModel,
+      maxConcurrentRequests: config.openrouterMaxConcurrentRequests,
+      maxBatchItems: config.openrouterMaxBatchItems,
+      maxBatchChars: config.openrouterMaxBatchChars,
+      requestTimeoutMs: config.openrouterRequestTimeoutMs,
+      systemPrompt: buildGlossarySystemPrompt(config.openrouterSystemPrompt, config.glossary),
+    };
+  }
+
   if (provider === "microsoft" || provider === "fake") return {};
 
   return {
@@ -365,6 +405,30 @@ function progressivePageBatchOptions(config: ExtensionConfig) {
       progressiveBatchItems: Math.min(config.geminiMaxBatchItems, 8),
       progressiveBatchChars: config.geminiMaxBatchChars,
       progressiveConcurrentBatches: config.geminiMaxConcurrentRequests,
+    };
+  }
+
+  if (config.provider === "deepseek") {
+    return {
+      progressiveBatchItems: Math.min(config.deepseekMaxBatchItems, 8),
+      progressiveBatchChars: config.deepseekMaxBatchChars,
+      progressiveConcurrentBatches: config.deepseekMaxConcurrentRequests,
+    };
+  }
+
+  if (config.provider === "anthropic") {
+    return {
+      progressiveBatchItems: Math.min(config.anthropicMaxBatchItems, 8),
+      progressiveBatchChars: config.anthropicMaxBatchChars,
+      progressiveConcurrentBatches: config.anthropicMaxConcurrentRequests,
+    };
+  }
+
+  if (config.provider === "openrouter") {
+    return {
+      progressiveBatchItems: Math.min(config.openrouterMaxBatchItems, 8),
+      progressiveBatchChars: config.openrouterMaxBatchChars,
+      progressiveConcurrentBatches: config.openrouterMaxConcurrentRequests,
     };
   }
 

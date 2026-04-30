@@ -16,8 +16,8 @@ describe("site rule helpers", () => {
         "https://www.youtube.com/watch?v=abc": {
           autoTranslate: true,
           displayMode: "translation-only",
-          provider: "gemini",
-          fallbackProvider: "microsoft",
+          provider: "deepseek",
+          fallbackProvider: "anthropic",
         },
         "bad site": {
           dynamicMode: "off",
@@ -31,8 +31,8 @@ describe("site rule helpers", () => {
       "youtube.com": {
         autoTranslate: true,
         displayMode: "translation-only",
-        provider: "gemini",
-        fallbackProvider: "microsoft",
+        provider: "deepseek",
+        fallbackProvider: "anthropic",
       },
     });
   });
