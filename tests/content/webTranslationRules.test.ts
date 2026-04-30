@@ -223,6 +223,7 @@ describe("webTranslationRules", () => {
         },
         mainFrameMinTextCount: 120,
         mainFrameMinWordCount: 20,
+        containerMinTextCount: 42,
         buildContainerSelectors: { add: ["main.article", "[data-reader-root]"] },
         skipBuildContainerSelectors: { add: [".sidebar", ".recommendations"] },
       }),
@@ -236,6 +237,7 @@ describe("webTranslationRules", () => {
     });
     expect(policy.mainFrameMinTextCount).toBe(120);
     expect(policy.mainFrameMinWordCount).toBe(20);
+    expect(policy.containerMinTextCount).toBe(42);
     expect(policy.buildContainerSelectors).toEqual(["main.article", "[data-reader-root]"]);
     expect(policy.skipBuildContainerSelectors).toEqual([".sidebar", ".recommendations"]);
   });

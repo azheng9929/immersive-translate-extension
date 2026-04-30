@@ -45,6 +45,7 @@ type ControllerOptions = {
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;
+  containerMinTextCount?: number;
   bodyRule?: WebTranslationBodyRule;
   buildContainerSelectors?: readonly string[];
   skipBuildContainerSelectors?: readonly string[];
@@ -123,7 +124,7 @@ export class PageController {
     root: ParentNode = document.body,
     options: ViewportRootOptions = {},
   ): HTMLElement[] {
-    const scanRoots = collectMainFrameRoots(root, this.options.mainFrameSelector);
+    const scanRoots = collectScanRoots(root, this.scanRootOptions());
     const candidates = dedupeElements(
       scanRoots.flatMap((scanRoot) => collectCandidateViewportRoots(scanRoot, this.options.preferredScanRootSelectors)),
     );
@@ -296,6 +297,9 @@ export class PageController {
         : {}),
       ...(this.options.mainFrameMinWordCount !== undefined
         ? { mainFrameMinWordCount: this.options.mainFrameMinWordCount }
+        : {}),
+      ...(this.options.containerMinTextCount !== undefined
+        ? { containerMinTextCount: this.options.containerMinTextCount }
         : {}),
       ...(this.options.bodyRule !== undefined ? { bodyRule: this.options.bodyRule } : {}),
     };
@@ -613,6 +617,7 @@ type ScanRootOptions = {
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;
+  containerMinTextCount?: number;
   bodyRule?: WebTranslationBodyRule;
   buildContainerSelectors?: readonly string[];
   skipBuildContainerSelectors?: readonly string[];
@@ -624,11 +629,12 @@ function collectScanRoots(root: ParentNode, options: ScanRootOptions): ParentNod
 
   const mainFrameRoots = collectMainFrameRoots(root, options.mainFrameSelector)
     .filter((mainFrameRoot) => passesMainFrameThreshold(mainFrameRoot, options));
-  const containerRoots = mainFrameRoots.flatMap((mainFrameRoot) => collectBuildContainerRoots(mainFrameRoot, options));
+  const bodyRoots = mainFrameRoots.flatMap((mainFrameRoot) => collectBodyRuleRoots(mainFrameRoot, options));
+  const containerRoots = bodyRoots.flatMap((mainFrameRoot) => collectBuildContainerRoots(mainFrameRoot, options));
   const scoringRoots = containerRoots.flatMap((containerRoot) => applyGenericRootScoring(containerRoot, options));
-  return scoringRoots.flatMap((containerRoot) =>
-    collectPreferredScanRoots(containerRoot, options.preferredScanRootSelectors),
-  );
+  return scoringRoots
+    .flatMap((containerRoot) => collectPreferredScanRoots(containerRoot, options.preferredScanRootSelectors))
+    .filter((scanRoot) => passesContainerTextThreshold(scanRoot, options));
 }
 
 function collectMainFrameRoots(root: ParentNode, mainFrameSelector: string | undefined): ParentNode[] {
@@ -700,6 +706,39 @@ function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions):
   return isDocumentScanRoot(root) ? [] : [root];
 }
 
+function collectBodyRuleRoots(root: ParentNode, options: ScanRootOptions): ParentNode[] {
+  const bodyRule = options.bodyRule;
+  if (!hasBodyRuleSelectors(bodyRule)) return passesBodyRuleTextLength(root, bodyRule) ? [root] : [];
+
+  const bodySelector = bodyRule?.bodySelector?.trim();
+  const articleSelector = bodyRule?.articleSelector?.trim();
+  const bodyRoots = bodySelector ? querySafeDeep(root, bodySelector) : parentNodeElements(root);
+  const articleRoots = bodyRoots.flatMap((bodyRoot) => {
+    if (!articleSelector) return [bodyRoot];
+    const articles = querySafeDeep(bodyRoot, articleSelector);
+    return articles.length > 0 ? articles : [bodyRoot];
+  });
+  const filteredRoots = dedupeElements(articleRoots)
+    .filter((candidate) => passesBodyRuleTextLength(candidate, bodyRule));
+
+  return filteredRoots.length > 0 ? filteredRoots : [];
+}
+
+function querySafeDeep(root: ParentNode, selector: string): HTMLElement[] {
+  try {
+    return querySelectorAllDeep(root, selector);
+  } catch {
+    return [];
+  }
+}
+
+function parentNodeElements(root: ParentNode): HTMLElement[] {
+  if (root instanceof HTMLElement) return [root];
+  if (root instanceof Document) return root.body ? [root.body] : [];
+  if (root instanceof ShadowRoot && root.host instanceof HTMLElement) return [root.host];
+  return [];
+}
+
 function applyGenericRootScoring(root: ParentNode, options: ScanRootOptions): ParentNode[] {
   if (!shouldUseGenericRootScoring(options)) return [root];
   const highConfidenceRoots = selectHighConfidenceTranslationRoots(root);
@@ -709,7 +748,12 @@ function applyGenericRootScoring(root: ParentNode, options: ScanRootOptions): Pa
 function shouldUseGenericRootScoring(options: ScanRootOptions): boolean {
   return !options.mainFrameSelector &&
     !options.preferredScanRootSelectors?.length &&
-    !options.buildContainerSelectors?.length;
+    !options.buildContainerSelectors?.length &&
+    !hasBodyRuleSelectors(options.bodyRule);
+}
+
+function hasBodyRuleSelectors(bodyRule: WebTranslationBodyRule | undefined): boolean {
+  return Boolean(bodyRule?.bodySelector?.trim() || bodyRule?.articleSelector?.trim());
 }
 
 function isGenericBodyFallbackDisabled(root: ParentNode, options: ScanRootOptions): boolean {
@@ -729,6 +773,18 @@ function passesMainFrameThreshold(root: ParentNode, options: ScanRootOptions): b
   if (minTextCount !== undefined && text.length < minTextCount) return false;
   if (minWordCount !== undefined && wordCount(text) < minWordCount) return false;
   return true;
+}
+
+function passesBodyRuleTextLength(root: ParentNode, bodyRule: WebTranslationBodyRule | undefined): boolean {
+  const minTextLength = bodyRule?.minTextLength;
+  if (minTextLength === undefined) return true;
+  return normalizeVisibleText(root.textContent ?? "").length >= minTextLength;
+}
+
+function passesContainerTextThreshold(root: ParentNode, options: ScanRootOptions): boolean {
+  const minTextCount = options.containerMinTextCount;
+  if (minTextCount === undefined) return true;
+  return normalizeVisibleText(root.textContent ?? "").length >= minTextCount;
 }
 
 function wordCount(text: string): number {

@@ -199,6 +199,7 @@ function ruleFiltersLabel(status: PageTranslationStatus): string {
     `attrs ${diagnostics.globalAttributeRuleCount}`,
     `page-attrs ${diagnostics.attributeNameCount}`,
     `classes ${diagnostics.translationClassCount}`,
+    `container ${diagnostics.containerMinTextCount ?? "off"}`,
     `line ${diagnostics.lineBreakMaxTextCount ?? "off"}`,
   ].join(", ");
 }

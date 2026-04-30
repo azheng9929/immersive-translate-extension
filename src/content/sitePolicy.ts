@@ -39,6 +39,7 @@ export type SitePolicy = {
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;
+  containerMinTextCount?: number;
   bodyRule?: WebTranslationBodyRule;
   buildContainerSelectors: readonly string[];
   skipBuildContainerSelectors: readonly string[];

@@ -974,6 +974,84 @@ describe("PageController", () => {
     expect(requestedTexts).toEqual([]);
   });
 
+  it("uses bodyRule selectors to scan the configured article body only", async () => {
+    document.body.innerHTML = `
+      <header><p>Navigation teaser should stay original.</p></header>
+      <main id="content">
+        <aside><p>Related links should stay original.</p></aside>
+        <article id="bodyContent">
+          <h1>Readable article heading</h1>
+          <p>Readable article paragraph with enough text to satisfy the body rule.</p>
+        </article>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      bodyRule: {
+        bodySelector: "#content",
+        articleSelector: "#bodyContent",
+        minTextLength: 40,
+      },
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Readable article heading",
+      "Readable article paragraph with enough text to satisfy the body rule.",
+    ]);
+    expect(document.querySelector("header .imt-translation-block")).toBeNull();
+    expect(document.querySelector("aside .imt-translation-block")).toBeNull();
+  });
+
+  it("uses bodyRule minTextLength even without explicit body selectors", async () => {
+    document.body.innerHTML = `<main><p>Skeleton text.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      bodyRule: { minTextLength: 80 },
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(result.total).toBe(0);
+    expect(requestedTexts).toEqual([]);
+  });
+
+  it("uses containerMinTextCount to drop tiny configured scan roots", async () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="card">OK</section>
+        <section class="card">Meaningful card text that should be translated.</section>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      preferredScanRootSelectors: [".card"],
+      containerMinTextCount: 10,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Meaningful card text that should be translated."]);
+    expect(document.body.textContent).toContain("OK");
+    expect(document.body.textContent).not.toContain("[zh-Hans] OK");
+  });
+
   it("skips generic document scans below the configured main frame text threshold", async () => {
     document.body.innerHTML = `<main><p>Short text.</p></main>`;
     const requestedTexts: string[] = [];

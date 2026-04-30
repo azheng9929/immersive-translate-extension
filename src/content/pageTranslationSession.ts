@@ -37,6 +37,7 @@ export type PageTranslationRuleDiagnostics = {
   globalAttributeRuleCount: number;
   attributeNameCount: number;
   translationClassCount: number;
+  containerMinTextCount?: number;
   lineBreakMaxTextCount?: number;
   allowTooltip: boolean;
   observeUrlChange: boolean;

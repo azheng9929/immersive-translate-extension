@@ -48,7 +48,7 @@ const SEMANTIC_GROUPS = [
       "containerMinTextCount",
     ],
     runtime: "partial",
-    action: "Implemented for main frame thresholds, bodyRule.enable, build/skip containers. bodyRule article scoring and containerMinTextCount are degraded to existing root scoring.",
+    action: "Implemented for main frame thresholds, bodyRule body/article selectors/minTextLength, build/skip containers, and containerMinTextCount. xpathRule/matchNodeRule remain metadata-only.",
   },
   {
     group: "layout repair",

@@ -1226,6 +1226,7 @@ export function compileRulePolicy(
     ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
     ...(rule.mainFrameMinTextCount !== undefined ? { mainFrameMinTextCount: rule.mainFrameMinTextCount } : {}),
     ...(rule.mainFrameMinWordCount !== undefined ? { mainFrameMinWordCount: rule.mainFrameMinWordCount } : {}),
+    ...(rule.containerMinTextCount !== undefined ? { containerMinTextCount: rule.containerMinTextCount } : {}),
     ...(rule.bodyRule ? { bodyRule: rule.bodyRule } : {}),
     buildContainerSelectors: rule.buildContainerSelectors,
     skipBuildContainerSelectors: rule.skipBuildContainerSelectors,
