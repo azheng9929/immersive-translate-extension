@@ -40,7 +40,7 @@ describe("rootScoring", () => {
       <aside><a href="/related">Related link</a><button>Share</button></aside>
     `;
 
-    expect(selectHighConfidenceTranslationRoots(document.body)).toEqual([document.querySelector("main")]);
+    expect(selectHighConfidenceTranslationRoots(document.body)).toEqual([document.querySelector("article")]);
   });
 
   it("keeps independent marketing page sections instead of only the single highest score", () => {
@@ -111,5 +111,37 @@ describe("rootScoring", () => {
       filterRule,
       excludeSelectors: [".promo"],
     })).toEqual([document.querySelector("article")]);
+  });
+
+  it("keeps social post roots instead of reselecting a generic parent", () => {
+    document.body.innerHTML = `
+      <main>
+        <article class="post">
+          <span>@reader_one</span>
+          <p>
+            Browser translation feels better when short posts keep their original rhythm and avoid action chrome.
+            The page shell should not become the only root just because it wraps multiple posts.
+          </p>
+        </article>
+        <article class="post">
+          <span>@builder_two</span>
+          <p>
+            Dynamic content needs conservative observation so feeds do not translate stale hover cards.
+            A post-sized root gives the scheduler a stable unit when new entries arrive.
+          </p>
+        </article>
+        <article class="post">
+          <span>@debugger_three</span>
+          <p>
+            Debug traces should make it clear which post body became a translation candidate.
+            The parent main element has no feed marker, so nested post candidates should win.
+          </p>
+        </article>
+      </main>
+    `;
+
+    expect(selectHighConfidenceTranslationRoots(document.body, { profileHint: "social" })).toEqual([
+      ...document.querySelectorAll(".post"),
+    ]);
   });
 });

@@ -16,8 +16,10 @@ export type PageContentProfile =
   | "generic";
 
 export type CandidateStats = {
+  acceptedTextLength: number;
   textLength: number;
   rawTextLength: number;
+  excludedTextLength: number;
   wordCount: number;
   textNodeCount: number;
   headingCount: number;
@@ -215,8 +217,10 @@ function statsFor(statsByElement: Map<HTMLElement, MutableStats>, element: HTMLE
   let stats = statsByElement.get(element);
   if (!stats) {
     stats = {
+      acceptedTextLength: 0,
       textLength: 0,
       rawTextLength: 0,
+      excludedTextLength: 0,
       wordCount: 0,
       textNodeCount: 0,
       headingCount: 0,
@@ -270,15 +274,18 @@ function finalizeStats(
   options: TextDrivenCandidateOptions,
 ): CandidateStats {
   const rawTextLength = normalizeVisibleText(element.textContent ?? "").length;
-  const textLength = stats.textLength;
+  const acceptedTextLength = stats.textLength;
+  const excludedTextLength = Math.max(0, rawTextLength - acceptedTextLength);
   const linkTextLength = stats.linkTextLength;
   const buttonTextLength = stats.buttonTextLength;
   const childSignatureCount = maxRepeatedChildSignatureCount(element);
   const weakCandidateHitCount = countSelectorMatches(element, options.weakCandidateSelectors);
 
   return {
-    textLength,
+    acceptedTextLength,
+    textLength: acceptedTextLength,
     rawTextLength,
+    excludedTextLength,
     wordCount: stats.wordCount,
     textNodeCount: stats.textNodeCount,
     headingCount: stats.headingCount + element.querySelectorAll("h1,h2,h3,h4,h5,h6").length,
@@ -303,8 +310,10 @@ function finalizeStats(
 function collectElementStats(element: HTMLElement): CandidateStats {
   const text = normalizeVisibleText(element.textContent ?? "");
   return {
+    acceptedTextLength: text.length,
     textLength: text.length,
     rawTextLength: text.length,
+    excludedTextLength: 0,
     wordCount: countWords(text),
     textNodeCount: text ? 1 : 0,
     headingCount: element.matches("h1,h2,h3,h4,h5,h6") ? 1 : element.querySelectorAll("h1,h2,h3,h4,h5,h6").length,
@@ -344,6 +353,7 @@ function scoreCandidate(
   const reasons: string[] = [profile];
   const linkDensity = stats.textLength > 0 ? stats.linkTextLength / stats.textLength : 0;
   const buttonDensity = stats.textLength > 0 ? stats.buttonTextLength / stats.textLength : 0;
+  const excludedDensity = stats.rawTextLength > 0 ? stats.excludedTextLength / stats.rawTextLength : 0;
   const repeated = stats.maxRepeatedChildSignatureCount;
   let score =
     Math.min(30, stats.textLength / 10) +
@@ -378,23 +388,120 @@ function scoreCandidate(
 
   if (stats.inputCount > 0) score -= 25;
   if (stats.uniqueTextRatio < 0.45) score -= 12;
+  if (stats.excludedTextLength > 0) score -= Math.min(28, excludedDensity * 34);
   return { score, reasons };
 }
 
 function dedupeNestedCandidates(candidates: TextDrivenCandidate[]): TextDrivenCandidate[] {
   const accepted: TextDrivenCandidate[] = [];
   for (const candidate of candidates) {
-    const containing = accepted.find((existing) => existing.element.contains(candidate.element));
-    if (containing) continue;
-
+    let rejected = false;
     for (const existing of [...accepted]) {
-      if (candidate.element.contains(existing.element)) {
-        accepted.splice(accepted.indexOf(existing), 1);
+      if (existing.element === candidate.element) {
+        rejected = true;
+        break;
       }
+      if (!existing.element.contains(candidate.element) && !candidate.element.contains(existing.element)) {
+        continue;
+      }
+
+      const preferred = preferredNestedCandidate(existing, candidate);
+      if (preferred === existing) {
+        rejected = true;
+        break;
+      }
+      accepted.splice(accepted.indexOf(existing), 1);
     }
+    if (rejected) continue;
     accepted.push(candidate);
   }
   return accepted.sort(compareDocumentOrder);
+}
+
+function preferredNestedCandidate(
+  left: TextDrivenCandidate,
+  right: TextDrivenCandidate,
+): TextDrivenCandidate {
+  if (left.element.contains(right.element)) return preferParentOrChild(left, right);
+  if (right.element.contains(left.element)) return preferParentOrChild(right, left);
+  return left.score >= right.score ? left : right;
+}
+
+function preferParentOrChild(
+  parent: TextDrivenCandidate,
+  child: TextDrivenCandidate,
+): TextDrivenCandidate {
+  if (shouldPreferParentCandidate(parent, child)) return parent;
+  if (shouldPreferChildCandidate(parent, child)) return child;
+  return parent.score >= child.score ? parent : child;
+}
+
+function shouldPreferParentCandidate(
+  parent: TextDrivenCandidate,
+  child: TextDrivenCandidate,
+): boolean {
+  if (isRepeatedListProfile(parent.profile) && isRepeatedListContainer(parent)) return true;
+  if (isSocialOrForumProfile(parent.profile) && isFeedLikeContainer(parent)) return true;
+  if (isSocialOrForumProfile(parent.profile) && isPostLikeCandidate(parent) && !isPostLikeCandidate(child)) return true;
+  if (isArticleLikeProfile(parent.profile) && isArticleBodyCandidate(parent) && !isRepeatedListProfile(child.profile)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldPreferChildCandidate(
+  parent: TextDrivenCandidate,
+  child: TextDrivenCandidate,
+): boolean {
+  if (child.profile === "landing" && isSectionLikeCandidate(child) && !isSectionLikeCandidate(parent)) return true;
+  if (isSocialOrForumProfile(child.profile) && isPostLikeCandidate(child) && !isFeedLikeContainer(parent)) return true;
+  if (isRepeatedListProfile(child.profile) && !isRepeatedListContainer(parent)) return true;
+  if (isArticleLikeProfile(child.profile) && isArticleBodyCandidate(child) && !isArticleBodyCandidate(parent)) return true;
+  return false;
+}
+
+function isArticleLikeProfile(profile: PageContentProfile): boolean {
+  return profile === "article" || profile === "docs";
+}
+
+function isRepeatedListProfile(profile: PageContentProfile): boolean {
+  return profile === "card-list" || profile === "video-list" || profile === "commerce";
+}
+
+function isSocialOrForumProfile(profile: PageContentProfile): boolean {
+  return profile === "social" || profile === "forum";
+}
+
+function isArticleBodyCandidate(candidate: TextDrivenCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.element.matches("article,main,[role='main']") ||
+    /(article|entry|post-content|markdown|readme|docs|documentation|content|body)/i.test(marker);
+}
+
+function isRepeatedListContainer(candidate: TextDrivenCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.stats.maxRepeatedChildSignatureCount >= 2 ||
+    /(grid|list|results|cards|products|items|videos|playlist|gallery|feed)/i.test(marker);
+}
+
+function isFeedLikeContainer(candidate: TextDrivenCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.stats.maxRepeatedChildSignatureCount >= 2 &&
+    /(feed|timeline|stream|list|threads?|comments?|discussion)/i.test(marker);
+}
+
+function isPostLikeCandidate(candidate: TextDrivenCandidate): boolean {
+  return /(post|tweet|comment|message|reply|thread|answer)/i.test(elementMarker(candidate.element));
+}
+
+function isSectionLikeCandidate(candidate: TextDrivenCandidate): boolean {
+  return candidate.element.matches("section,article") ||
+    /(hero|feature|section|faq|pricing|benefit|use-case|usecase)/i.test(elementMarker(candidate.element));
+}
+
+function elementMarker(element: HTMLElement): string {
+  const className = element.className ? String(element.className).toLowerCase() : "";
+  return `${element.tagName.toLowerCase()} ${element.id.toLowerCase()} ${className}`;
 }
 
 function normalizeProfileHint(hint: WebTranslationFallbackProfile | PageContentProfile | undefined): PageContentProfile | undefined {

@@ -1,5 +1,6 @@
 import { normalizeVisibleText } from "../shared/normalize";
 import {
+  classifyCandidateProfile,
   collectTextDrivenCandidates,
   type PageContentProfile,
 } from "./contentCandidateEngine";
@@ -14,12 +15,20 @@ import {
 export type TranslationRootScore = {
   element: HTMLElement;
   score: number;
+  acceptedTextLength: number;
   textLength: number;
+  rawTextLength: number;
+  excludedTextLength: number;
   wordCount: number;
   linkDensity: number;
   buttonDensity: number;
   repeatedTextDensity: number;
   visibleArea: number;
+};
+
+type ScoredRootCandidate = TranslationRootScore & {
+  profile?: PageContentProfile;
+  source: "selector" | "text-driven";
 };
 
 export type TranslationRootScoreOptions = {
@@ -56,7 +65,8 @@ function scoreTranslationRootWithOptions(
   options: TranslationRootScoreOptions,
 ): TranslationRootScore {
   const text = translationRootText(element, options);
-  const textLength = text.length;
+  const acceptedTextLength = text.length;
+  const textLength = acceptedTextLength;
   const wordCount = countWords(text);
   const linkDensity = textDensity(element, "a", options);
   const buttonDensity = textDensity(element, "button,[role='button'],input,select,textarea", options);
@@ -82,7 +92,10 @@ function scoreTranslationRootWithOptions(
   return {
     element,
     score,
+    acceptedTextLength,
     textLength,
+    rawTextLength,
+    excludedTextLength: Math.max(0, rawTextLength - acceptedTextLength),
     wordCount,
     linkDensity,
     buttonDensity,
@@ -97,7 +110,11 @@ export function selectHighConfidenceTranslationRoots(
 ): HTMLElement[] {
   const selectorCandidates = collectCandidateRoots(root)
     .filter((element) => isAllowedScoringRoot(element, options))
-    .map((element) => scoreTranslationRootWithOptions(element, options))
+    .map((element): ScoredRootCandidate => ({
+      ...scoreTranslationRootWithOptions(element, options),
+      profile: classifyCandidateProfile(element, undefined, options.profileHint),
+      source: "selector",
+    }))
     .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH && candidate.score >= MIN_CONFIDENT_SCORE);
   const textDrivenOptions: Parameters<typeof collectTextDrivenCandidates>[1] = {};
   if (options.profileHint) textDrivenOptions.profileHint = options.profileHint;
@@ -109,10 +126,15 @@ export function selectHighConfidenceTranslationRoots(
   const rawTextDrivenCandidates = collectTextDrivenCandidates(root, textDrivenOptions);
   for (const candidate of rawTextDrivenCandidates) recordCandidateEvaluated(options.diagnostics, candidate.profile);
   const profileByElement = new Map(rawTextDrivenCandidates.map((candidate) => [candidate.element, candidate.profile]));
-  const textDrivenCandidates = rawTextDrivenCandidates.map((candidate) => ({
+  const textDrivenCandidates = rawTextDrivenCandidates.map((candidate): ScoredRootCandidate => ({
     element: candidate.element,
     score: candidate.score,
+    profile: candidate.profile,
+    source: "text-driven",
+    acceptedTextLength: candidate.stats.acceptedTextLength,
     textLength: candidate.stats.textLength,
+    rawTextLength: candidate.stats.rawTextLength,
+    excludedTextLength: candidate.stats.excludedTextLength,
     wordCount: candidate.stats.wordCount,
     linkDensity: candidate.stats.textLength > 0 ? candidate.stats.linkTextLength / candidate.stats.textLength : 0,
     buttonDensity: candidate.stats.textLength > 0 ? candidate.stats.buttonTextLength / candidate.stats.textLength : 0,
@@ -123,16 +145,30 @@ export function selectHighConfidenceTranslationRoots(
     .filter((candidate) => candidate.textLength >= MIN_CONFIDENT_TEXT_LENGTH || candidate.score >= MIN_CONFIDENT_SCORE)
     .sort((left, right) => right.score - left.score);
 
-  const selected: HTMLElement[] = [];
+  const selected: ScoredRootCandidate[] = [];
   for (const candidate of candidates) {
     if (selected.length >= MAX_CONFIDENT_ROOTS) break;
-    if (selected.some((element) => element.contains(candidate.element) || candidate.element.contains(element))) continue;
-    selected.push(candidate.element);
+    let rejected = false;
+    for (const existing of [...selected]) {
+      if (existing.element === candidate.element) {
+        rejected = true;
+        break;
+      }
+      if (!existing.element.contains(candidate.element) && !candidate.element.contains(existing.element)) continue;
+      const preferred = preferredRootCandidate(existing, candidate);
+      if (preferred === existing) {
+        rejected = true;
+        break;
+      }
+      selected.splice(selected.indexOf(existing), 1);
+    }
+    if (rejected) continue;
+    selected.push(candidate);
     const profile = profileByElement.get(candidate.element);
     if (profile) recordCandidateAccepted(options.diagnostics, profile);
   }
 
-  return selected.sort(compareDocumentOrder);
+  return selected.map((candidate) => candidate.element).sort(compareDocumentOrder);
 }
 
 function isAllowedScoringRoot(element: HTMLElement, options: TranslationRootScoreOptions): boolean {
@@ -143,15 +179,51 @@ function isAllowedScoringRoot(element: HTMLElement, options: TranslationRootScor
 }
 
 function mergeCandidateScores(
-  left: readonly TranslationRootScore[],
-  right: readonly TranslationRootScore[],
-): TranslationRootScore[] {
-  const byElement = new Map<HTMLElement, TranslationRootScore>();
+  left: readonly ScoredRootCandidate[],
+  right: readonly ScoredRootCandidate[],
+): ScoredRootCandidate[] {
+  const byElement = new Map<HTMLElement, ScoredRootCandidate>();
   for (const candidate of [...left, ...right]) {
     const existing = byElement.get(candidate.element);
     if (!existing || candidate.score > existing.score) byElement.set(candidate.element, candidate);
   }
   return [...byElement.values()];
+}
+
+function preferredRootCandidate(
+  left: ScoredRootCandidate,
+  right: ScoredRootCandidate,
+): ScoredRootCandidate {
+  if (left.element.contains(right.element)) return preferParentOrChild(left, right);
+  if (right.element.contains(left.element)) return preferParentOrChild(right, left);
+  return left.score >= right.score ? left : right;
+}
+
+function preferParentOrChild(
+  parent: ScoredRootCandidate,
+  child: ScoredRootCandidate,
+): ScoredRootCandidate {
+  if (shouldPreferParentCandidate(parent, child)) return parent;
+  if (shouldPreferChildCandidate(parent, child)) return child;
+  return parent.score >= child.score ? parent : child;
+}
+
+function shouldPreferParentCandidate(parent: ScoredRootCandidate, child: ScoredRootCandidate): boolean {
+  if (isRepeatedListProfile(parent.profile) && isRepeatedListContainer(parent)) return true;
+  if (isSocialOrForumProfile(parent.profile) && isFeedLikeContainer(parent)) return true;
+  if (isSocialOrForumProfile(parent.profile) && isPostLikeCandidate(parent) && !isPostLikeCandidate(child)) return true;
+  if (isArticleLikeProfile(parent.profile) && isArticleBodyCandidate(parent) && !isRepeatedListProfile(child.profile)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldPreferChildCandidate(parent: ScoredRootCandidate, child: ScoredRootCandidate): boolean {
+  if (child.profile === "landing" && isSectionLikeCandidate(child) && !isSectionLikeCandidate(parent)) return true;
+  if (isSocialOrForumProfile(child.profile) && isPostLikeCandidate(child) && !isFeedLikeContainer(parent)) return true;
+  if (isRepeatedListProfile(child.profile) && !isRepeatedListContainer(parent)) return true;
+  if (isArticleLikeProfile(child.profile) && isArticleBodyCandidate(child) && !isArticleBodyCandidate(parent)) return true;
+  return false;
 }
 
 function collectCandidateRoots(root: ParentNode): HTMLElement[] {
@@ -171,6 +243,50 @@ function collectCandidateRoots(root: ParentNode): HTMLElement[] {
   }
 
   return candidates.filter((element) => !element.closest("nav,header,footer,aside,[data-imt-managed='true']"));
+}
+
+function isArticleLikeProfile(profile: PageContentProfile | undefined): boolean {
+  return profile === "article" || profile === "docs";
+}
+
+function isRepeatedListProfile(profile: PageContentProfile | undefined): boolean {
+  return profile === "card-list" || profile === "video-list" || profile === "commerce";
+}
+
+function isSocialOrForumProfile(profile: PageContentProfile | undefined): boolean {
+  return profile === "social" || profile === "forum";
+}
+
+function isArticleBodyCandidate(candidate: ScoredRootCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.element.matches("article,main,[role='main']") ||
+    /(article|entry|post-content|markdown|readme|docs|documentation|content|body)/i.test(marker);
+}
+
+function isRepeatedListContainer(candidate: ScoredRootCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.repeatedTextDensity > 0 ||
+    /(grid|list|results|cards|products|items|videos|playlist|gallery|feed)/i.test(marker);
+}
+
+function isFeedLikeContainer(candidate: ScoredRootCandidate): boolean {
+  const marker = elementMarker(candidate.element);
+  return candidate.repeatedTextDensity > 0 &&
+    /(feed|timeline|stream|list|threads?|comments?|discussion)/i.test(marker);
+}
+
+function isPostLikeCandidate(candidate: ScoredRootCandidate): boolean {
+  return /(post|tweet|comment|message|reply|thread|answer)/i.test(elementMarker(candidate.element));
+}
+
+function isSectionLikeCandidate(candidate: ScoredRootCandidate): boolean {
+  return candidate.element.matches("section,article") ||
+    /(hero|feature|section|faq|pricing|benefit|use-case|usecase)/i.test(elementMarker(candidate.element));
+}
+
+function elementMarker(element: HTMLElement): string {
+  const className = element.className ? String(element.className).toLowerCase() : "";
+  return `${element.tagName.toLowerCase()} ${element.id.toLowerCase()} ${className}`;
 }
 
 function textDensity(root: HTMLElement, selector: string, options: TranslationRootScoreOptions): number {

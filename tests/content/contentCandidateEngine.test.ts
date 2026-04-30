@@ -66,12 +66,8 @@ describe("contentCandidateEngine", () => {
     document.body.innerHTML = `
       <main>
         <section class="shell">
-          <span class="real-copy">
-            <p>
-              This is the real readable sentence that should contribute to root scoring
-              because it survives the active exclusion rules.
-            </p>
-          </span>
+          This is the real readable sentence that should contribute to root scoring
+          because it survives the active exclusion rules and sits on the candidate shell.
           <aside class="excluded">
             ${Array.from({ length: 20 }, (_, index) => `<p>Excluded sidebar copy ${index} that must not inflate candidate text.</p>`).join("")}
           </aside>
@@ -84,9 +80,43 @@ describe("contentCandidateEngine", () => {
       excludeSelectors: [".excluded"],
       weakCandidateSelectors: [".shell"],
     });
-    const candidate = candidates.find((entry) => entry.element === main) ?? candidates[0];
+    const candidate = candidates.find((entry) => entry.element === main) ?? candidates.find((entry) => entry.element.matches(".shell"));
 
+    expect(candidate?.stats.acceptedTextLength).toBe(candidate?.stats.textLength);
     expect(candidate?.stats.textLength).toBeLessThan(180);
     expect(candidate?.stats.rawTextLength).toBeGreaterThan(900);
+    expect(candidate?.stats.excludedTextLength).toBeGreaterThan(800);
+  });
+
+  it("prefers post roots over a generic social parent without feed semantics", () => {
+    document.body.innerHTML = `
+      <main>
+        <article class="post">
+          <span>@reader_one</span>
+          <p>
+            Browser translation feels better when short posts keep their original rhythm and avoid action chrome.
+            The candidate should stay close to the post body instead of expanding to the whole page shell.
+          </p>
+        </article>
+        <article class="post">
+          <span>@builder_two</span>
+          <p>
+            Dynamic content needs conservative observation so feeds do not translate stale hover cards.
+            A post-sized root gives the scheduler a stable unit when new entries arrive.
+          </p>
+        </article>
+        <article class="post">
+          <span>@debugger_three</span>
+          <p>
+            Debug traces should make it clear which post body became a translation candidate.
+            The parent main element has no feed marker, so nested post candidates should win.
+          </p>
+        </article>
+      </main>
+    `;
+
+    const roots = selectTextDrivenTranslationRoots(document.body, { profileHint: "social" });
+
+    expect(roots).toEqual([...document.querySelectorAll(".post")]);
   });
 });
