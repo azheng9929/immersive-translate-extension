@@ -9,22 +9,36 @@ export function ensureRuntimeStyle(): void {
   style.textContent = `
     .imt-translation-block {
       display: block;
+      box-sizing: border-box;
       max-width: 100%;
-      margin-block-start: 0.24em;
+      margin-block-start: 0.3em;
+      padding-inline-start: 0.56em;
+      border-inline-start: 2px solid currentColor;
+      border-inline-start-color: color-mix(in srgb, currentColor 18%, transparent);
+      background: transparent;
+      color: currentColor;
       color: color-mix(in srgb, currentColor 76%, transparent);
       font: inherit;
-      font-size: 0.94em;
-      line-height: 1.5;
+      font-size: 0.93em;
+      font-weight: 400;
+      line-height: 1.48;
       letter-spacing: 0;
       overflow-wrap: anywhere;
+      text-wrap: pretty;
     }
     .imt-translation-compact {
       display: block;
-      margin-block-start: 0.15em;
+      box-sizing: border-box;
+      max-width: 100%;
+      margin-block-start: 0.12em;
+      padding-inline-start: 0;
+      border-inline-start: 0;
+      background: transparent;
+      color: currentColor;
       color: color-mix(in srgb, currentColor 70%, transparent);
       font: inherit;
       font-size: 0.82em;
-      line-height: 1.35;
+      line-height: 1.32;
       font-weight: 400;
       letter-spacing: 0;
       overflow-wrap: anywhere;
