@@ -4,7 +4,7 @@
 
 - `npm.cmd run typecheck`: PASS
 - `npm.cmd run build`: PASS
-- Core test suite: PASS, 13 test files and 51 tests
+- Core test suite: PASS, 45 test files and 282 tests
 
 ## Covered Flows
 
@@ -15,6 +15,7 @@
 - Page controller prevents stale async translation results after restore.
 - Translation cache reuses successful translations and does not cache failed results.
 - Background provider protocol supports fake, Microsoft, and OpenAI-compatible providers with stable id mapping.
+- Imported Immersive Translate web rules are URL-lazy loaded, runtime capability filtered, and merged as same-site deltas on top of stable core rules.
 
 ## Browser Manual Check
 

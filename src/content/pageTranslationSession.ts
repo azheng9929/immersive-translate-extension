@@ -4,6 +4,7 @@ import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText } from "../shared/skipRules";
 import type { PageRenderState } from "../shared/config";
 import type { TranslationDiagnostics } from "./translationDiagnostics";
+import type { WebTranslationRuleSource } from "../shared/webRuleTypes";
 
 export type PageTranslationPhase = "idle" | "translating" | "translated" | "updating" | "partial" | "failed";
 export type DynamicObservationState = "inactive" | "observing" | "queued" | "paused" | "suspended";
@@ -11,6 +12,9 @@ export type DynamicObservationState = "inactive" | "observing" | "queued" | "pau
 export type PageTranslationSiteStatus = {
   hostname: string;
   siteKey: string;
+  ruleId: string;
+  ruleSource: WebTranslationRuleSource;
+  mergedRuleIds: readonly string[];
   dynamicMode: DynamicTranslationMode;
   dynamicModeSource: DynamicModeSource;
   isHighDynamic: boolean;

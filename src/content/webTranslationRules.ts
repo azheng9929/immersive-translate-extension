@@ -1,7 +1,7 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
 import { compileFilterRule, type CompiledFilterRule } from "./compiledFilterRule";
 import type { DynamicMode } from "../shared/config";
-import { matchWebTranslationRule } from "../shared/webRuleMatcher";
+import { filterMatchingWebTranslationRules, matchWebTranslationRule } from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
 import type {
   RuleArrayValue,
@@ -9,6 +9,7 @@ import type {
   RuleRecordValue,
   WebTranslationBodyRule,
   WebTranslationRule,
+  WebTranslationRuleSource,
 } from "../shared/webRuleTypes";
 import type { DynamicModeSource, SitePolicy } from "./sitePolicy";
 
@@ -33,6 +34,9 @@ type ResolvedWebTranslationRule = Omit<
   | "attributeNames"
   | "advanceMergeConfig"
 > & {
+  ruleId: string;
+  ruleSource: WebTranslationRuleSource;
+  mergedRuleIds: readonly string[];
   selectors: readonly string[];
   excludeSelectors: readonly string[];
   mutationExcludeSelectors: readonly string[];
@@ -79,6 +83,9 @@ const TOOLTIP_DYNAMIC_SELECTORS = ['[role="tooltip"]', "[popover]"] as const;
 const DEFAULT_SITE_POLICY = {
   hostname: "",
   siteKey: "",
+  ruleId: "general",
+  ruleSource: "core" as WebTranslationRuleSource,
+  mergedRuleIds: ["general"],
   dynamicModeSource: "global" as DynamicModeSource,
   isHighDynamic: false,
   dynamicMode: "normal" as DynamicMode,
@@ -183,6 +190,7 @@ const DYNAMIC_PRESETS = {
 
 export const GENERAL_WEB_TRANSLATION_RULE: WebTranslationRule = {
   id: "general",
+  ruleSource: "core",
   siteKey: "",
   excludeSelectors: [],
   mutationExcludeSelectors: DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
@@ -517,11 +525,19 @@ export function resolveWebTranslationRule(
   rules: readonly WebTranslationRule[] = BUILTIN_WEB_TRANSLATION_RULES,
 ): ResolvedWebTranslationRule {
   const match = matchWebTranslationRule(url, doc, rules);
-  if (!match) return mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" });
+  if (!match) return withRuleMetadata(mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }), {
+    ruleId: "general",
+    ruleSource: "core",
+    mergedRuleIds: ["general"],
+  });
   const base = match.id === "twitter"
     ? mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, CORE_WEB_TRANSLATION_RULES[0]!)
     : GENERAL_WEB_TRANSLATION_RULE;
-  return mergeWebTranslationRules(base, match);
+  return withRuleMetadata(mergeWebTranslationRules(base, match), {
+    ruleId: match.id,
+    ruleSource: match.ruleSource ?? "core",
+    mergedRuleIds: match.id === "twitter" ? ["x", "twitter"] : [match.id],
+  });
 }
 
 export function mergeWebTranslationRules(base: WebTranslationRule, delta: WebTranslationRule): ResolvedWebTranslationRule {
@@ -547,6 +563,9 @@ export function compileRulePolicy(
     ...preset,
     hostname: normalizedHostname,
     siteKey: rule.siteKey || normalizedHostname,
+    ruleId: rule.ruleId,
+    ruleSource: rule.ruleSource,
+    mergedRuleIds: rule.mergedRuleIds,
     isHighDynamic: Boolean(rule.isHighDynamic),
     attributeNames: rule.attributeNames,
     ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
@@ -611,13 +630,96 @@ export function resolveWebTranslationPolicy(
 ): SitePolicy {
   const parsed = parseUrl(url);
   const hostname = parsed?.hostname ?? normalizeHostname(url);
-  const rules = options.rules ? [...CORE_WEB_TRANSLATION_RULES, ...options.rules] : BUILTIN_WEB_TRANSLATION_RULES;
+  const effectiveUrl = urlFromHostnameFallback(url, hostname);
+  const rule = options.rules?.length
+    ? resolveWebTranslationRuleWithImportedDeltas(effectiveUrl, options.document, options.rules, hostname)
+    : resolveWebTranslationRule(effectiveUrl, options.document, BUILTIN_WEB_TRANSLATION_RULES);
   return compileRulePolicy(
-    resolveWebTranslationRule(urlFromHostnameFallback(url, hostname), options.document, rules),
+    rule,
     hostname,
     preferredDynamicMode,
     options,
   );
+}
+
+function resolveWebTranslationRuleWithImportedDeltas(
+  url: string,
+  doc: Document | undefined,
+  importedRules: readonly WebTranslationRule[],
+  hostname: string,
+): ResolvedWebTranslationRule {
+  const coreMatch = matchWebTranslationRule(url, doc, CORE_WEB_TRANSLATION_RULES);
+  const importedMatches = filterMatchingWebTranslationRules(url, doc, importedRules);
+
+  if (coreMatch) {
+    const coreRule = resolveWebTranslationRule(url, doc, CORE_WEB_TRANSLATION_RULES);
+    const compatibleImportedRules = importedMatches.filter((rule) =>
+      rule.ruleSource !== "imported-experimental" && isSameRuleFamily(coreMatch, rule, hostname)
+    );
+    if (compatibleImportedRules.length === 0) return coreRule;
+
+    const merged = compatibleImportedRules.reduce<ResolvedWebTranslationRule>(
+      (current, importedRule) => mergeWebTranslationRules(current, importedRule),
+      coreRule,
+    );
+
+    const mergedWithCoreSiteKey = coreRule.siteKey ? { ...merged, siteKey: coreRule.siteKey } : merged;
+    return withRuleMetadata(mergedWithCoreSiteKey, {
+      ruleId: coreMatch.id,
+      ruleSource: "core+imported",
+      mergedRuleIds: [coreMatch.id, ...compatibleImportedRules.map((rule) => rule.id)],
+    });
+  }
+
+  const importedPrimary = matchWebTranslationRule(url, doc, importedRules);
+  if (!importedPrimary) return resolveWebTranslationRule(url, doc, BUILTIN_WEB_TRANSLATION_RULES);
+
+  const sameFamilyRules = importedMatches.filter((rule) => isSameRuleFamily(importedPrimary, rule, hostname));
+  const merged = sameFamilyRules.reduce<ResolvedWebTranslationRule>(
+    (current, importedRule) => mergeWebTranslationRules(current, importedRule),
+    mergeWebTranslationRules(GENERAL_WEB_TRANSLATION_RULE, { id: "general" }),
+  );
+
+  return withRuleMetadata(merged, {
+    ruleId: importedPrimary.id,
+    ruleSource: importedPrimary.ruleSource ?? "imported-experimental",
+    mergedRuleIds: sameFamilyRules.map((rule) => rule.id),
+  });
+}
+
+function withRuleMetadata(
+  rule: ResolvedWebTranslationRule,
+  metadata: Pick<ResolvedWebTranslationRule, "ruleId" | "ruleSource" | "mergedRuleIds">,
+): ResolvedWebTranslationRule {
+  return {
+    ...rule,
+    ...metadata,
+  };
+}
+
+function isSameRuleFamily(base: WebTranslationRule, candidate: WebTranslationRule, hostname: string): boolean {
+  if (base.id === candidate.id) return true;
+  const baseSite = normalizedRuleSiteKey(base, hostname);
+  const candidateSite = normalizedRuleSiteKey(candidate, hostname);
+  return Boolean(baseSite && candidateSite && baseSite === candidateSite);
+}
+
+function normalizedRuleSiteKey(rule: WebTranslationRule, hostname: string): string | undefined {
+  const raw = rule.siteKey ?? rule.matches?.[0];
+  if (!raw && rule === GENERAL_WEB_TRANSLATION_RULE) return normalizeHostname(hostname);
+  const host = parseRuleHost(raw);
+  return host?.replace(/^www\./, "").replace(/^\*\./, "").toLowerCase();
+}
+
+function parseRuleHost(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const firstPattern = value.split(",")[0]?.trim();
+  if (!firstPattern) return undefined;
+  try {
+    return new URL(firstPattern.includes("://") ? firstPattern : `https://${firstPattern}`).hostname;
+  } catch {
+    return firstPattern.split("/")[0];
+  }
 }
 
 function mergeOneRule(base: ResolvedWebTranslationRule, delta: WebTranslationRule): ResolvedWebTranslationRule {
@@ -651,6 +753,9 @@ function mergeOneRule(base: ResolvedWebTranslationRule, delta: WebTranslationRul
 function toResolvedRule(rule: WebTranslationRule): ResolvedWebTranslationRule {
   return {
     ...rule,
+    ruleId: rule.id,
+    ruleSource: rule.ruleSource ?? "core",
+    mergedRuleIds: [rule.id],
     selectors: arrayValue(rule.selectors),
     excludeSelectors: arrayValue(rule.excludeSelectors),
     mutationExcludeSelectors: arrayValue(rule.mutationExcludeSelectors),

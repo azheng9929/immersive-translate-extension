@@ -333,6 +333,37 @@ describe("webTranslationRules", () => {
     });
   });
 
+  it("merges same-site imported rule deltas into a matching core rule without replacing the core profile", () => {
+    const policy = resolveWebTranslationPolicy("https://www.youtube.com/results?search_query=openai", "normal", {
+      rules: [
+        {
+          id: "youtube",
+          siteKey: "www.youtube.com",
+          matches: ["www.youtube.com"],
+          ruleSource: "imported-stable",
+          selectors: { add: [".imported-youtube-snippet"] },
+          excludeSelectors: { add: [".imported-youtube-ad"] },
+          globalStyles: {
+            ".imported-youtube-snippet": "-webkit-line-clamp: unset;",
+          },
+        },
+      ],
+    });
+
+    expect(policy).toMatchObject({
+      ruleId: "youtube",
+      ruleSource: "core+imported",
+      siteKey: "youtube.com",
+      dynamicMode: "conservative",
+      isHighDynamic: true,
+    });
+    expect(policy.mergedRuleIds).toEqual(["youtube", "youtube"]);
+    expect(policy.preferredScanRootSelectors).toContain("#video-title");
+    expect(policy.preferredScanRootSelectors).toContain(".imported-youtube-snippet");
+    expect(policy.excludeSelectors).toContain(".imported-youtube-ad");
+    expect(policy.injectedCss.join("\n")).toContain(".imported-youtube-snippet");
+  });
+
   it("maps imported always-on advanceMergeConfig rules to chat-style scheduling", () => {
     const chatRules: WebTranslationRule[] = [
       {

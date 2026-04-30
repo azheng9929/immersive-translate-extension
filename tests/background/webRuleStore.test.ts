@@ -34,6 +34,7 @@ describe("webRuleStore", () => {
     const github = githubRules.find((rule) => rule.id === "github");
     expect(github).toMatchObject({
       detectParagraphLanguage: true,
+      ruleSource: "imported-stable",
     });
     expect(github?.extraInlineSelectors).toContain("g-emoji");
     expect(github?.atomicBlockSelectors).toContain("[itemprop=description]");
@@ -48,6 +49,34 @@ describe("webRuleStore", () => {
     expect(medium?.globalStyles).toMatchObject({
       "article p": "-webkit-line-clamp: unset;max-height:unset;",
     });
+  });
+
+  it("keeps supported body, container, and additional selector fields from the imported config", async () => {
+    const wikipediaRules = await getWebRulesForUrl("https://en.wikipedia.org/wiki/Translation");
+    const wikipedia = wikipediaRules.find((rule) => rule.id === "wikipedia");
+    expect(wikipedia?.bodyRule).toMatchObject({
+      bodySelector: "#content",
+      articleSelector: "#bodyContent",
+    });
+    expect(wikipedia?.mainFrameSelector).toBe("#bodyContent");
+
+    const maxrollRules = await getWebRulesForUrl("https://maxroll.gg/poe/build-guides/example");
+    const maxroll = maxrollRules.find((rule) => rule.id === "maxroll");
+    expect(maxroll?.buildContainerSelectors).toContain(".poe-content");
+
+    const artstationRules = await getWebRulesForUrl("https://www.artstation.com/learning/courses/demo");
+    const artstationLearning = artstationRules.find((rule) => rule.id === "artstationLearning");
+    expect(artstationLearning?.selectors).toContain("footer.learning-course-description.ng-star-inserted > span");
+  });
+
+  it("filters imported rules whose primary surface is outside webpage translation", async () => {
+    const rules = await getWebRulesForUrl("https://arxiv.org/pdf/2501.00001");
+
+    expect(rules.map((rule) => rule.id)).not.toContain("pdf");
+    expect(rules.map((rule) => rule.id)).not.toContain("finalCommon.pdfWebPage");
+    expect(rules.map((rule) => rule.id)).not.toContain("NoTranslate");
+    expect(rules.every((rule) => rule.ruleSource === "imported-stable" || rule.ruleSource === "imported-experimental"))
+      .toBe(true);
   });
 
   it("does not statically import content or the full imported rule chunk", () => {

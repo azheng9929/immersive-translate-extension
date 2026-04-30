@@ -230,6 +230,9 @@ function createPageSession(config: ExtensionConfig, pageRules: readonly WebTrans
     site: {
       hostname: sitePolicy.hostname,
       siteKey: sitePolicy.siteKey,
+      ruleId: sitePolicy.ruleId,
+      ruleSource: sitePolicy.ruleSource,
+      mergedRuleIds: sitePolicy.mergedRuleIds,
       dynamicMode: sitePolicy.dynamicMode,
       dynamicModeSource: sitePolicy.dynamicModeSource,
       isHighDynamic: sitePolicy.isHighDynamic,

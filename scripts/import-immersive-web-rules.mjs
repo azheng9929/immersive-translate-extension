@@ -17,14 +17,17 @@ console.log(`Imported ${rules.length} web rules from ${sourcePath}`);
 
 function normalizeRule(source) {
   const matches = collectArray(source, "matches");
-  const selectors = collectArray(source, "selectors");
+  const bodyRule = collectObject(source, "bodyRule");
+  const selectors = collectArray(source, "selectors", ["additionalSelectors"]);
   const excludeSelectors = collectArray(source, "excludeSelectors", ["additionalExcludeSelectors"]);
   const mutationExcludeSelectors = collectArray(source, "mutationExcludeSelectors");
   const injectedCss = collectArray(source, "injectedCss");
   const extraBlockSelectors = collectArray(source, "extraBlockSelectors");
-  const extraInlineSelectors = collectArray(source, "extraInlineSelectors");
+  const extraInlineSelectors = collectArray(source, "extraInlineSelectors", ["additionalInlineSelectors"]);
   const atomicBlockSelectors = collectArray(source, "atomicBlockSelectors");
-  const stayOriginalSelectors = collectArray(source, "stayOriginalSelectors");
+  const buildContainerSelectors = collectArray(source, "buildContainerSelectors");
+  const skipBuildContainerSelectors = collectArray(source, "skipBuildContainerSelectors");
+  const stayOriginalSelectors = collectArray(source, "stayOriginalSelectors", ["additionalStayOriginalSelectors"]);
   const stayOriginalTags = collectArray(source, "stayOriginalTags").map((tag) => tag.toUpperCase());
   const globalStyles = collectRecord(source, "globalStyles");
 
@@ -42,10 +45,13 @@ function normalizeRule(source) {
     extraBlockSelectors,
     extraInlineSelectors,
     atomicBlockSelectors,
+    buildContainerSelectors,
+    skipBuildContainerSelectors,
     stayOriginalSelectors,
     stayOriginalTags,
     globalStyles,
-    mainFrameSelector: source.mainFrameSelector,
+    mainFrameSelector: source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector,
+    bodyRule,
     observeUrlChange: source.observeUrlChange,
     urlChangeDelay: source.urlChangeDelay,
     detectParagraphLanguage: source.detectParagraphLanguage,
@@ -61,10 +67,11 @@ function normalizeRule(source) {
 }
 
 function collectArray(source, field, aliases = []) {
-  let values = toArray(source[field]);
+  let values = [];
   const remove = new Set();
 
   for (const key of [field, ...aliases]) {
+    values = values.concat(toArray(source[key]));
     values = values.concat(toArray(source[`${key}.add`]));
     for (const [sourceKey, value] of Object.entries(source)) {
       if (sourceKey.startsWith(`${key}.add_v.`)) values = values.concat(toArray(value));
@@ -92,10 +99,32 @@ function collectRecord(source, field) {
   return output;
 }
 
+function collectObject(source, field) {
+  const output = {};
+  assignObject(output, source[field]);
+  assignObject(output, source[`${field}.add`]);
+
+  for (const [sourceKey, value] of Object.entries(source)) {
+    if (sourceKey.startsWith(`${field}.add_v.`)) assignObject(output, value);
+    if (sourceKey === `${field}.remove` || sourceKey.startsWith(`${field}.remove_v.`)) {
+      for (const key of toArray(value)) delete output[key];
+    }
+  }
+
+  return output;
+}
+
 function assignRecord(target, value) {
   if (!value || Array.isArray(value) || typeof value !== "object") return;
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry === "string") target[key] = entry;
+  }
+}
+
+function assignObject(target, value) {
+  if (!value || Array.isArray(value) || typeof value !== "object") return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry !== undefined) target[key] = entry;
   }
 }
 
@@ -109,18 +138,22 @@ function normalizeAdvanceMergeConfig(value, id) {
 }
 
 function normalizeAdvanceConfig(source, id) {
+  const bodyRule = collectObject(source, "bodyRule");
   return compact({
-    selectors: collectArray(source, "selectors"),
+    selectors: collectArray(source, "selectors", ["additionalSelectors"]),
     excludeSelectors: collectArray(source, "excludeSelectors", ["additionalExcludeSelectors"]),
     mutationExcludeSelectors: collectArray(source, "mutationExcludeSelectors"),
     injectedCss: collectArray(source, "injectedCss"),
     extraBlockSelectors: collectArray(source, "extraBlockSelectors"),
-    extraInlineSelectors: collectArray(source, "extraInlineSelectors"),
+    extraInlineSelectors: collectArray(source, "extraInlineSelectors", ["additionalInlineSelectors"]),
     atomicBlockSelectors: collectArray(source, "atomicBlockSelectors"),
-    stayOriginalSelectors: collectArray(source, "stayOriginalSelectors"),
+    buildContainerSelectors: collectArray(source, "buildContainerSelectors"),
+    skipBuildContainerSelectors: collectArray(source, "skipBuildContainerSelectors"),
+    stayOriginalSelectors: collectArray(source, "stayOriginalSelectors", ["additionalStayOriginalSelectors"]),
     stayOriginalTags: collectArray(source, "stayOriginalTags").map((tag) => tag.toUpperCase()),
     globalStyles: collectRecord(source, "globalStyles"),
-    mainFrameSelector: source.mainFrameSelector,
+    mainFrameSelector: source.mainFrameSelector ?? bodyRule.articleSelector ?? bodyRule.bodySelector,
+    bodyRule,
     observeUrlChange: source.observeUrlChange,
     urlChangeDelay: source.urlChangeDelay,
     detectParagraphLanguage: source.detectParagraphLanguage,

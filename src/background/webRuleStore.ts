@@ -1,5 +1,6 @@
 import { shouldLoadImportedWebRulesForUrl } from "../shared/webRuleCatalog";
-import { selectWebTranslationRulesForContent } from "../shared/webRuleMatcher";
+import { prepareImportedWebTranslationRules } from "../shared/importedWebRuleRuntime";
+import { mayWebTranslationRuleMatchUrl, selectWebTranslationRulesForContent } from "../shared/webRuleMatcher";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
 
 const IMPORTED_WEB_RULES_RESOURCE_PATH = "data/imported-immersive-web-rules.json";
@@ -9,6 +10,7 @@ let importedRulesPromise: Promise<readonly WebTranslationRule[]> | undefined;
 export async function getWebRulesForUrl(url: string): Promise<WebTranslationRule[]> {
   if (!shouldLoadImportedWebRulesForUrl(url)) return [];
   const rules = await loadImportedWebRules();
+  if (!rules.some((rule) => Boolean(rule.matches?.length) && mayWebTranslationRuleMatchUrl(url, rule))) return [];
   return selectWebTranslationRulesForContent(url, rules);
 }
 
@@ -28,5 +30,5 @@ async function fetchImportedWebRules(): Promise<readonly WebTranslationRule[]> {
 
   const data: unknown = await response.json();
   if (!Array.isArray(data)) throw new Error("Imported web rules payload is not an array");
-  return data as WebTranslationRule[];
+  return prepareImportedWebTranslationRules(data as WebTranslationRule[]);
 }

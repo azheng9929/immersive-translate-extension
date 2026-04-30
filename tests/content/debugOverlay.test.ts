@@ -23,6 +23,7 @@ describe("DebugOverlay", () => {
     const root = document.querySelector<HTMLElement>("[data-imt-debug-overlay='true']");
     expect(root).not.toBeNull();
     expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("x.com");
+    expect(root?.querySelector("[data-testid='debug-overlay-rule']")?.textContent).toContain("core+imported");
     expect(root?.querySelector("[data-testid='debug-overlay-segments']")?.textContent).toContain("7");
     expect(root?.querySelector("[data-testid='debug-overlay-queue']")?.textContent).toContain("2");
     expect(root?.querySelector("[data-testid='debug-overlay-cache']")?.textContent).toContain("3 / 4");
@@ -49,6 +50,9 @@ function createStatus(): PageTranslationStatus {
     site: {
       hostname: "x.com",
       siteKey: "x.com",
+      ruleId: "x",
+      ruleSource: "core+imported",
+      mergedRuleIds: ["x", "twitter"],
       dynamicMode: "conservative",
       dynamicModeSource: "site-default",
       isHighDynamic: true,

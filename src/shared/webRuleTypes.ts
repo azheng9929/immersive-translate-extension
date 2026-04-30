@@ -17,14 +17,20 @@ export type RuleContentSelector = {
   category: UnitCategory;
 };
 
+export type WebTranslationRuleSource = "core" | "core+imported" | "imported-stable" | "imported-experimental";
+
 export type WebTranslationBodyRule = {
   enable?: boolean;
   minTextLength?: number;
+  bodySelector?: string;
+  articleSelector?: string;
+  xpathRule?: readonly unknown[];
   matchNodeRule?: Readonly<Record<string, unknown>>;
 };
 
 export type WebTranslationRule = {
   id: string;
+  ruleSource?: WebTranslationRuleSource;
   siteKey?: string;
   matches?: readonly string[];
   excludeMatches?: readonly string[];

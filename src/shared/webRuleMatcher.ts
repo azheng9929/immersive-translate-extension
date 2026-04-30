@@ -25,6 +25,14 @@ export function selectPotentialWebTranslationRulesForUrl(
   return rules.filter((rule) => mayWebTranslationRuleMatchUrl(url, rule));
 }
 
+export function filterMatchingWebTranslationRules(
+  url: string,
+  doc: Document | undefined,
+  rules: readonly WebTranslationRule[],
+): WebTranslationRule[] {
+  return rules.filter((rule) => matchesRule(url, doc, rule));
+}
+
 export function mayWebTranslationRuleMatchUrl(url: string, rule: WebTranslationRule): boolean {
   if (rule.matches?.length && !rule.matches.some((pattern) => matchesUrlPattern(url, pattern))) return false;
   if (rule.excludeMatches?.some((pattern) => matchesUrlPattern(url, pattern))) return false;

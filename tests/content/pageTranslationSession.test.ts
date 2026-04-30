@@ -79,6 +79,9 @@ describe("PageTranslationSession", () => {
       site: {
         hostname: "www.youtube.com",
         siteKey: "youtube.com",
+        ruleId: "youtube",
+        ruleSource: "core",
+        mergedRuleIds: ["youtube"],
         dynamicMode: "conservative",
         dynamicModeSource: "site-default",
         isHighDynamic: true,
@@ -88,6 +91,9 @@ describe("PageTranslationSession", () => {
     expect(session.getStatus().site).toEqual({
       hostname: "www.youtube.com",
       siteKey: "youtube.com",
+      ruleId: "youtube",
+      ruleSource: "core",
+      mergedRuleIds: ["youtube"],
       dynamicMode: "conservative",
       dynamicModeSource: "site-default",
       isHighDynamic: true,

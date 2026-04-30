@@ -11,6 +11,9 @@
     "selectorMatches": [
       "meta[name='immersive-translate-subtitle-builder'][content='true']"
     ],
+    "bodyRule": {
+      "enable": false
+    },
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2
   },
@@ -40,6 +43,12 @@
       ".immersive-translate-target-inner div div {border:unset!important;padding:0!important;}",
       ".immersive-translate-target-wrapper[dir='rtl'] {text-align: right;display: inline-block!important;position:unset;}"
     ],
+    "mainFrameSelector": "#viewerContainer",
+    "bodyRule": {
+      "enable": true,
+      "bodySelector": "#viewerContainer",
+      "articleSelector": "#viewerContainer"
+    },
     "detectParagraphLanguage": true
   },
   {
@@ -59,6 +68,9 @@
     "extraInlineSelectors": [
       "span.dropcaps"
     ],
+    "bodyRule": {
+      "enable": false
+    },
     "urlChangeDelay": 200,
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2,
@@ -93,6 +105,9 @@
     "injectedCss": [
       ".immersive-translate-target-translation-block-wrapper {display:block;}"
     ],
+    "bodyRule": {
+      "enable": false
+    },
     "detectParagraphLanguage": true,
     "paragraphMinTextCount": 1,
     "paragraphMinWordCount": 1,
@@ -190,6 +205,9 @@
     ],
     "mutationExcludeSelectors": [
       "#imt-navbar"
+    ],
+    "buildContainerSelectors": [
+      ".docx p"
     ],
     "detectParagraphLanguage": true,
     "paragraphMinTextCount": 0,
@@ -332,6 +350,11 @@
     "globalStyles": {
       ".no-article-text-sister-projects li": "height:unset;"
     },
+    "mainFrameSelector": "#bodyContent",
+    "bodyRule": {
+      "bodySelector": "#content",
+      "articleSelector": "#bodyContent"
+    },
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2
   },
@@ -432,6 +455,17 @@
       "[data-testid='HoverCard'] div[dir=auto] div",
       "[data-testid='HoverCard'] span[dir=auto] div"
     ],
+    "stayOriginalSelectors": [
+      "[data-testid=\"tweetText\"] a",
+      "[data-testid='UserDescription'] a",
+      "[data-testid='HoverCard'] a",
+      "[data-testid='UserCell'] a",
+      "[data-testid='birdwatch-pivot'] a",
+      ".DocsMarkdown--link-external-icon"
+    ],
+    "bodyRule": {
+      "enable": false
+    },
     "observeUrlChange": false,
     "paragraphMinTextCount": 2,
     "paragraphMinWordCount": 1,
@@ -793,6 +827,9 @@
       "a.pointer-events-none": "pointer-events: unset",
       "a.absolute.inset-0": "inset: unset !important;"
     },
+    "bodyRule": {
+      "enable": false
+    },
     "observeUrlChange": true,
     "detectParagraphLanguage": true
   },
@@ -879,7 +916,12 @@
       "[data-testid=SiteFooter]",
       "[class^=refinitiv-promo-bar__container]",
       "[data-testid=ResponsiveAdSlot]"
-    ]
+    ],
+    "mainFrameSelector": "[data-testid=ArticleBody]",
+    "bodyRule": {
+      "bodySelector": "[data-testid=MainContent]",
+      "articleSelector": "[data-testid=ArticleBody]"
+    }
   },
   {
     "id": "npmjs",
@@ -1176,7 +1218,11 @@
       ".title"
     ],
     "excludeSelectors": [
-      ".ytm-badge-and-byline-item-byline"
+      ".ytm-badge-and-byline-item-byline",
+      ".ytp-caption-window-container",
+      "text",
+      ".imt-caption-container",
+      "ytd-live-chat-frame"
     ],
     "mutationExcludeSelectors": [
       ".imt-caption-container *"
@@ -1280,6 +1326,9 @@
       "yt-formatted-string.ytd-transcript-segment-renderer",
       ".caption-visual-line"
     ],
+    "bodyRule": {
+      "enable": false
+    },
     "observeUrlChange": true,
     "urlChangeDelay": 2000,
     "detectParagraphLanguage": true,
@@ -1792,6 +1841,9 @@
       ".c-alert__message",
       "[data-qa=message_attachment_text]"
     ],
+    "stayOriginalSelectors": [
+      "[data-qa=emoji]"
+    ],
     "detectParagraphLanguage": true,
     "dynamicPreset": "chat-stream",
     "isHighDynamic": true
@@ -1818,6 +1870,9 @@
     "matches": [
       "www.artstation.com/learning/courses/*"
     ],
+    "selectors": [
+      "footer.learning-course-description.ng-star-inserted > span"
+    ],
     "excludeSelectors": [
       ".learning-card-meta",
       ".vjs-text-track-display",
@@ -1834,6 +1889,9 @@
     "matches": [
       "https://www.artstation.com/blogs",
       "https://www.artstation.com/blogs/*"
+    ],
+    "selectors": [
+      ".comment-item-body"
     ],
     "excludeSelectors": [
       "blog-card-thumbnail",
@@ -1855,6 +1913,9 @@
     "siteKey": "www.figma.com",
     "matches": [
       "www.figma.com/community/*"
+    ],
+    "selectors": [
+      "div[class*='mini_cardBottomRow_Metadata']"
     ],
     "excludeSelectors": [
       "div[class*='metadataRight']",
@@ -2033,6 +2094,10 @@
     "matches": [
       "www.newyorker.com"
     ],
+    "selectors": [
+      "h1",
+      "[data-testid=SummaryItemHed]"
+    ],
     "excludeSelectors": [
       "[data-testid=PersistentTop]",
       "[data-testid=StackedNavigationHeader]"
@@ -2068,6 +2133,10 @@
     "matches": [
       "www.scmp.com"
     ],
+    "selectors": [
+      ".info__subHeadline",
+      ".section-content h2"
+    ],
     "globalStyles": {
       ".topic__article-list": "height: unset;",
       ".adverisers__adveriser": "height: unset;",
@@ -2076,6 +2145,14 @@
       ".title__text": "max-height:unset; -webkit-line-clamp:unset;",
       ".news-list-item__news-title": "max-height:unset; -webkit-line-clamp:unset;",
       "a[class*='link'] > .link__headline": "max-height:unset; -webkit-line-clamp:unset;"
+    },
+    "mainFrameSelector": "[data-qa='GenericArticle-Content']",
+    "bodyRule": {
+      "bodySelector": "[data-qa='ArticleList-Item']",
+      "articleSelector": "[data-qa='GenericArticle-Content']",
+      "xpathRule": [
+        "datatype:p"
+      ]
     }
   },
   {
@@ -2544,6 +2621,9 @@
     "extraBlockSelectors": [
       ".a-size-small.a-link-normal.page-banner-link.a-nowrap"
     ],
+    "bodyRule": {
+      "enable": false
+    },
     "paragraphMinTextCount": 4,
     "paragraphMinWordCount": 2
   },
@@ -2552,13 +2632,30 @@
     "siteKey": "sellercentral.amazon.*",
     "matches": [
       "https://sellercentral.amazon.*/messaging/inbox*"
-    ]
+    ],
+    "mainFrameSelector": "#case-messages",
+    "bodyRule": {
+      "bodySelector": "#case-messages"
+    }
   },
   {
     "id": "visualstudioMarketplace",
     "siteKey": "marketplace.visualstudio.com",
     "matches": [
       "marketplace.visualstudio.com"
+    ],
+    "excludeSelectors": [
+      ".core-info-second-row",
+      ".core-info-third-row",
+      ".meta-data-list",
+      ".item-title",
+      ".breadcrumb",
+      ".itemDetails-right",
+      ".ux-user-name",
+      ".ux-updated-date",
+      ".ux-item-second-row-wrapper",
+      ".stats-and-offer",
+      ".header-container"
     ],
     "atomicBlockSelectors": [
       ".core-info-cell > div.name"
@@ -2584,6 +2681,11 @@
       "footer.bb-global-footer",
       ".vjs-text-track-display"
     ],
+    "mainFrameSelector": ".body-content",
+    "bodyRule": {
+      "bodySelector": "main article",
+      "articleSelector": ".body-content"
+    },
     "urlChangeDelay": 2000
   },
   {
@@ -2630,6 +2732,10 @@
       "span.display",
       "span.math"
     ],
+    "mainFrameSelector": "article",
+    "bodyRule": {
+      "bodySelector": "article"
+    },
     "urlChangeDelay": 2000
   },
   {
@@ -2769,6 +2875,53 @@
       "preview.construct.net",
       "editor.construct.net"
     ],
+    "selectors": [
+      "aside",
+      "div.manualContent"
+    ],
+    "excludeSelectors": [
+      "div.topNav",
+      "div.usernameLink",
+      "ul.authorDetails",
+      "ul.tagViewer",
+      "ul.breadCrumbNav",
+      "ul.subForumForums",
+      "ul.postTools",
+      "li.comment ul.controls",
+      "div.forumTopNavWrap",
+      "div.downloadWrap",
+      "div.articleLeftMenu",
+      "div.usernameTextWrap",
+      "div.favouriteWrap",
+      "div.bannerWrapper",
+      "div.viewAddonRightMenu",
+      "div.extendedMenu.addonsSubMenu",
+      "#BottomLinks.bottomLinks",
+      "div#LeftSide.leftSide",
+      "div#BottomWrap.bottomWrap",
+      "div.courseListWrap div.overview",
+      "div.conversationControls",
+      "div.contentWrapper h1",
+      "td.location a#LocationLink",
+      "#TopLevelComments .topBar",
+      "#TopLevelComments .controls",
+      ".tagViewWrap",
+      ".changeCount",
+      ".otherStats",
+      ".FilterMenu",
+      ".mobileTopicStats",
+      ".forumControlsWrapper",
+      ".forumsBottomNavWrap",
+      ".breadCrumbNav",
+      ".favouriteWrap",
+      ".usernameLink",
+      ".followWrapper",
+      ".blogPostStats",
+      ".manualContent dl dt"
+    ],
+    "extraInlineSelectors": [
+      "a.forumLink"
+    ],
     "stayOriginalSelectors": [
       "a.usernameReference"
     ],
@@ -2799,6 +2952,10 @@
     "siteKey": "*.fandom.com",
     "matches": [
       "*.fandom.com"
+    ],
+    "excludeSelectors": [
+      "header.fandom-community-header",
+      "div.ph-registration-buttons"
     ],
     "injectedCss": [
       ".immersive-translate-target-translation-block-wrapper {display: unset!important;}"
@@ -2976,6 +3133,10 @@
       "developer.android.google.cn",
       "developer.android.com"
     ],
+    "selectors": [
+      "aside",
+      "google-codelab-step"
+    ],
     "observeUrlChange": true
   },
   {
@@ -2996,6 +3157,9 @@
     "siteKey": "apps.microsoft.com",
     "matches": [
       "https://apps.microsoft.com/store/detail/*"
+    ],
+    "selectors": [
+      "pre"
     ],
     "globalStyles": {
       ".line-clamp": "-webkit-line-clamp:unset;max-height:unset;"
@@ -3072,6 +3236,9 @@
     "siteKey": "store.steampowered.com",
     "matches": [
       "store.steampowered.com/app/*"
+    ],
+    "selectors": [
+      ".game_page_autocollapse_ctn iframe"
     ],
     "excludeSelectors": [
       "#global_actions",
@@ -3341,6 +3508,12 @@
     "siteKey": "wandb.ai",
     "matches": [
       "wandb.ai"
+    ],
+    "selectors": [
+      ".report-page-top"
+    ],
+    "stayOriginalSelectors": [
+      "span[data-slate-inline=true]"
     ]
   },
   {
@@ -3348,6 +3521,9 @@
     "siteKey": "paulgraham.com",
     "matches": [
       "paulgraham.com"
+    ],
+    "selectors": [
+      "font[face=verdana]"
     ],
     "extraBlockSelectors": [
       "font[face=verdana]"
@@ -3381,6 +3557,9 @@
     "siteKey": "thehackernews.com",
     "matches": [
       "thehackernews.com"
+    ],
+    "selectors": [
+      ".pop-title"
     ],
     "excludeSelectors": [
       "span#blog-pager-older-link",
@@ -3615,6 +3794,10 @@
     "excludeSelectors": [
       "[data-framer-name='Desktop']"
     ],
+    "stayOriginalSelectors": [
+      "a.citation",
+      "[class='my-md pb-xs pt-sm']"
+    ],
     "globalStyles": {
       "[class*=line-clamp]": "-webkit-line-clamp: unset !important;"
     }
@@ -3846,7 +4029,10 @@
     ],
     "extraInlineSelectors": [
       ".x1lliihq"
-    ]
+    ],
+    "bodyRule": {
+      "enable": false
+    }
   },
   {
     "id": "bing",
@@ -4024,6 +4210,11 @@
     "siteKey": "bugs.kde.org",
     "matches": [
       "bugs.kde.org"
+    ],
+    "excludeSelectors": [
+      ".bz_first_comment_head",
+      ".bz_comment_head",
+      ".related_actions"
     ]
   },
   {
@@ -4186,7 +4377,12 @@
     "excludeSelectors": [
       ".ad-slot-header__wrapper",
       "#pageFooter"
-    ]
+    ],
+    "mainFrameSelector": ".article__content-container",
+    "bodyRule": {
+      "bodySelector": ".layout__content-wrapper",
+      "articleSelector": ".article__content-container"
+    }
   },
   {
     "id": "githubBlog",
@@ -4510,6 +4706,9 @@
     "extraInlineSelectors": [
       ".d4t-sprite-icon",
       ".d4t-icon"
+    ],
+    "buildContainerSelectors": [
+      ".poe-content"
     ]
   },
   {
@@ -4596,7 +4795,10 @@
     "siteKey": "www.cpb.nl",
     "matches": [
       "www.cpb.nl"
-    ]
+    ],
+    "bodyRule": {
+      "enable": false
+    }
   },
   {
     "id": "hub.logseq",
@@ -5696,6 +5898,9 @@
     ],
     "injectedCss": [
       "[id*='expandable-paragraph'] {max-height:unset!important;}"
+    ],
+    "buildContainerSelectors": [
+      "main"
     ]
   },
   {
@@ -7034,7 +7239,12 @@
     ],
     "mutationExcludeSelectors": [
       "[data-testid='media-player-container-landscape'] *"
-    ]
+    ],
+    "mainFrameSelector": "article",
+    "bodyRule": {
+      "bodySelector": "#main-content",
+      "articleSelector": "article"
+    }
   },
   {
     "id": "zdf.de",
@@ -7507,6 +7717,9 @@
     "siteKey": "the.fibery.io",
     "matches": [
       "the.fibery.io"
+    ],
+    "stayOriginalSelectors": [
+      ".entity-node-view-container"
     ]
   },
   {
@@ -7578,6 +7791,9 @@
     ],
     "atomicBlockSelectors": [
       "p ms-cmark-node"
+    ],
+    "buildContainerSelectors": [
+      "rich-text-editor"
     ]
   },
   {
@@ -7601,7 +7817,12 @@
       ".ltx_toclist",
       ".ltx_authors",
       ".ltx_bibliography"
-    ]
+    ],
+    "mainFrameSelector": ".ltx_abstract",
+    "bodyRule": {
+      "bodySelector": "article",
+      "articleSelector": ".ltx_abstract"
+    }
   },
   {
     "id": "ar5iv",
@@ -7679,6 +7900,11 @@
     "injectedCss": [
       ".r-xoduu5 {display:inline!important;}",
       "[style*='-webkit-line-clamp'] {-webkit-line-clamp:unset!important;}"
+    ],
+    "extraInlineSelectors": [
+      "[data-testid*=postThread] a[role=link]",
+      "[data-feed-context] button",
+      "[data-feed-context] a[role=link]"
     ]
   },
   {
@@ -7696,6 +7922,9 @@
     "siteKey": "*.jmir.org",
     "matches": [
       "*.jmir.org"
+    ],
+    "extraInlineSelectors": [
+      ".tooltiptext"
     ],
     "stayOriginalSelectors": [
       ".article-content .footers"
@@ -7919,6 +8148,9 @@
       "#footer",
       ".summary > h3",
       ".notes > h3"
+    ],
+    "buildContainerSelectors": [
+      "#main"
     ]
   },
   {
@@ -8865,6 +9097,12 @@
       "bb-rich-text-editor",
       ".bb-editor-root",
       ".ql-editor"
+    ],
+    "buildContainerSelectors": [
+      "bb-rich-text-editor",
+      ".bb-editor-wrapper",
+      ".bb-editor-root",
+      "#content-tab-panel-content"
     ]
   },
   {
@@ -9054,6 +9292,9 @@
     "matches": [
       "journals.aps.*"
     ],
+    "extraInlineSelectors": [
+      "[class*='article'] button"
+    ],
     "stayOriginalSelectors": [
       "button"
     ]
@@ -9066,6 +9307,9 @@
     ],
     "extraInlineSelectors": [
       "p.xlpi6m9.x5qbwci.xw7yly9 span span"
+    ],
+    "buildContainerSelectors": [
+      ".x1n2onr6.xb3r6kr.x5yr21d"
     ]
   },
   {
@@ -9219,6 +9463,9 @@
     ],
     "injectedCss": [
       "[class*='line-clamp'] {-webkit-line-clamp:unset!important;}"
+    ],
+    "buildContainerSelectors": [
+      ".next-container section"
     ]
   },
   {
@@ -9393,6 +9640,9 @@
     "siteKey": "turboscribe.ai",
     "matches": [
       "turboscribe.ai"
+    ],
+    "buildContainerSelectors": [
+      "#page-root"
     ]
   },
   {
@@ -9920,6 +10170,9 @@
     "siteKey": "www.mckinsey.com",
     "matches": [
       "www.mckinsey.com"
+    ],
+    "buildContainerSelectors": [
+      "#interactive-bespoke-tech-trends-2025"
     ]
   },
   {
@@ -10227,6 +10480,9 @@
     ],
     "selectorMatches": [
       "pre.changelog"
+    ],
+    "buildContainerSelectors": [
+      "pre"
     ]
   },
   {
@@ -10247,7 +10503,11 @@
       "mjx-container",
       "[class*='MathJax']",
       "[class*='math-']"
-    ]
+    ],
+    "mainFrameSelector": "article",
+    "bodyRule": {
+      "bodySelector": "article"
+    }
   },
   {
     "id": "htmlLangFirst",
