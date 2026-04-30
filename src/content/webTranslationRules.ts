@@ -641,19 +641,26 @@ function normalizeVersionedRuleDeltas(rule: WebTranslationRule): WebTranslationR
   const raw = rule as WebTranslationRule & Record<string, unknown>;
   return {
     ...rule,
-    selectors: withVersionedArrayDeltas(raw, "selectors"),
-    excludeSelectors: withVersionedArrayDeltas(raw, "excludeSelectors"),
-    mutationExcludeSelectors: withVersionedArrayDeltas(raw, "mutationExcludeSelectors"),
-    injectedCss: withVersionedArrayDeltas(raw, "injectedCss"),
-    extraBlockSelectors: withVersionedArrayDeltas(raw, "extraBlockSelectors"),
-    extraInlineSelectors: withVersionedArrayDeltas(raw, "extraInlineSelectors"),
-    atomicBlockSelectors: withVersionedArrayDeltas(raw, "atomicBlockSelectors"),
-    buildContainerSelectors: withVersionedArrayDeltas(raw, "buildContainerSelectors"),
-    skipBuildContainerSelectors: withVersionedArrayDeltas(raw, "skipBuildContainerSelectors"),
-    stayOriginalSelectors: withVersionedArrayDeltas(raw, "stayOriginalSelectors"),
-    stayOriginalTags: withVersionedArrayDeltas(raw, "stayOriginalTags"),
-    globalStyles: withVersionedRecordDeltas(raw, "globalStyles"),
+    ...optionalRuleValue("selectors", withVersionedArrayDeltas(raw, "selectors")),
+    ...optionalRuleValue("excludeSelectors", withVersionedArrayDeltas(raw, "excludeSelectors")),
+    ...optionalRuleValue("mutationExcludeSelectors", withVersionedArrayDeltas(raw, "mutationExcludeSelectors")),
+    ...optionalRuleValue("injectedCss", withVersionedArrayDeltas(raw, "injectedCss")),
+    ...optionalRuleValue("extraBlockSelectors", withVersionedArrayDeltas(raw, "extraBlockSelectors")),
+    ...optionalRuleValue("extraInlineSelectors", withVersionedArrayDeltas(raw, "extraInlineSelectors")),
+    ...optionalRuleValue("atomicBlockSelectors", withVersionedArrayDeltas(raw, "atomicBlockSelectors")),
+    ...optionalRuleValue("buildContainerSelectors", withVersionedArrayDeltas(raw, "buildContainerSelectors")),
+    ...optionalRuleValue("skipBuildContainerSelectors", withVersionedArrayDeltas(raw, "skipBuildContainerSelectors")),
+    ...optionalRuleValue("stayOriginalSelectors", withVersionedArrayDeltas(raw, "stayOriginalSelectors")),
+    ...optionalRuleValue("stayOriginalTags", withVersionedArrayDeltas(raw, "stayOriginalTags")),
+    ...optionalRuleValue("globalStyles", withVersionedRecordDeltas(raw, "globalStyles")),
   };
+}
+
+function optionalRuleValue<Key extends keyof WebTranslationRule>(
+  key: Key,
+  value: WebTranslationRule[Key] | undefined,
+): Partial<WebTranslationRule> {
+  return value === undefined ? {} : { [key]: value };
 }
 
 function mergeArray<T>(

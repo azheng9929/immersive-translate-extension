@@ -205,15 +205,18 @@ export class PageController {
 
     const cacheWrites: TranslationCacheWrite[] = [];
     await this.translateMissingUnits(
-      missingUnits.map((unit) => ({
-        unit,
-        item: {
-          id: unit.id,
-          text: unit.originalText,
-          category: unit.category,
-          cacheKey: lookupByUnitId.get(unit.id)?.key,
-        },
-      })),
+      missingUnits.map((unit) => {
+        const lookup = lookupByUnitId.get(unit.id);
+        return {
+          unit,
+          item: {
+            id: unit.id,
+            text: unit.originalText,
+            category: unit.category,
+            ...(lookup ? { cacheKey: lookup.key } : {}),
+          },
+        };
+      }),
       lookupByUnitId,
       cacheWrites,
       summary,
@@ -246,15 +249,7 @@ export class PageController {
     };
     const scanRoots = dedupeParentNodes(
       roots.flatMap((root) =>
-        collectScanRoots(root, {
-          mainFrameSelector: this.options.mainFrameSelector,
-          preferredScanRootSelectors: this.options.preferredScanRootSelectors,
-          buildContainerSelectors: this.options.buildContainerSelectors,
-          skipBuildContainerSelectors: this.options.skipBuildContainerSelectors,
-          mainFrameMinTextCount: this.options.mainFrameMinTextCount,
-          mainFrameMinWordCount: this.options.mainFrameMinWordCount,
-          bodyRule: this.options.bodyRule,
-        }),
+        collectScanRoots(root, this.scanRootOptions()),
       ),
     );
     const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
@@ -274,6 +269,28 @@ export class PageController {
       ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),
       diagnostics,
     });
+  }
+
+  private scanRootOptions(): ScanRootOptions {
+    return {
+      ...(this.options.mainFrameSelector !== undefined ? { mainFrameSelector: this.options.mainFrameSelector } : {}),
+      ...(this.options.preferredScanRootSelectors !== undefined
+        ? { preferredScanRootSelectors: this.options.preferredScanRootSelectors }
+        : {}),
+      ...(this.options.buildContainerSelectors !== undefined
+        ? { buildContainerSelectors: this.options.buildContainerSelectors }
+        : {}),
+      ...(this.options.skipBuildContainerSelectors !== undefined
+        ? { skipBuildContainerSelectors: this.options.skipBuildContainerSelectors }
+        : {}),
+      ...(this.options.mainFrameMinTextCount !== undefined
+        ? { mainFrameMinTextCount: this.options.mainFrameMinTextCount }
+        : {}),
+      ...(this.options.mainFrameMinWordCount !== undefined
+        ? { mainFrameMinWordCount: this.options.mainFrameMinWordCount }
+        : {}),
+      ...(this.options.bodyRule !== undefined ? { bodyRule: this.options.bodyRule } : {}),
+    };
   }
 
   restorePage(): void {
