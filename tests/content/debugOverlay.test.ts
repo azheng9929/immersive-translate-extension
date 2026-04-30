@@ -84,6 +84,30 @@ describe("DebugOverlay", () => {
 
     overlay.unmount();
   });
+
+  it("visualizes actual text candidates separately from rule selectors", () => {
+    document.body.innerHTML = `
+      <main>
+        <h2 class="organic-title">Hot Porn Videos in the USA</h2>
+      </main>
+    `;
+    const status = createStatus();
+    const overlay = new DebugOverlay({
+      getStatus: () => status,
+      subscribeStatus: () => () => undefined,
+      collectTranslatableRoots: () => [document.querySelector<HTMLElement>(".organic-title")!],
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+
+    expect(document.querySelector(".organic-title")?.getAttribute("data-imt-rule-visualization")).toContain(
+      "text-candidate",
+    );
+    expect(document.querySelector("[data-imt-rule-visualizer='true']")?.textContent).toContain("text-candidate 1");
+
+    overlay.unmount();
+  });
 });
 
 function createStatus(): PageTranslationStatus {

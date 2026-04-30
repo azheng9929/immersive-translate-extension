@@ -8,6 +8,7 @@ import type {
 type DebugOverlayOptions = {
   getStatus: () => PageTranslationStatus;
   subscribeStatus: (listener: (status: PageTranslationStatus) => void) => () => void;
+  collectTranslatableRoots?: () => HTMLElement[];
 };
 
 export type ContentDebugApi = {
@@ -80,7 +81,7 @@ export class DebugOverlay {
       createRow("服务", providerLabel(status), "debug-overlay-provider"),
       createRow("动态", `${status.dynamicRuns} runs`, "debug-overlay-dynamic"),
     );
-    if (this.ruleVisualizationActive) this.ruleVisualizer.show(status);
+    if (this.ruleVisualizationActive) this.ruleVisualizer.show(status, this.collectTextCandidates());
   }
 
   private toggleRuleVisualization(): void {
@@ -88,6 +89,10 @@ export class DebugOverlay {
     const status = this.options.getStatus();
     if (!this.ruleVisualizationActive) this.ruleVisualizer.hide();
     this.render(status);
+  }
+
+  private collectTextCandidates(): HTMLElement[] {
+    return this.options.collectTranslatableRoots?.() ?? [];
   }
 }
 
@@ -260,7 +265,7 @@ class RuleVisualizer {
   private styleElement: HTMLStyleElement | undefined;
   private legendElement: HTMLElement | undefined;
 
-  show(status: PageTranslationStatus): void {
+  show(status: PageTranslationStatus, textCandidates: readonly HTMLElement[] = []): void {
     this.hide();
     const selectors = status.site?.ruleDiagnostics?.visualizationSelectors ?? [];
     this.ensureStyle();
@@ -282,6 +287,18 @@ class RuleVisualizer {
       }
       summaries.set(entry.group, summary);
     }
+    const textSummary = summaries.get("text-candidate") ?? {
+      group: "text-candidate" as const,
+      selectorCount: 0,
+      elementCount: 0,
+    };
+    for (const element of textCandidates) {
+      if (isExtensionElement(element)) continue;
+      markElement(element, "text-candidate");
+      this.markedElements.add(element);
+      textSummary.elementCount += 1;
+    }
+    summaries.set("text-candidate", textSummary);
 
     this.legendElement = createRuleVisualizerLegend([...summaries.values()]);
     document.documentElement.append(this.legendElement);
@@ -305,6 +322,7 @@ class RuleVisualizer {
     style.dataset.imtRuleVisualizerStyle = "true";
     style.textContent = `
 [data-imt-rule-visualization~="scan-root"] { outline: 2px solid rgba(59, 130, 246, 0.88) !important; outline-offset: 2px !important; }
+[data-imt-rule-visualization~="text-candidate"] { outline: 2px dashed rgba(14, 165, 233, 0.96) !important; outline-offset: 4px !important; }
 [data-imt-rule-visualization~="content"] { outline: 2px solid rgba(16, 185, 129, 0.92) !important; outline-offset: 2px !important; }
 [data-imt-rule-visualization~="build-container"] { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.92) !important; }
 [data-imt-rule-visualization~="skip-build-container"] { box-shadow: inset 0 0 0 2px rgba(100, 116, 139, 0.72) !important; }
@@ -384,6 +402,7 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
 
 const RULE_VISUALIZATION_GROUPS: readonly PageTranslationRuleVisualizationGroup[] = [
   "scan-root",
+  "text-candidate",
   "content",
   "exclude",
   "build-container",
@@ -393,6 +412,7 @@ const RULE_VISUALIZATION_GROUPS: readonly PageTranslationRuleVisualizationGroup[
 
 const RULE_VISUALIZATION_COLORS: Record<PageTranslationRuleVisualizationGroup, string> = {
   "scan-root": "#2563eb",
+  "text-candidate": "#0284c7",
   content: "#059669",
   exclude: "#dc2626",
   "build-container": "#d97706",

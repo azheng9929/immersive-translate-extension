@@ -58,6 +58,7 @@ export type PageTranslationRuleVisualizationSelector = {
 
 export type PageTranslationRuleVisualizationGroup =
   | "scan-root"
+  | "text-candidate"
   | "content"
   | "exclude"
   | "build-container"
@@ -169,6 +170,10 @@ export class PageTranslationSession {
       ...this.status,
       ...(this.status.site || !this.options.site ? {} : { site: this.options.site }),
     };
+  }
+
+  collectTranslatableRoots(root: ParentNode = this.options.observeRoot ?? document.body): HTMLElement[] {
+    return this.controller.collectTranslatableRoots(root);
   }
 
   subscribe(listener: StatusListener): () => void {

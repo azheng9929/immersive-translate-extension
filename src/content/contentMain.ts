@@ -307,6 +307,7 @@ function createDebugOverlay(config: ExtensionConfig, pageSession: PageTranslatio
   return new DebugOverlay({
     getStatus: () => pageSession.getStatus(),
     subscribeStatus: (listener) => pageSession.subscribe(listener),
+    collectTranslatableRoots: () => pageSession.collectTranslatableRoots(),
   });
 }
 
