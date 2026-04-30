@@ -1,6 +1,7 @@
 import { createConfigStore } from "./configStore";
 import { fakeProvider } from "./providers/fakeProvider";
 import { geminiProvider } from "./providers/geminiProvider";
+import { runProviderRequestWithInflightDedupe } from "./inflightTranslationDedupe";
 import { microsoftProvider } from "./providers/microsoftProvider";
 import { openaiProvider } from "./providers/openaiProvider";
 import { queryParagraphCache, setParagraphCache } from "./paragraphCache";
@@ -92,7 +93,9 @@ async function translateBatch(request: ProviderRequest): Promise<MessageResponse
   if (!provider) return { ok: false, error: `Unsupported translation provider: ${request.provider}` };
 
   try {
-    const items = await withTranslationPermit(request.provider, request.maxConcurrentRequests, () => provider.translate(request));
+    const items = await runProviderRequestWithInflightDedupe(request, (dedupedRequest) =>
+      withTranslationPermit(request.provider, request.maxConcurrentRequests, () => provider.translate(dedupedRequest)),
+    );
     return { ok: true, items: reconcileProviderItems(request.items, items) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };

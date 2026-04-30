@@ -6,6 +6,7 @@ export type ProviderRequestItem = {
   id: string;
   text: string;
   category: UnitCategory;
+  cacheKey?: string;
 };
 
 export type ProviderRequest = {

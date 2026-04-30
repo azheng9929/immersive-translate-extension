@@ -18,7 +18,7 @@ import {
   type TranslationDiagnostics,
 } from "./translationDiagnostics";
 
-type BatchItem = { id: string; text: string; category: TranslationUnit["category"] };
+type BatchItem = { id: string; text: string; category: TranslationUnit["category"]; cacheKey?: string };
 type BatchResult = { id: string; text: string; status: "ok" | "skipped" | "failed"; error?: string };
 type MissingUnit = { unit: TranslationUnit; item: BatchItem };
 type MissingUnitGroup = { item: BatchItem; entries: MissingUnit[] };
@@ -204,6 +204,7 @@ export class PageController {
           id: unit.id,
           text: unit.originalText,
           category: unit.category,
+          cacheKey: lookupByUnitId.get(unit.id)?.key,
         },
       })),
       lookupByUnitId,
