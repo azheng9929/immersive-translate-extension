@@ -139,6 +139,50 @@ describe("webTranslationRules", () => {
     expect(merged.selectors).toContain(".message");
   });
 
+  it("merges versioned add and remove fields from raw immersive rules", () => {
+    const merged = mergeWebTranslationRules(generalRule, {
+      id: "versioned",
+      "selectors.add_v.1.28.0": [".post-body"],
+      "excludeSelectors.remove_v.1.28.0": ["nav"],
+      "globalStyles.add_v.1.28.0": {
+        ".post-body": "-webkit-line-clamp: unset;",
+      },
+    } as unknown as WebTranslationRule);
+
+    expect(merged.selectors).toEqual(["main p", "article p", ".post-body"]);
+    expect(merged.excludeSelectors).toEqual(["footer"]);
+    expect(merged.globalStyles).toEqual({
+      ".post-body": "-webkit-line-clamp: unset;",
+    });
+  });
+
+  it("keeps body and container rule fields in compiled site policy", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "article",
+        bodyRule: {
+          enable: false,
+          minTextLength: 800,
+        },
+        mainFrameMinTextCount: 120,
+        mainFrameMinWordCount: 20,
+        buildContainerSelectors: { add: ["main.article", "[data-reader-root]"] },
+        skipBuildContainerSelectors: { add: [".sidebar", ".recommendations"] },
+      }),
+      "example.com",
+      "normal",
+    );
+
+    expect(policy.bodyRule).toEqual({
+      enable: false,
+      minTextLength: 800,
+    });
+    expect(policy.mainFrameMinTextCount).toBe(120);
+    expect(policy.mainFrameMinWordCount).toBe(20);
+    expect(policy.buildContainerSelectors).toEqual(["main.article", "[data-reader-root]"]);
+    expect(policy.skipBuildContainerSelectors).toEqual([".sidebar", ".recommendations"]);
+  });
+
   it("compiles merged rules into a site policy for the existing translation pipeline", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {

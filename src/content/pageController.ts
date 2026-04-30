@@ -8,6 +8,7 @@ import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
+import type { WebTranslationBodyRule } from "../shared/webRuleTypes";
 import type { CompiledFilterRule } from "./compiledFilterRule";
 import type { SiteContentSelector } from "./sitePolicy";
 import {
@@ -41,6 +42,11 @@ type ControllerOptions = {
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
   mainFrameSelector?: string;
+  mainFrameMinTextCount?: number;
+  mainFrameMinWordCount?: number;
+  bodyRule?: WebTranslationBodyRule;
+  buildContainerSelectors?: readonly string[];
+  skipBuildContainerSelectors?: readonly string[];
   preferredScanRootSelectors?: readonly string[];
   excludeSelectors?: readonly string[];
   contentSelectors?: readonly SiteContentSelector[];
@@ -239,7 +245,15 @@ export class PageController {
     };
     const scanRoots = dedupeParentNodes(
       roots.flatMap((root) =>
-        collectScanRoots(root, this.options.mainFrameSelector, this.options.preferredScanRootSelectors),
+        collectScanRoots(root, {
+          mainFrameSelector: this.options.mainFrameSelector,
+          preferredScanRootSelectors: this.options.preferredScanRootSelectors,
+          buildContainerSelectors: this.options.buildContainerSelectors,
+          skipBuildContainerSelectors: this.options.skipBuildContainerSelectors,
+          mainFrameMinTextCount: this.options.mainFrameMinTextCount,
+          mainFrameMinWordCount: this.options.mainFrameMinWordCount,
+          bodyRule: this.options.bodyRule,
+        }),
       ),
     );
     const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
@@ -569,13 +583,24 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
   return Math.min(Math.max(Math.round(numberValue), min), max);
 }
 
-function collectScanRoots(
-  root: ParentNode,
-  mainFrameSelector: string | undefined,
-  preferredSelectors: readonly string[] | undefined,
-): ParentNode[] {
-  return collectMainFrameRoots(root, mainFrameSelector).flatMap((mainFrameRoot) =>
-    collectPreferredScanRoots(mainFrameRoot, preferredSelectors),
+type ScanRootOptions = {
+  mainFrameSelector?: string;
+  mainFrameMinTextCount?: number;
+  mainFrameMinWordCount?: number;
+  bodyRule?: WebTranslationBodyRule;
+  buildContainerSelectors?: readonly string[];
+  skipBuildContainerSelectors?: readonly string[];
+  preferredScanRootSelectors?: readonly string[];
+};
+
+function collectScanRoots(root: ParentNode, options: ScanRootOptions): ParentNode[] {
+  if (isGenericBodyFallbackDisabled(root, options)) return [];
+
+  const mainFrameRoots = collectMainFrameRoots(root, options.mainFrameSelector)
+    .filter((mainFrameRoot) => passesMainFrameThreshold(mainFrameRoot, options));
+  const containerRoots = mainFrameRoots.flatMap((mainFrameRoot) => collectBuildContainerRoots(mainFrameRoot, options));
+  return containerRoots.flatMap((containerRoot) =>
+    collectPreferredScanRoots(containerRoot, options.preferredScanRootSelectors),
   );
 }
 
@@ -632,6 +657,49 @@ function collectPreferredScanRoots(root: ParentNode, preferredSelectors: readonl
     }
   }
   return roots;
+}
+
+function collectBuildContainerRoots(root: ParentNode, options: ScanRootOptions): ParentNode[] {
+  const selectors = options.buildContainerSelectors;
+  if (!selectors || selectors.length === 0) return [root];
+
+  const roots: HTMLElement[] = [];
+  for (const selector of selectors) {
+    try {
+      if (root instanceof HTMLElement && root.matches(selector)) addRoot(roots, root);
+      root.querySelectorAll?.(selector).forEach((element) => {
+        if (!(element instanceof HTMLElement)) return;
+        if (matchesClosestSelector(element, options.skipBuildContainerSelectors)) return;
+        addRoot(roots, element);
+      });
+    } catch {
+      continue;
+    }
+  }
+  return roots;
+}
+
+function isGenericBodyFallbackDisabled(root: ParentNode, options: ScanRootOptions): boolean {
+  return options.bodyRule?.enable === false &&
+    isDocumentScanRoot(root) &&
+    !options.mainFrameSelector &&
+    !options.preferredScanRootSelectors?.length &&
+    !options.buildContainerSelectors?.length;
+}
+
+function passesMainFrameThreshold(root: ParentNode, options: ScanRootOptions): boolean {
+  const minTextCount = options.mainFrameMinTextCount;
+  const minWordCount = options.mainFrameMinWordCount;
+  if (minTextCount === undefined && minWordCount === undefined) return true;
+
+  const text = normalizeVisibleText(root.textContent ?? "");
+  if (minTextCount !== undefined && text.length < minTextCount) return false;
+  if (minWordCount !== undefined && wordCount(text) < minWordCount) return false;
+  return true;
+}
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
 }
 
 const DEFAULT_VIEWPORT_ROOT_SELECTORS = [

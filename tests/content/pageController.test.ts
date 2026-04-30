@@ -714,6 +714,65 @@ describe("PageController", () => {
     expect(document.querySelector("main .imt-translation-block")?.textContent).toBe("[zh-Hans] Readable article paragraph.");
   });
 
+  it("uses build and skip container selectors to choose scan roots", async () => {
+    document.body.innerHTML = `
+      <main class="reader"><p>Readable article paragraph.</p></main>
+      <aside class="recommendations"><p>Recommended teaser outside the article.</p></aside>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      buildContainerSelectors: ["main.reader", "aside.recommendations"],
+      skipBuildContainerSelectors: ["aside.recommendations"],
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual(["Readable article paragraph."]);
+    expect(document.querySelector("aside .imt-translation-block")).toBeNull();
+  });
+
+  it("can disable generic body fallback when a rule opts out", async () => {
+    document.body.innerHTML = `<main><p>Generic fallback paragraph should stay original.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      bodyRule: { enable: false },
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(result.total).toBe(0);
+    expect(requestedTexts).toEqual([]);
+  });
+
+  it("skips generic document scans below the configured main frame text threshold", async () => {
+    document.body.innerHTML = `<main><p>Short text.</p></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      mainFrameMinTextCount: 80,
+      mainFrameMinWordCount: 10,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    const result = await controller.translatePage();
+
+    expect(result.total).toBe(0);
+    expect(requestedTexts).toEqual([]);
+  });
+
   it("uses preferred scan roots to avoid translating Twitter chrome", async () => {
     document.body.innerHTML = `
       <main>

@@ -1,4 +1,5 @@
 import type { DynamicMode } from "../shared/config";
+import type { WebTranslationBodyRule } from "../shared/webRuleTypes";
 import type { TranslatableAttributeName, UnitCategory } from "../shared/types";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
 import type { CompiledFilterRule } from "./compiledFilterRule";
@@ -25,6 +26,11 @@ export type SitePolicy = {
   dynamicMode: DynamicTranslationMode;
   attributeNames: readonly TranslatableAttributeName[];
   mainFrameSelector?: string;
+  mainFrameMinTextCount?: number;
+  mainFrameMinWordCount?: number;
+  bodyRule?: WebTranslationBodyRule;
+  buildContainerSelectors: readonly string[];
+  skipBuildContainerSelectors: readonly string[];
   preferredScanRootSelectors: readonly string[];
   excludeSelectors: readonly string[];
   contentSelectors: readonly SiteContentSelector[];

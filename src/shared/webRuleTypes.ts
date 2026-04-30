@@ -17,6 +17,12 @@ export type RuleContentSelector = {
   category: UnitCategory;
 };
 
+export type WebTranslationBodyRule = {
+  enable?: boolean;
+  minTextLength?: number;
+  matchNodeRule?: Readonly<Record<string, unknown>>;
+};
+
 export type WebTranslationRule = {
   id: string;
   siteKey?: string;
@@ -31,12 +37,17 @@ export type WebTranslationRule = {
   extraBlockSelectors?: RuleArrayValue<string>;
   extraInlineSelectors?: RuleArrayValue<string>;
   atomicBlockSelectors?: RuleArrayValue<string>;
+  buildContainerSelectors?: RuleArrayValue<string>;
+  skipBuildContainerSelectors?: RuleArrayValue<string>;
   stayOriginalSelectors?: RuleArrayValue<string>;
   stayOriginalTags?: RuleArrayValue<string>;
   globalStyles?: RuleRecordValue<string>;
   contentSelectors?: RuleArrayValue<RuleContentSelector>;
   attributeNames?: RuleArrayValue<TranslatableAttributeName>;
   mainFrameSelector?: string;
+  mainFrameMinTextCount?: number;
+  mainFrameMinWordCount?: number;
+  bodyRule?: WebTranslationBodyRule;
   observeUrlChange?: boolean;
   urlChangeDelay?: number;
   detectParagraphLanguage?: boolean;
