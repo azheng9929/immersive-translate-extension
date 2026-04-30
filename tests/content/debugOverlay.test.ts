@@ -138,6 +138,30 @@ describe("DebugOverlay", () => {
 
     overlay.unmount();
   });
+
+  it("shows selector-level rule visualization counts including zero-match selectors", () => {
+    document.body.innerHTML = `
+      <main>
+        <article class="tweet">
+          <p class="body-text">Hello world</p>
+        </article>
+      </main>
+    `;
+    const status = createStatus();
+    const overlay = new DebugOverlay({
+      getStatus: () => status,
+      subscribeStatus: () => () => undefined,
+    });
+
+    overlay.mount();
+    document.querySelector<HTMLButtonElement>("[data-testid='debug-overlay-visualize-rules']")?.click();
+
+    const legendText = document.querySelector("[data-imt-rule-visualizer='true']")?.textContent ?? "";
+    expect(legendText).toContain("content:comment 1 · .body-text");
+    expect(legendText).toContain("content:missing 0 · .missing-content");
+
+    overlay.unmount();
+  });
 });
 
 function createStatus(): PageTranslationStatus {
@@ -187,6 +211,7 @@ function createStatus(): PageTranslationStatus {
         visualizationSelectors: [
           { group: "scan-root", selector: ".tweet" },
           { group: "content", selector: ".body-text", label: "comment" },
+          { group: "content", selector: ".missing-content", label: "missing" },
           { group: "exclude", selector: ".action" },
           { group: "build-container", selector: ".build-root" },
           { group: "skip-build-container", selector: ".skip-root" },

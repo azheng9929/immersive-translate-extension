@@ -265,6 +265,14 @@ type RuleVisualizationSummary = {
   group: PageTranslationRuleVisualizationGroup;
   selectorCount: number;
   elementCount: number;
+  selectors: RuleVisualizationSelectorSummary[];
+};
+
+type RuleVisualizationSelectorSummary = {
+  group: PageTranslationRuleVisualizationGroup;
+  selector: string;
+  label?: string;
+  elementCount: number;
 };
 
 class RuleVisualizer {
@@ -292,11 +300,17 @@ class RuleVisualizer {
         group: entry.group,
         selectorCount: 0,
         elementCount: 0,
+        selectors: [],
       };
       summary.selectorCount += 1;
-      const matchedElements = queryRuleElements(entry.selector);
+      const matchedElements = queryRuleElements(entry.selector).filter((element) => !isExtensionElement(element));
+      summary.selectors.push({
+        group: entry.group,
+        selector: entry.selector,
+        ...(entry.label ? { label: entry.label } : {}),
+        elementCount: matchedElements.length,
+      });
       for (const element of matchedElements) {
-        if (isExtensionElement(element)) continue;
         markElement(element, entry.group, ruleReasonLabel(entry.group, entry.selector, entry.label));
         this.markedElements.add(element);
         summary.elementCount += 1;
@@ -307,6 +321,7 @@ class RuleVisualizer {
       group: "text-candidate" as const,
       selectorCount: 0,
       elementCount: 0,
+      selectors: [],
     };
     for (const element of textCandidates) {
       if (isExtensionElement(element)) continue;
@@ -458,6 +473,7 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
     zIndex: "2147483645",
     width: "300px",
     maxWidth: "calc(100vw - 24px)",
+    maxHeight: "48vh",
     boxSizing: "border-box",
     padding: "12px",
     border: "1px solid rgba(20, 33, 61, 0.14)",
@@ -468,6 +484,7 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
     color: "#14213d",
     font: "12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     letterSpacing: "0",
+    overflowY: "auto",
   });
 
   const title = document.createElement("div");
@@ -479,7 +496,12 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
   legend.append(title);
 
   const orderedSummaries = RULE_VISUALIZATION_GROUPS.map((group) =>
-    summaries.find((summary) => summary.group === group) ?? { group, selectorCount: 0, elementCount: 0 },
+    summaries.find((summary) => summary.group === group) ?? {
+      group,
+      selectorCount: 0,
+      elementCount: 0,
+      selectors: [],
+    },
   );
   for (const summary of orderedSummaries) {
     const row = document.createElement("div");
@@ -491,9 +513,45 @@ function createRuleVisualizerLegend(summaries: RuleVisualizationSummary[]): HTML
       color: RULE_VISUALIZATION_COLORS[summary.group],
     });
     legend.append(row);
+    appendSelectorRows(legend, summary);
   }
 
   return legend;
+}
+
+function appendSelectorRows(legend: HTMLElement, summary: RuleVisualizationSummary): void {
+  const selectorSummaries = summary.selectors.slice(0, 18);
+  for (const selectorSummary of selectorSummaries) {
+    const row = document.createElement("div");
+    row.textContent = `${selectorSummaryLabel(selectorSummary)} ${selectorSummary.elementCount} · ${selectorSummary.selector}`;
+    Object.assign(row.style, {
+      marginLeft: "10px",
+      padding: "1px 0 2px",
+      color: RULE_VISUALIZATION_COLORS[summary.group],
+      fontSize: "11px",
+      opacity: selectorSummary.elementCount > 0 ? "0.82" : "0.58",
+      overflowWrap: "anywhere",
+      whiteSpace: "normal",
+    });
+    legend.append(row);
+  }
+
+  const hiddenCount = summary.selectors.length - selectorSummaries.length;
+  if (hiddenCount <= 0) return;
+  const row = document.createElement("div");
+  row.textContent = `还有 ${hiddenCount} 条 selector 未展开`;
+  Object.assign(row.style, {
+    marginLeft: "10px",
+    padding: "1px 0 2px",
+    color: RULE_VISUALIZATION_COLORS[summary.group],
+    fontSize: "11px",
+    opacity: "0.6",
+  });
+  legend.append(row);
+}
+
+function selectorSummaryLabel(summary: RuleVisualizationSelectorSummary): string {
+  return summary.label ? `${summary.group}:${summary.label}` : summary.group;
 }
 
 const RULE_VISUALIZATION_GROUPS: readonly PageTranslationRuleVisualizationGroup[] = [

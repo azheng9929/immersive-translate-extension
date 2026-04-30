@@ -10,6 +10,7 @@
     "test:real-sites": "npm run build && node scripts/real-site-regression.mjs --profile=all",
     "test:real-sites:smoke": "npm run build && node scripts/real-site-regression.mjs --profile=smoke",
     "test:real-sites:high-dynamic": "npm run build && node scripts/real-site-regression.mjs --profile=high-dynamic",
+    "test:real-sites:long-tail": "npm run build && node scripts/real-site-regression.mjs --profile=long-tail-rules",
     "audit:web-rules": "node scripts/audit-imported-web-rule-capabilities.mjs",
     "audit:rule-semantics": "node scripts/audit-rule-semantics.mjs",
     "test:watch": "vitest",

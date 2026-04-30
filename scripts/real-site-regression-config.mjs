@@ -5,6 +5,7 @@ export const allRegressionSites = [
   { name: "Reddit", host: "reddit.com", url: "https://www.reddit.com/r/technology/" },
   { name: "Old Reddit", host: "old.reddit.com", url: "https://old.reddit.com/r/TrueReddit/" },
   { name: "Inworld", host: "inworld.ai", url: "https://inworld.ai/" },
+  { name: "PromptOT", host: "promptot.com", url: "https://www.promptot.com/" },
   { name: "MetaTFT", host: "metatft.com", url: "https://www.metatft.com/comps" },
   { name: "MetaTFT Augments", host: "metatft.com", url: "https://www.metatft.com/augments" },
   {
@@ -19,6 +20,8 @@ export const allRegressionSites = [
   { name: "Nature Article", host: "nature.com", url: "https://www.nature.com/articles/s41586-020-2649-2" },
   { name: "Product Hunt", host: "producthunt.com", url: "https://www.producthunt.com/" },
   { name: "Amazon Product", host: "amazon.com", url: "https://www.amazon.com/s?k=kindle" },
+  { name: "Pornhub", host: "pornhub.com", url: "https://www.pornhub.com/" },
+  { name: "XVideos", host: "xvideos.com", url: "https://www.xvideos.com/" },
 ];
 
 const regressionProfiles = {
@@ -34,6 +37,10 @@ const regressionProfiles = {
     dynamicModes: ["normal"],
     siteFilter: ["stackoverflow", "github blog", "openai docs", "nature article", "product hunt", "amazon product"],
   },
+  "long-tail-rules": {
+    dynamicModes: ["normal"],
+    siteFilter: ["old reddit", "inworld", "promptot", "pornhub", "xvideos"],
+  },
   all: {
     dynamicModes: ["conservative", "normal"],
     siteFilter: [],
@@ -44,7 +51,7 @@ export function resolveRegressionSelection({ argv = [], env = process.env } = {}
   const profile = readArg(argv, "profile") || env.IMT_REGRESSION_PROFILE || "all";
   const profileConfig = regressionProfiles[profile];
   if (!profileConfig) {
-    throw new Error(`Unsupported regression profile: ${profile}. Use smoke, high-dynamic, core-rules, or all.`);
+    throw new Error(`Unsupported regression profile: ${profile}. Use smoke, high-dynamic, core-rules, long-tail-rules, or all.`);
   }
 
   const dynamicModes = parseCsv(env.IMT_REGRESSION_DYNAMIC_MODES ?? "").length > 0
@@ -95,8 +102,8 @@ function matchesSiteFilter(site, filter) {
   const name = site.name.toLowerCase();
   const host = site.host.toLowerCase();
   const url = site.url.toLowerCase();
+  if (filter.length <= 2) return name === filter || host === filter;
   if (name.includes(filter) || host.includes(filter)) return true;
-  if (filter.length <= 2) return false;
   return url.includes(filter);
 }
 

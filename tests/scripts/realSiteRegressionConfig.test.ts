@@ -76,6 +76,23 @@ describe("real-site regression selection", () => {
     );
   });
 
+  it("uses a long-tail rules profile for recently debugged site-specific rules", () => {
+    const selection = resolveRegressionSelection({
+      argv: ["--profile=long-tail-rules"],
+      env: {},
+    });
+
+    expect(selection.profile).toBe("long-tail-rules");
+    expect(selection.dynamicModes).toEqual(["normal"]);
+    expect(selection.selectedSites.map((site) => site.name)).toEqual([
+      "Old Reddit",
+      "Inworld",
+      "PromptOT",
+      "Pornhub",
+      "XVideos",
+    ]);
+  });
+
   it("treats Amazon robot checks as an access gate", () => {
     expect(
       siteAccessGateReason(
