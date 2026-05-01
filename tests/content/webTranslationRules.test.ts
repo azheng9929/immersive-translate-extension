@@ -1038,7 +1038,7 @@ describe("webTranslationRules", () => {
       ruleId: "youtube",
       ruleSource: "core+imported",
       siteKey: "youtube.com",
-      dynamicMode: "conservative",
+      dynamicMode: "normal",
       isHighDynamic: true,
     });
     expect(policy.mergedRuleIds).toEqual(["youtube", "youtube"]);

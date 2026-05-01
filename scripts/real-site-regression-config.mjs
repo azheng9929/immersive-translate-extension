@@ -162,7 +162,18 @@ export const realSiteFixtureExpectations = {
     requiredCategories: ["content-block", "card-text"],
   },
   "card-list": {
-    positiveSelectors: ["article h2", "article h3", ".card h2", ".card h3", ".card p", "[class*='card' i] h2", "[class*='card' i] h3", "[class*='description' i]"],
+    positiveSelectors: [
+      "article h2",
+      "article h3",
+      ".card h2",
+      ".card h3",
+      ".card p",
+      "[class*='card' i] h2",
+      "[class*='card' i] h3",
+      "[class*='description' i]",
+      "main a[href^='/products/']",
+      "main a[href^='/posts/']",
+    ],
     negativeSelectors: [...commonNegativeSelectors, "button", "[role='button']", "[class*='score' i]", "[class*='rank' i]", "[class*='stars' i]", "[class*='vote' i]"],
     minPositiveTranslated: 5,
     maxNegativeTranslated: 2,
@@ -407,7 +418,7 @@ const fixtureMatrixSiteFilters = Object.values(realSiteFixtureGroups).flat().map
 
 const regressionProfiles = {
   smoke: {
-    dynamicModes: ["conservative"],
+    dynamicModes: ["normal"],
     siteFilter: ["metatft augments"],
   },
   "high-dynamic": {
@@ -477,6 +488,79 @@ export function parseCsv(value) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+export function createRegressionProviderConfig({ provider = "fake", env = process.env } = {}) {
+  return {
+    provider,
+    openaiEndpoint: env.IMT_REGRESSION_OPENAI_ENDPOINT ?? "https://api.openai.com/v1/chat/completions",
+    openaiApiKey: env.IMT_REGRESSION_OPENAI_API_KEY ?? "",
+    openaiModel: env.IMT_REGRESSION_OPENAI_MODEL ?? "gpt-4o-mini",
+    openaiMaxConcurrentRequests: Number(env.IMT_REGRESSION_OPENAI_CONCURRENCY ?? 2),
+    openaiMaxBatchItems: Number(env.IMT_REGRESSION_OPENAI_BATCH_ITEMS ?? 16),
+    openaiMaxBatchChars: Number(env.IMT_REGRESSION_OPENAI_BATCH_CHARS ?? 6000),
+    openaiRequestTimeoutMs: Number(env.IMT_REGRESSION_OPENAI_TIMEOUT_MS ?? 45000),
+    deepseekEndpoint: env.IMT_REGRESSION_DEEPSEEK_ENDPOINT ?? "https://api.deepseek.com/chat/completions",
+    deepseekApiKey: env.IMT_REGRESSION_DEEPSEEK_API_KEY ?? env.IMT_REGRESSION_OPENAI_API_KEY ?? "",
+    deepseekModel: env.IMT_REGRESSION_DEEPSEEK_MODEL ?? "deepseek-v4-flash",
+    deepseekMaxConcurrentRequests: Number(env.IMT_REGRESSION_DEEPSEEK_CONCURRENCY ?? 4),
+    deepseekMaxBatchItems: Number(env.IMT_REGRESSION_DEEPSEEK_BATCH_ITEMS ?? 4),
+    deepseekMaxBatchChars: Number(env.IMT_REGRESSION_DEEPSEEK_BATCH_CHARS ?? 1200),
+    deepseekRequestTimeoutMs: Number(env.IMT_REGRESSION_DEEPSEEK_TIMEOUT_MS ?? 45000),
+    geminiEndpoint: env.IMT_REGRESSION_GEMINI_ENDPOINT ?? "https://generativelanguage.googleapis.com/v1beta",
+    geminiApiKey: env.IMT_REGRESSION_GEMINI_API_KEY ?? "",
+    geminiModel: env.IMT_REGRESSION_GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
+    geminiMaxConcurrentRequests: Number(env.IMT_REGRESSION_GEMINI_CONCURRENCY ?? 2),
+    geminiMaxBatchItems: Number(env.IMT_REGRESSION_GEMINI_BATCH_ITEMS ?? 16),
+    geminiMaxBatchChars: Number(env.IMT_REGRESSION_GEMINI_BATCH_CHARS ?? 6000),
+    geminiRequestTimeoutMs: Number(env.IMT_REGRESSION_GEMINI_TIMEOUT_MS ?? 45000),
+    firstTranslationTimeoutMs: Number(env.IMT_REGRESSION_FIRST_TRANSLATION_TIMEOUT_MS ?? (provider === "fake" ? 8000 : 20000)),
+    translationSettleTimeoutMs: Number(env.IMT_REGRESSION_TRANSLATION_SETTLE_TIMEOUT_MS ?? (provider === "fake" ? 5000 : 45000)),
+    translationSettleQuietMs: Number(env.IMT_REGRESSION_TRANSLATION_SETTLE_QUIET_MS ?? 1000),
+    dynamicActionTimeoutMs: Number(env.IMT_REGRESSION_DYNAMIC_ACTION_TIMEOUT_MS ?? (provider === "fake" ? 8000 : 30000)),
+    siteDynamicModes: parseSiteDynamicModeOverrides(env.IMT_REGRESSION_SITE_DYNAMIC_MODES ?? ""),
+  };
+}
+
+export function validateRegressionProviderConfig(config, { dynamicModes = [], selectedSites = [], siteFilter = [] } = {}) {
+  const supportedProviders = new Set(["fake", "microsoft", "openai-compatible", "deepseek", "gemini"]);
+  if (!supportedProviders.has(config.provider)) {
+    throw new Error(`Unsupported IMT_REGRESSION_PROVIDER: ${config.provider}`);
+  }
+  const supportedDynamicModes = new Set(["off", "conservative", "normal"]);
+  for (const dynamicMode of dynamicModes) {
+    if (!supportedDynamicModes.has(dynamicMode)) throw new Error(`Unsupported IMT_REGRESSION_DYNAMIC_MODES value: ${dynamicMode}`);
+  }
+  if (dynamicModes.length === 0) throw new Error("IMT_REGRESSION_DYNAMIC_MODES must include at least one mode");
+  if (selectedSites.length === 0) throw new Error(`IMT_REGRESSION_SITE_FILTER matched no sites: ${siteFilter.join(", ")}`);
+  if (config.provider === "openai-compatible" && !config.openaiApiKey) {
+    throw new Error("IMT_REGRESSION_OPENAI_API_KEY is required when IMT_REGRESSION_PROVIDER=openai-compatible");
+  }
+  if (config.provider === "deepseek" && !config.deepseekApiKey) {
+    throw new Error("IMT_REGRESSION_DEEPSEEK_API_KEY is required when IMT_REGRESSION_PROVIDER=deepseek");
+  }
+  if (config.provider === "gemini" && !config.geminiApiKey) {
+    throw new Error("IMT_REGRESSION_GEMINI_API_KEY is required when IMT_REGRESSION_PROVIDER=gemini");
+  }
+}
+
+export function publicRegressionConfig(config) {
+  return {
+    ...config,
+    openaiApiKey: config.openaiApiKey ? "[set]" : "",
+    deepseekApiKey: config.deepseekApiKey ? "[set]" : "",
+    geminiApiKey: config.geminiApiKey ? "[set]" : "",
+  };
+}
+
+function parseSiteDynamicModeOverrides(value) {
+  const overrides = {};
+  for (const entry of parseCsv(value)) {
+    const [rawHost, rawMode] = entry.split("=").map((part) => part?.trim()).filter(Boolean);
+    if (!rawHost || !["off", "conservative", "normal"].includes(rawMode)) continue;
+    overrides[rawHost] = rawMode;
+  }
+  return overrides;
+}
+
 function parseFixtureKinds(value) {
   const kinds = parseCsv(value).map((kind) => kind.toLowerCase());
   const unknown = kinds.filter((kind) => !realSiteFixtureGroups[kind]);
@@ -491,6 +575,7 @@ export function siteAccessGateReason(site, metrics) {
   if (isXLoginWall(site, metrics)) return "login wall";
   if (isRedditHumanityCheck(site, metrics)) return "humanity check";
   if (isRedditNetworkSecurityBlock(site, metrics)) return "network security block";
+  if (isCloudflareChallenge(metrics)) return "cloudflare challenge";
   if (isAmazonRobotCheck(site, metrics)) return "robot check";
   if (isAmazonUnavailablePage(site, metrics)) return "unavailable page";
   return undefined;
@@ -531,6 +616,11 @@ function isRedditHumanityCheck(site, metrics) {
 
 function isRedditNetworkSecurityBlock(site, metrics) {
   return isRedditSite(site) && /blocked by network security/i.test(metrics.bodyTextPreview ?? "");
+}
+
+function isCloudflareChallenge(metrics) {
+  const text = `${metrics.title ?? ""} ${metrics.bodyTextPreview ?? ""}`;
+  return /cloudflare|checking if the site connection is secure|verify you are human|正在进行安全验证|安全服务防护恶意自动程序|由 Cloudflare 提供/i.test(text);
 }
 
 function isAmazonRobotCheck(site, metrics) {

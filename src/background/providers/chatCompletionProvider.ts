@@ -74,6 +74,7 @@ async function translateChunk(
   defaults: ChatCompletionProviderDefaults,
   runtime: ChatCompletionRuntimeState,
   items: ProviderRequestItem[],
+  allowMissingResultRetry = true,
 ): Promise<ProviderChunkRunResult> {
   const useStructuredOutputs = defaults.responseFormat !== "none" && !runtime.structuredOutputsDisabled;
   const response = await fetchWithTimeout(defaults.providerName, options.endpoint, {
@@ -91,7 +92,7 @@ async function translateChunk(
     const message = chatCompletionErrorMessage(defaults.providerName, response.status, data);
     if (useStructuredOutputs && isStructuredOutputUnsupported(response.status, message)) {
       runtime.structuredOutputsDisabled = true;
-      return translateChunk(request, options, defaults, runtime, items);
+      return translateChunk(request, options, defaults, runtime, items, allowMissingResultRetry);
     }
     throw new ProviderAdaptiveError(message, throttle);
   }
@@ -108,7 +109,42 @@ async function translateChunk(
   if (!Array.isArray(parsed.items)) throw new Error(`${defaults.providerName} API response missing items`);
 
   const responseItems = reconcileChunkItems(defaults.providerName, items, parsed.items.map(normalizeProviderItem));
-  return throttle ? { items: responseItems, throttle } : responseItems;
+  const reconciledItems = allowMissingResultRetry
+    ? await retryMissingChunkItems(request, options, defaults, runtime, items, responseItems)
+    : responseItems;
+  return throttle ? { items: reconciledItems, throttle } : reconciledItems;
+}
+
+async function retryMissingChunkItems(
+  request: ProviderRequest,
+  options: ChatCompletionOptions,
+  defaults: ChatCompletionProviderDefaults,
+  runtime: ChatCompletionRuntimeState,
+  requestItems: ProviderRequestItem[],
+  responseItems: ProviderResponseItem[],
+): Promise<ProviderResponseItem[]> {
+  const retryItems = responseItems
+    .map((item, index) => ({ item, requestItem: requestItems[index] as ProviderRequestItem | undefined }))
+    .filter(({ item, requestItem }) => requestItem && isRetryableMissingResult(item))
+    .map(({ requestItem }) => requestItem as ProviderRequestItem);
+  if (retryItems.length === 0) return responseItems;
+
+  try {
+    const retryResult = await translateChunk(request, options, defaults, runtime, retryItems, false);
+    const retryResponseItems = Array.isArray(retryResult) ? retryResult : retryResult.items;
+    const retryById = new Map(retryResponseItems.map((item) => [item.id, item]));
+    return responseItems.map((item) => {
+      if (!isRetryableMissingResult(item)) return item;
+      const retried = retryById.get(item.id);
+      return retried && !isRetryableMissingResult(retried) ? retried : item;
+    });
+  } catch {
+    return responseItems;
+  }
+}
+
+function isRetryableMissingResult(item: ProviderResponseItem): boolean {
+  return item.status === "failed" && /Missing .* API result|Empty .* API result/i.test(item.error ?? "");
 }
 
 function normalizeChatCompletionOptions(

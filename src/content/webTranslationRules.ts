@@ -207,6 +207,21 @@ const DYNAMIC_PRESETS = {
     maxObservedRoots: DEFAULT_SITE_POLICY.maxObservedRoots,
     maxMutationNodesPerWindow: DEFAULT_SITE_POLICY.maxMutationNodesPerWindow,
   },
+  "youtube-fast": {
+    dynamicMode: "normal",
+    debounceMs: 900,
+    lazyRootMargin: "1200px",
+    eagerLazyRootMargin: "1400px",
+    maxEagerLazyRoots: 180,
+    viewportSupplement: true,
+    viewportSupplementDebounceMs: 900,
+    viewportSupplementRootMargin: "1400px",
+    viewportSupplementMaxRoots: 36,
+    maxQueueSize: 900,
+    maxRootsPerFlush: 72,
+    maxObservedRoots: 900,
+    maxMutationNodesPerWindow: 6000,
+  },
   "twitter-fast": {
     dynamicMode: "conservative",
     debounceMs: 1200,
@@ -900,7 +915,7 @@ ytd-expander.ytd-comment-renderer {
     detectParagraphLanguage: true,
     blockMinTextCount: 0,
     blockMinWordCount: 0,
-    dynamicPreset: "conservative",
+    dynamicPreset: "youtube-fast",
     isHighDynamic: true,
   },
   {
@@ -1718,6 +1733,8 @@ main li {
       "[data-test=\"show-more-shoutouts-button\"]",
       ".styles_buttons__kKy_S",
       ".styles_count___6_8F",
+      "main a[href^='/@']",
+      "main a[href^='/@'] p",
       "nav",
       "header",
       "footer",
@@ -1725,6 +1742,7 @@ main li {
       "input",
       "textarea",
     ],
+    mutationExcludeSelectors: ["main a[href^='/@']", "main a[href^='/@'] p", "nav", "header", "footer", "button"],
     injectedCss: [
       `
 h5 + p,

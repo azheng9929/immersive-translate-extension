@@ -41,6 +41,7 @@ import {
   type ExtensionProvider,
 } from "../shared/config";
 import { buildGlossarySystemPrompt } from "../shared/glossary";
+import { normalizeSiteRuleKey } from "../shared/siteRules";
 import type { WebTranslationRule } from "../shared/webRuleTypes";
 
 export async function runContentMain(): Promise<void> {
@@ -51,7 +52,7 @@ export async function runContentMain(): Promise<void> {
     await waitForDocumentBody();
     let config = await loadConfig();
     let pageRules = await loadWebRules(window.location.href);
-    let sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+    let sitePolicy = resolveConfiguredSitePolicy(window.location.href, config, pageRules);
     let sitePolicySignature = createSitePolicySignature(sitePolicy);
     injectSitePolicyCss(sitePolicy);
     let cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
@@ -71,7 +72,7 @@ export async function runContentMain(): Promise<void> {
     };
     const resolveSpaPolicyChange = async ({ currentUrl }: PageTranslationUrlChange): Promise<boolean> => {
       const nextRules = await loadWebRules(currentUrl);
-      const nextSitePolicy = resolveSitePolicy(currentUrl, config.dynamicMode, { document, rules: nextRules });
+      const nextSitePolicy = resolveConfiguredSitePolicy(currentUrl, config, nextRules);
       const nextSignature = createSitePolicySignature(nextSitePolicy);
       pageRules = nextRules;
       if (areSitePolicySignaturesEqual(sitePolicySignature, nextSignature)) {
@@ -171,7 +172,7 @@ export async function runContentMain(): Promise<void> {
           cleanupSitePolicyAttributes();
           config = nextConfig;
           pageRules = await loadWebRules(window.location.href);
-          sitePolicy = resolveSitePolicy(window.location.href, config.dynamicMode, { document, rules: pageRules });
+          sitePolicy = resolveConfiguredSitePolicy(window.location.href, config, pageRules);
           sitePolicySignature = createSitePolicySignature(sitePolicy);
           injectSitePolicyCss(sitePolicy);
           cleanupSitePolicyAttributes = applySitePolicyGlobalAttributes(sitePolicy);
@@ -282,6 +283,29 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
   };
 
   return new PageController(config.useCache ? { ...options, cache: new BackgroundTranslationCache() } : options);
+}
+
+function resolveConfiguredSitePolicy(url: string, config: ExtensionConfig, rules: readonly WebTranslationRule[]): SitePolicy {
+  const siteDynamicMode = siteDynamicModeForUrl(url, config);
+  return resolveSitePolicy(url, config.dynamicMode, {
+    document,
+    rules,
+    ...(siteDynamicMode ? { siteDynamicMode } : {}),
+  });
+}
+
+function siteDynamicModeForUrl(url: string, config: ExtensionConfig) {
+  const hostname = hostnameFromUrl(url);
+  const siteKey = hostname ? normalizeSiteRuleKey(hostname) : undefined;
+  return siteKey ? config.siteDynamicModes[siteKey] : undefined;
+}
+
+function hostnameFromUrl(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 function createPageSession(

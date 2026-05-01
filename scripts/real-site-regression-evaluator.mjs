@@ -29,6 +29,7 @@ export function buildStructuredRegressionReport(input) {
     translateResponse,
     pageStatusResponse,
     firstProgress,
+    dynamicActionResult,
     hoverResult,
     restoreResponse,
     restoreMetrics,
@@ -52,7 +53,7 @@ export function buildStructuredRegressionReport(input) {
   const provider = evaluateProvider(pageStatus, diagnostics, config, translateResponse);
   const render = evaluateRender(pageStatus, metrics);
   const negativeSamples = evaluateNegativeSamples(metrics, expectation);
-  const dynamic = evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, expectation);
+  const dynamic = evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, dynamicActionResult, expectation);
   const restore = evaluateRestore(metrics, restoreResponse, restoreMetrics, access);
   const score = calculateScore({
     access,
@@ -101,6 +102,7 @@ export function buildStructuredRegressionReport(input) {
     pageStatusResponse,
     metrics,
     hoverResult,
+    dynamicActionResult,
     firstProgress,
     restoreResponse,
     restoreMetrics,
@@ -492,7 +494,7 @@ function evaluateNegativeSamples(metrics, expectation) {
   };
 }
 
-function evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, expectation) {
+function evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, dynamicActionResult, expectation) {
   const required = Boolean(expectation?.requiresDynamic || DYNAMIC_FIXTURE_KINDS.has(site.fixtureKind));
   if (!required || config.dynamicMode === "off") {
     return {
@@ -509,6 +511,7 @@ function evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, e
 
   const dynamicRuns = pageStatus?.dynamicRuns ?? 0;
   const hoverOk = expectation?.requiresHover ? Boolean(hoverResult?.ok) || Boolean(site.hoverTooltipOptional) : false;
+  const dynamicActionOk = Boolean(dynamicActionResult?.ok);
   const suspended = pageStatus?.observation === "suspended";
   const pendingRoots = pageStatus?.pendingRoots ?? 0;
   const observedRoots = pageStatus?.observedRoots ?? 0;
@@ -516,7 +519,7 @@ function evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, e
   const translatedAtLeastOnce = (pageStatus?.translated ?? 0) > 0 || initialTranslated > 0;
   const status = suspended
     ? translatedAtLeastOnce && pendingRoots === 0 ? "partial" : "failed"
-    : dynamicRuns > 0 || hoverOk
+    : dynamicRuns > 0 || hoverOk || dynamicActionOk
       ? pendingRoots > Math.max(4, observedRoots * 0.25) ? "partial" : "ok"
       : translatedAtLeastOnce ? "partial" : "failed";
 
@@ -526,7 +529,7 @@ function evaluateDynamic(site, config, pageStatus, firstProgress, hoverResult, e
     initialTranslated,
     dynamicRuns,
     newlyAddedRoots: observedRoots,
-    newlyTranslatedRoots: dynamicRuns > 0 ? Math.max(1, (pageStatus?.translated ?? 0) - initialTranslated) : 0,
+    newlyTranslatedRoots: dynamicRuns > 0 || dynamicActionOk ? Math.max(1, (pageStatus?.translated ?? 0) - initialTranslated) : 0,
     pendingRoots,
     observedRoots,
     suspendedReason: suspended ? pageStatus?.lastError : undefined,
@@ -763,6 +766,12 @@ function providerLimits(config) {
     return {
       maxBatchItems: Number(config.geminiMaxBatchItems ?? 16),
       maxBatchChars: Number(config.geminiMaxBatchChars ?? 6000),
+    };
+  }
+  if (config.provider === "deepseek") {
+    return {
+      maxBatchItems: Number(config.deepseekMaxBatchItems ?? 4),
+      maxBatchChars: Number(config.deepseekMaxBatchChars ?? 1200),
     };
   }
   return {

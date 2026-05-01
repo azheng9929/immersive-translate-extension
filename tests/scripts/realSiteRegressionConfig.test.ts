@@ -10,6 +10,19 @@ const {
   resolveRegressionSelection,
 } = regressionConfig;
 
+const {
+  createRegressionProviderConfig,
+  publicRegressionConfig,
+  validateRegressionProviderConfig,
+} = regressionConfig as typeof regressionConfig & {
+  createRegressionProviderConfig: (options: { provider: string; env: Record<string, string> }) => Record<string, unknown>;
+  publicRegressionConfig: (config: Record<string, unknown>) => Record<string, unknown>;
+  validateRegressionProviderConfig: (
+    config: Record<string, unknown>,
+    selection: { dynamicModes: string[]; selectedSites: unknown[]; siteFilter: string[] },
+  ) => void;
+};
+
 const { siteAccessGateReason } = regressionConfig as typeof regressionConfig & {
   siteAccessGateReason: (site: { host: string }, metrics: {
     title: string;
@@ -20,18 +33,58 @@ const { siteAccessGateReason } = regressionConfig as typeof regressionConfig & {
 };
 
 describe("real-site regression selection", () => {
+  it("builds and validates native DeepSeek regression provider config", () => {
+    const config = createRegressionProviderConfig({
+      provider: "deepseek",
+      env: {
+        IMT_REGRESSION_DEEPSEEK_API_KEY: "deepseek-secret",
+        IMT_REGRESSION_SITE_DYNAMIC_MODES: "www.youtube.com=normal, metatft.com=conservative, bad=fast",
+      },
+    });
+
+    expect(config).toMatchObject({
+      provider: "deepseek",
+      deepseekEndpoint: "https://api.deepseek.com/chat/completions",
+      deepseekApiKey: "deepseek-secret",
+      deepseekModel: "deepseek-v4-flash",
+      deepseekMaxConcurrentRequests: 4,
+      deepseekMaxBatchItems: 4,
+      deepseekMaxBatchChars: 1200,
+      deepseekRequestTimeoutMs: 45000,
+      siteDynamicModes: {
+        "www.youtube.com": "normal",
+        "metatft.com": "conservative",
+      },
+    });
+    expect(publicRegressionConfig(config).deepseekApiKey).toBe("[set]");
+    expect(() =>
+      validateRegressionProviderConfig(config, {
+        dynamicModes: ["normal"],
+        selectedSites: [{ name: "OpenAI Docs" }],
+        siteFilter: ["openai docs"],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateRegressionProviderConfig({ ...config, deepseekApiKey: "" }, {
+        dynamicModes: ["normal"],
+        selectedSites: [{ name: "OpenAI Docs" }],
+        siteFilter: ["openai docs"],
+      }),
+    ).toThrow("IMT_REGRESSION_DEEPSEEK_API_KEY is required");
+  });
+
   it("parses comma separated filters without empty values", () => {
     expect(parseCsv(" x, , MetaTFT ,,reddit ")).toEqual(["x", "MetaTFT", "reddit"]);
   });
 
-  it("uses a fast smoke profile for one conservative high-value page", () => {
+  it("uses a fast smoke profile for one high-value page with site default dynamics", () => {
     const selection = resolveRegressionSelection({
       argv: ["--profile=smoke"],
       env: {},
     });
 
     expect(selection.profile).toBe("smoke");
-    expect(selection.dynamicModes).toEqual(["conservative"]);
+    expect(selection.dynamicModes).toEqual(["normal"]);
     expect(selection.selectedSites.map((site) => site.name)).toEqual(["MetaTFT Augments"]);
   });
 
@@ -163,6 +216,20 @@ describe("real-site regression selection", () => {
     ).toBe("network security block");
   });
 
+  it("treats localized Cloudflare challenge pages as an access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "producthunt.com" },
+        {
+          title: "www.producthunt.com",
+          url: "https://www.producthunt.com/",
+          bodyTextLength: 121,
+          bodyTextPreview: "www.producthunt.com 正在进行安全验证 本网站使用安全服务防护恶意自动程序。由 Cloudflare 提供的性能和安全服务",
+        },
+      ),
+    ).toBe("cloudflare challenge");
+  });
+
   it("keeps all known sites available for the full profile", () => {
     const selection = resolveRegressionSelection({ argv: [], env: {} });
 
@@ -207,6 +274,13 @@ describe("real-site regression selection", () => {
       expect(expectation.minUnits, kind).toBeGreaterThan(0);
       expect(expectation.requiredCategories.length, kind).toBeGreaterThan(0);
     }
+  });
+
+  it("recognizes current Product Hunt product links as card-list positives", () => {
+    const expectation = fixtureExpectationForKind("card-list");
+
+    expect(expectation.positiveSelectors).toContain("main a[href^='/products/']");
+    expect(expectation.positiveSelectors).toContain("main a[href^='/posts/']");
   });
 
   it("caps hover tooltip regressions so they sample representative targets only", () => {

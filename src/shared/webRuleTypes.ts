@@ -85,7 +85,7 @@ export type WebTranslationRule = {
   observeUrlChange?: boolean;
   urlChangeDelay?: number;
   detectParagraphLanguage?: boolean;
-  dynamicPreset?: "normal" | "conservative" | "twitter-fast" | "metatft-fast" | "tactics-fast" | "chat-stream";
+  dynamicPreset?: "normal" | "conservative" | "youtube-fast" | "twitter-fast" | "metatft-fast" | "tactics-fast" | "chat-stream";
   isHighDynamic?: boolean;
   allowTooltip?: boolean;
   paragraphMinTextCount?: number;

@@ -36,8 +36,24 @@ describe("sitePolicy", () => {
     }
   });
 
-  it("uses conservative dynamic defaults for YouTube and new Reddit", () => {
-    for (const hostname of ["youtube.com", "www.youtube.com", "m.youtube.com", "reddit.com", "www.reddit.com"]) {
+  it("uses a wide bounded dynamic policy for YouTube", () => {
+    const normal = resolveSitePolicy("example.com");
+
+    for (const hostname of ["youtube.com", "www.youtube.com", "m.youtube.com"]) {
+      const policy = resolveSitePolicy(hostname);
+
+      expect(policy.dynamicMode).toBe("normal");
+      expect(policy.dynamicModeSource).toBe("site-default");
+      expect(policy.isHighDynamic).toBe(true);
+      expect(policy.maxQueueSize).toBeGreaterThan(normal.maxQueueSize);
+      expect(policy.maxRootsPerFlush).toBeGreaterThan(normal.maxRootsPerFlush);
+      expect(policy.maxMutationNodesPerWindow).toBeGreaterThan(normal.maxMutationNodesPerWindow);
+      expect(policy.injectedCss.join("\n")).toContain("-webkit-line-clamp");
+    }
+  });
+
+  it("uses conservative dynamic defaults for new Reddit", () => {
+    for (const hostname of ["reddit.com", "www.reddit.com"]) {
       const policy = resolveSitePolicy(hostname);
 
       expect(policy.dynamicMode).toBe("conservative");
@@ -90,6 +106,17 @@ describe("sitePolicy", () => {
     expect(policy.excludedDynamicSelectors).not.toContain("[popover]");
   });
 
+  it("keeps Product Hunt focused on product cards instead of profile shoutouts", () => {
+    const policy = resolveSitePolicy("www.producthunt.com");
+
+    expect(policy.siteKey).toBe("producthunt.com");
+    expect(policy.contentSelectors.map((entry) => entry.selector)).toContain(
+      "main a[href^='/posts/'], main a[href^='/products/']",
+    );
+    expect(policy.excludeSelectors).toContain("main a[href^='/@']");
+    expect(policy.excludeSelectors).toContain("main a[href^='/@'] p");
+  });
+
   it("turns dynamic translation off when the user chooses off", () => {
     expect(resolveSitePolicy("example.com", "off").dynamicMode).toBe("off");
     expect(resolveSitePolicy("x.com", "off").dynamicMode).toBe("off");
@@ -109,15 +136,15 @@ describe("sitePolicy", () => {
   });
 
   it("lets an explicit site override force the dynamic mode", () => {
-    const automatic = resolveSitePolicy("www.youtube.com", "normal");
-    const forcedNormal = resolveSitePolicy("www.youtube.com", "normal", { siteDynamicMode: "normal" });
-    const forcedOff = resolveSitePolicy("www.youtube.com", "normal", { siteDynamicMode: "off" });
+    const automatic = resolveSitePolicy("www.reddit.com", "normal");
+    const forcedNormal = resolveSitePolicy("www.reddit.com", "normal", { siteDynamicMode: "normal" });
+    const forcedOff = resolveSitePolicy("www.reddit.com", "normal", { siteDynamicMode: "off" });
 
     expect(automatic.dynamicMode).toBe("conservative");
     expect(forcedNormal).toMatchObject({
       dynamicMode: "normal",
       dynamicModeSource: "site-override",
-      siteKey: "youtube.com",
+      siteKey: "reddit.com",
     });
     expect(forcedNormal.maxQueueSize).toBeGreaterThan(automatic.maxQueueSize);
     expect(forcedOff.dynamicMode).toBe("off");

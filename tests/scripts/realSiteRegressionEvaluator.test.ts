@@ -207,4 +207,57 @@ describe("real-site regression evaluator", () => {
     expect(evaluatePageReport(report)).toBe("FAIL");
     expect(report.negativeSamples.status).toBe("failed");
   });
+
+  it("treats deterministic dynamic probe translation as a successful dynamic check", () => {
+    const expectation = fixtureExpectationForKind("video-list");
+    const videoSite = {
+      name: "Example Video",
+      host: "video.example",
+      url: "https://video.example/results",
+      fixtureKind: "video-list",
+    };
+    const report = buildStructuredRegressionReport(buildBaseReportInput({
+      site: videoSite,
+      expectation,
+      metrics: {
+        ...buildBaseReportInput().metrics,
+        fixtureKind: "video-list",
+        translatedRoots: 8,
+        translatedBlocks: 8,
+        positiveSamples: {
+          checked: 8,
+          translated: 8,
+          untranslatedSamples: [],
+        },
+      },
+      pageStatusResponse: {
+        ok: true,
+        status: {
+          ...buildBaseReportInput().pageStatusResponse.status,
+          total: 8,
+          translated: 8,
+          dynamicRuns: 0,
+          pendingRoots: 0,
+          observedRoots: 1,
+          diagnostics: {
+            ...buildBaseReportInput().pageStatusResponse.status.diagnostics,
+            units: {
+              ...buildBaseReportInput().pageStatusResponse.status.diagnostics.units,
+              built: 8,
+              byCategory: { "card-text": 8 },
+            },
+          },
+        },
+      },
+      dynamicActionResult: {
+        attempted: true,
+        ok: true,
+        probeId: "probe-1",
+        translatedText: "动态视频标题",
+      },
+    }));
+
+    expect(report.dynamic.status).toBe("ok");
+    expect(report.verdict).toBe("PASS");
+  });
 });

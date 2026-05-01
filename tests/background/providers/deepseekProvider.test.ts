@@ -33,6 +33,41 @@ describe("deepseekProvider", () => {
     expect(result).toEqual([{ id: "u-1", text: "hello-zh", status: "ok" }]);
   });
 
+  it("retries missing DeepSeek result ids as a smaller follow-up request", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      const payload = JSON.parse(body.messages[1].content);
+      if (payload.items.length === 2) {
+        return chatResponse([{ id: "u-1", text: "hello-zh", status: "ok" }]);
+      }
+      return chatResponse([{ id: payload.items[0].id, text: "world-zh", status: "ok" }]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await deepseekProvider.translate({
+      provider: "deepseek",
+      endpoint: "https://api.deepseek.com/chat/completions",
+      apiKey: "deepseek-secret",
+      model: "deepseek-v4-flash",
+      targetLang: "zh-Hans",
+      maxBatchItems: 2,
+      items: [
+        { id: "u-1", text: "Hello", category: "content-block" },
+        { id: "u-2", text: "World", category: "content-block" },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retryBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string);
+    expect(JSON.parse(retryBody.messages[1].content).items).toEqual([
+      { id: "u-2", category: "content-block", text: "World" },
+    ]);
+    expect(result).toEqual([
+      { id: "u-1", text: "hello-zh", status: "ok" },
+      { id: "u-2", text: "world-zh", status: "ok" },
+    ]);
+  });
+
   it("surfaces DeepSeek API errors with provider-specific wording", async () => {
     vi.stubGlobal(
       "fetch",

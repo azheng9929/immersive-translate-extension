@@ -6,9 +6,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import {
+  createRegressionProviderConfig,
   fixtureExpectationForKind,
+  publicRegressionConfig,
   resolveRegressionSelection,
   siteAccessGateReason,
+  validateRegressionProviderConfig,
 } from "./real-site-regression-config.mjs";
 import {
   buildFailedRegressionReport,
@@ -33,27 +36,9 @@ const { profile, dynamicModes, siteFilter, fixtureKinds, selectedSites } = regre
 
 const baseConfig = {
   targetLang: "zh-Hans",
-  provider,
+  ...createRegressionProviderConfig({ provider, env: process.env }),
   displayMode: "bilingual",
   dynamicMode: "conservative",
-  openaiEndpoint: process.env.IMT_REGRESSION_OPENAI_ENDPOINT ?? "https://api.openai.com/v1/chat/completions",
-  openaiApiKey: process.env.IMT_REGRESSION_OPENAI_API_KEY ?? "",
-  openaiModel: process.env.IMT_REGRESSION_OPENAI_MODEL ?? "gpt-4o-mini",
-  openaiMaxConcurrentRequests: Number(process.env.IMT_REGRESSION_OPENAI_CONCURRENCY ?? 2),
-  openaiMaxBatchItems: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_ITEMS ?? 16),
-  openaiMaxBatchChars: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_CHARS ?? 6000),
-  openaiRequestTimeoutMs: Number(process.env.IMT_REGRESSION_OPENAI_TIMEOUT_MS ?? 45000),
-  firstTranslationTimeoutMs: Number(process.env.IMT_REGRESSION_FIRST_TRANSLATION_TIMEOUT_MS ?? (provider === "fake" ? 8000 : 20000)),
-  translationSettleTimeoutMs: Number(process.env.IMT_REGRESSION_TRANSLATION_SETTLE_TIMEOUT_MS ?? (provider === "fake" ? 5000 : 45000)),
-  translationSettleQuietMs: Number(process.env.IMT_REGRESSION_TRANSLATION_SETTLE_QUIET_MS ?? 1000),
-  geminiEndpoint: process.env.IMT_REGRESSION_GEMINI_ENDPOINT ?? "https://generativelanguage.googleapis.com/v1beta",
-  geminiApiKey: process.env.IMT_REGRESSION_GEMINI_API_KEY ?? "",
-  geminiModel: process.env.IMT_REGRESSION_GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
-  geminiMaxConcurrentRequests: Number(process.env.IMT_REGRESSION_GEMINI_CONCURRENCY ?? 2),
-  geminiMaxBatchItems: Number(process.env.IMT_REGRESSION_GEMINI_BATCH_ITEMS ?? 16),
-  geminiMaxBatchChars: Number(process.env.IMT_REGRESSION_GEMINI_BATCH_CHARS ?? 6000),
-  geminiRequestTimeoutMs: Number(process.env.IMT_REGRESSION_GEMINI_TIMEOUT_MS ?? 45000),
-  siteDynamicModes: {},
   showFloatingBall: true,
   useCache: false,
 };
@@ -68,7 +53,7 @@ async function main() {
     console.error(`Browser executable not found. Set CHROME_PATH to override. Tried: ${chromePath}`);
     process.exit(1);
   }
-  validateProviderConfig(baseConfig);
+  validateRegressionProviderConfig(baseConfig, { dynamicModes, selectedSites, siteFilter });
 
   await mkdir(profileDir, { recursive: true });
   await mkdir(reportDir, { recursive: true });
@@ -98,7 +83,7 @@ async function main() {
     profile,
     dynamicModes,
     fixtureKinds,
-    config: publicConfig(baseConfig),
+    config: publicRegressionConfig(baseConfig),
     siteFilter,
     sites: [],
   };
@@ -169,13 +154,14 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
     const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, config.firstTranslationTimeoutMs);
     await delay(500);
     const hoverResult = site.hoverTooltip ? await runHoverTooltipRegression(pageSession, site) : undefined;
+    await waitForTranslationSettled(pageSession, translateStartedAt, config.translationSettleTimeoutMs, config.translationSettleQuietMs);
+    await pageSession.send("Page.bringToFront").catch(() => undefined);
+    const dynamicActionResult = await runDeterministicDynamicRegression(pageSession, site, expectation, config.dynamicActionTimeoutMs);
+    if (dynamicActionResult.attempted) {
+      await waitForTranslationSettled(pageSession, translateStartedAt, config.dynamicActionTimeoutMs, config.translationSettleQuietMs);
+    }
     await scrollPage(pageSession);
-    await waitForTranslationSettled(
-      pageSession,
-      translateStartedAt,
-      config.translationSettleTimeoutMs,
-      config.translationSettleQuietMs,
-    );
+    await waitForTranslationSettled(pageSession, translateStartedAt, config.translationSettleTimeoutMs, config.translationSettleQuietMs);
     const fullTranslationMs = Date.now() - translateStartedAt;
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
 
@@ -205,6 +191,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       translateResponse,
       pageStatusResponse,
       firstProgress,
+      dynamicActionResult,
       hoverResult,
       restoreResponse,
       restoreMetrics,
@@ -382,6 +369,186 @@ async function scrollPage(pageSession) {
     await evaluate(pageSession, "window.scrollBy(0, Math.max(window.innerHeight, 700))");
     await delay(1000);
   }
+}
+
+const DYNAMIC_REGRESSION_FIXTURE_KINDS = new Set([
+  "social-feed",
+  "video-list",
+  "forum",
+  "data-dashboard",
+  "hover-tooltip",
+  "ai-chat",
+  "search-results",
+]);
+
+async function runDeterministicDynamicRegression(pageSession, site, expectation, timeoutMs) {
+  if (!expectation?.requiresDynamic && !DYNAMIC_REGRESSION_FIXTURE_KINDS.has(site.fixtureKind)) {
+    return { attempted: false, ok: false, reason: "not required" };
+  }
+
+  const inserted = await insertDynamicProbe(pageSession, site.fixtureKind);
+  if (!inserted?.ok) {
+    return {
+      attempted: true,
+      ok: false,
+      reason: inserted?.reason ?? "probe insert failed",
+    };
+  }
+
+  const translated = await waitForDynamicProbeTranslation(pageSession, inserted.probeId, timeoutMs);
+  return {
+    attempted: true,
+    ...inserted,
+    ...translated,
+  };
+}
+
+async function insertDynamicProbe(pageSession, fixtureKind) {
+  return evaluate(pageSession, `(() => {
+    const fixtureKind = ${JSON.stringify(fixtureKind ?? "generic")};
+    const probeId = "regression-dynamic-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    const specs = {
+      "video-list": {
+        containers: ["#contents", "ytd-rich-grid-renderer", "main", "body"],
+        nodes: [
+          { tag: "a", attrs: { id: "video-title", class: "regression-dynamic-title" }, text: "Regression dynamic video title about reliable translation systems" },
+          { tag: "p", attrs: { class: "metadata-snippet-text" }, text: "A newly loaded video description should be translated after the initial pass." },
+        ],
+      },
+      "search-results": {
+        containers: ["#search", "main", "body"],
+        nodes: [
+          { tag: "div", attrs: { class: "result" }, children: [
+            { tag: "h3", text: "Regression dynamic search result about translation quality" },
+            { tag: "p", text: "A newly inserted result snippet should be translated without touching search controls." },
+          ] },
+        ],
+      },
+      forum: {
+        containers: [".commentarea", ".s-post-summary", "main", "body"],
+        nodes: [
+          { tag: "div", attrs: { class: "comment" }, children: [
+            { tag: "p", text: "Regression dynamic forum comment about translation quality should be translated after insertion." },
+          ] },
+        ],
+      },
+      "social-feed": {
+        containers: ["main", "[role='main']", "body"],
+        nodes: [
+          { tag: "article", children: [
+            { tag: "p", attrs: { class: "post" }, text: "Regression dynamic feed post about translation quality should be translated after insertion." },
+          ] },
+        ],
+      },
+      "data-dashboard": {
+        containers: ["main", "[class*='content' i]", "body"],
+        nodes: [
+          { tag: "section", attrs: { class: "card" }, children: [
+            { tag: "h2", text: "Regression dynamic dashboard card" },
+            { tag: "p", text: "A newly inserted dashboard description should be translated after insertion." },
+          ] },
+        ],
+      },
+      "hover-tooltip": {
+        containers: ["main", "body"],
+        nodes: [
+          { tag: "div", attrs: { class: "tooltip", role: "tooltip" }, text: "Regression dynamic tooltip description should be translated after insertion." },
+        ],
+      },
+      "ai-chat": {
+        containers: ["main", "[data-testid*='conversation' i]", "body"],
+        nodes: [
+          { tag: "div", attrs: { class: "message" }, children: [
+            { tag: "p", text: "Regression dynamic assistant message should be translated after insertion." },
+          ] },
+        ],
+      },
+    };
+    const spec = specs[fixtureKind];
+    if (!spec) return { ok: false, reason: "no dynamic probe spec", fixtureKind };
+    const container = spec.containers.map((selector) => {
+      try {
+        return document.querySelector(selector);
+      } catch {
+        return undefined;
+      }
+    }).find(Boolean);
+    if (!container) return { ok: false, reason: "probe container not found", fixtureKind };
+
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-regression-dynamic-probe", probeId);
+    wrapper.style.cssText = "display:block;margin:12px 0;padding:4px 0;min-height:20px;";
+    const appendNode = (parent, nodeSpec) => {
+      const tag = String(nodeSpec.tag || "div").toLowerCase();
+      const node = document.createElement(tag);
+      for (const [name, value] of Object.entries(nodeSpec.attrs || {})) {
+        node.setAttribute(name, String(value));
+      }
+      if (nodeSpec.text) node.textContent = String(nodeSpec.text);
+      for (const child of nodeSpec.children || []) appendNode(node, child);
+      parent.appendChild(node);
+      return node;
+    };
+    for (const nodeSpec of spec.nodes) appendNode(wrapper, nodeSpec);
+    container.appendChild(wrapper);
+    wrapper.scrollIntoView({ block: "center", inline: "nearest" });
+    return {
+      ok: true,
+      probeId,
+      fixtureKind,
+      text: (wrapper.innerText || wrapper.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 300),
+    };
+  })()`);
+}
+
+async function waitForDynamicProbeTranslation(pageSession, probeId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastProbe;
+  while (Date.now() < deadline) {
+    lastProbe = await readDynamicProbe(pageSession, probeId);
+    if (lastProbe?.translated) {
+      return {
+        ok: true,
+        translatedText: lastProbe.translatedText,
+      };
+    }
+    await delay(250);
+  }
+  return {
+    ok: false,
+    reason: lastProbe?.exists ? "probe not translated before timeout" : "probe missing",
+    translatedText: lastProbe?.translatedText,
+  };
+}
+
+async function readDynamicProbe(pageSession, probeId) {
+  return evaluate(pageSession, `(() => {
+    const probe = document.querySelector(${JSON.stringify(`[data-regression-dynamic-probe="${probeId}"]`)});
+    if (!probe) return { exists: false, translated: false };
+    const translatedSelector = [
+      '[data-imt-state="translated"]',
+      '[data-imt-managed="true"]',
+      '.imt-translation-block',
+      '.imt-translation-compact',
+      '.imt-translation-replacement'
+    ].join(',');
+    const translated = Boolean(
+      probe.closest('[data-imt-state="translated"]') ||
+      probe.matches(translatedSelector) ||
+      probe.querySelector(translatedSelector)
+    );
+    const translatedText = Array.from(probe.querySelectorAll('.imt-translation-block, .imt-translation-compact, .imt-translation-replacement'))
+      .map((node) => (node.innerText || node.textContent || "").replace(/\\s+/g, " ").trim())
+      .filter(Boolean)
+      .join(" | ")
+      .slice(0, 500);
+    return {
+      exists: true,
+      translated,
+      text: (probe.innerText || probe.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 500),
+      translatedText,
+    };
+  })()`);
 }
 
 async function readRegressionMetrics(pageSession, site, expectation, ruleVisualizationSelectors = []) {
@@ -948,33 +1115,6 @@ function isExtensionError(error, extensionId) {
 
 function isIgnorableConsoleError(message) {
   return /favicon|net::ERR_BLOCKED_BY_CLIENT|net::ERR_CONNECTION_CLOSED|ResizeObserver loop/i.test(message);
-}
-
-function validateProviderConfig(config) {
-  const supportedProviders = new Set(["fake", "microsoft", "openai-compatible", "gemini"]);
-  if (!supportedProviders.has(config.provider)) {
-    throw new Error(`Unsupported IMT_REGRESSION_PROVIDER: ${config.provider}`);
-  }
-  const supportedDynamicModes = new Set(["off", "conservative", "normal"]);
-  for (const dynamicMode of dynamicModes) {
-    if (!supportedDynamicModes.has(dynamicMode)) throw new Error(`Unsupported IMT_REGRESSION_DYNAMIC_MODES value: ${dynamicMode}`);
-  }
-  if (dynamicModes.length === 0) throw new Error("IMT_REGRESSION_DYNAMIC_MODES must include at least one mode");
-  if (selectedSites.length === 0) throw new Error(`IMT_REGRESSION_SITE_FILTER matched no sites: ${siteFilter.join(", ")}`);
-  if (config.provider === "openai-compatible" && !config.openaiApiKey) {
-    throw new Error("IMT_REGRESSION_OPENAI_API_KEY is required when IMT_REGRESSION_PROVIDER=openai-compatible");
-  }
-  if (config.provider === "gemini" && !config.geminiApiKey) {
-    throw new Error("IMT_REGRESSION_GEMINI_API_KEY is required when IMT_REGRESSION_PROVIDER=gemini");
-  }
-}
-
-function publicConfig(config) {
-  return {
-    ...config,
-    openaiApiKey: config.openaiApiKey ? "[set]" : "",
-    geminiApiKey: config.geminiApiKey ? "[set]" : "",
-  };
 }
 
 class CDPSession {
