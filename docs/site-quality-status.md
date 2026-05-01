@@ -1,6 +1,6 @@
 # Site Quality Status
 
-Baseline report: `.tmp/real-site-regression-reports/report-2026-04-30T23-57-52-956Z.json`
+Baseline report: `.tmp/real-site-regression-reports/report-2026-05-01T01-31-45-315Z.json`
 
 Baseline date: 2026-05-01 Asia/Shanghai
 
@@ -13,17 +13,17 @@ Provider: `fake`
 | Gate | Status | Evidence |
 | --- | --- | --- |
 | Typecheck | PASS | `npm.cmd run typecheck` |
-| Unit tests | PASS | `npm.cmd test` - 56 files, 415 tests |
-| Build | PASS | `npm.cmd run build` |
+| Unit tests | PASS | `npm.cmd test` - 56 files, 422 tests |
+| Build | PASS | `npm.cmd run build`; fixture matrix also rebuilt `.output/chrome-mv3` |
 | Rule capability audit | PASS | `npm.cmd run audit:web-rules` - 830 rules, 0 invalid selectors |
 | Rule semantic audit | PASS | `npm.cmd run audit:rule-semantics` |
 | Real-site smoke | PASS | 1 PASS, 0 WARN, 0 FAIL |
-| Fixture matrix | PASS | 22 PASS, 13 WARN, 5 GATED, 0 FAIL |
+| Fixture matrix | PASS | 28 PASS, 7 WARN, 5 GATED, 0 FAIL |
 | Real provider smoke | PASS | Native DeepSeek `deepseek-v4-flash`: 6 PASS, 0 WARN, 0 FAIL |
 | Critical negative violations | PASS | 0 critical violations |
 | Restore failures | PASS | 0 restore failures |
 
-Current release gate result: PASS for a first usable version. The latest native DeepSeek smoke and fake-provider smoke have no WARN/FAIL results, and the fake-provider fixture matrix has no FAIL results or critical negative violations.
+Current release gate result: PASS for a first usable version. The native DeepSeek smoke, fake-provider smoke, and full fake-provider fixture matrix have no FAIL results, no critical negative violations, and no restore failures.
 
 ## Real Provider Smoke
 
@@ -61,8 +61,8 @@ Real provider acceptance:
 
 | Verdict | Count | Notes |
 | --- | ---: | --- |
-| PASS | 22 | Stable core coverage across docs, GitHub, article, landing, commerce, adult video list, and most card/list pages. |
-| WARN | 13 | Mostly dynamic partial checks or partial unit coverage on dense dashboard/list pages. |
+| PASS | 28 | Stable core coverage across docs, GitHub, article, landing, card-list, video-list, commerce, search, forum, data dashboard, and adult video-list fixtures. |
+| WARN | 7 | No critical failures; remaining WARNs are dense UI unit coverage, dynamic partial checks, generic-rule coverage, or eBay duplicate render hygiene. |
 | FAIL | 0 | No accessible site failed the quality baseline. |
 | GATED | 5 | Login walls or humanity checks; not counted as translation failures. |
 
@@ -70,9 +70,10 @@ Real provider acceptance:
 
 | Group | Sites | Main issue | Next action |
 | --- | --- | --- | --- |
-| Dynamic partial with otherwise healthy translation | Old Reddit, StackOverflow, Hacker News, Bing Search, DuckDuckGo Search | Initial translation, provider, render, negative, and restore all pass; dynamic observer did not produce a translated dynamic run during the fixture window. YouTube, Google Search, and MetaTFT Augments are covered by deterministic dynamic probes in the latest smoke runs. | Keep remaining fake-provider WARNs as follow-up; add deterministic actions per site. |
-| Partial unit coverage on dense UI pages | Tactics Tools Hover, AlternativeTo, Vimeo Watch, Mobalytics TFT | Translation works, but unit count or rendered unit coverage is below the page-type threshold. | Tighten site selectors or thresholds after reviewing screenshots/debug overlay. |
-| Weak policy with successful translation | eBay Search | Content and rendering pass, but policy compilation is weak and render has duplicate translation count on a large result page. | Add stronger commerce scan roots/excludes if eBay becomes a priority. |
+| Dense UI or list unit coverage | Tactics Tools Hover, AlternativeTo, Vimeo Watch, Mobalytics TFT | Translation works and negative samples are clean, but unit quality score is partial due to many short UI/attribute units or fewer core units than the fixture target. | Review debug overlay before changing thresholds; prefer site selectors/excludes over lowering standards. |
+| Dynamic partial with otherwise healthy translation | Vimeo Watch, DuckDuckGo Search, Mobalytics TFT, OP.GG Champions | Provider, render, negative, and restore pass; dynamic observation did not fully drain or did not produce a deterministic translated new-root run in the fixture window. | Add deterministic site actions only where the product workflow naturally mutates content. |
+| eBay render hygiene | eBay Search | Content, unit build, provider, negative samples, and restore pass, but policy is weak and duplicate translation count is high on a large result page. | Keep Amazon/Etsy commerce logic unchanged; tune eBay-specific roots/excludes if eBay becomes release-critical. |
+| Generic rule path | OP.GG Champions | Translation is healthy through the generic profile, but the page has no dedicated site rule and dynamic remains partial. | Add a dedicated OP.GG rule only if generic coverage regresses or tooltip quality becomes a priority. |
 
 ## Site Matrix
 
@@ -80,15 +81,15 @@ Real provider acceptance:
 | --- | --- | --- | --- | --- |
 | X | social-feed | GATED | Login wall | Use manual authenticated session for quality checks. |
 | Threads | social-feed | PASS | - | Keep in matrix. |
-| YouTube | video-list | PASS | Native DeepSeek smoke dynamic probe passes | Keep in release gate. |
+| YouTube | video-list | PASS | Dynamic probe passes in full matrix and DeepSeek smoke | Keep in release gate. |
 | Reddit | social-feed | GATED | Humanity check | Keep gated classification. |
-| Old Reddit | forum | WARN | Dynamic partial; translation otherwise healthy | Keep as WARN; add deterministic comment/list mutation later. |
+| Old Reddit | forum | PASS | Dynamic probe now passes | Keep in matrix. |
 | Inworld | landing | PASS | - | Keep in matrix. |
 | PromptOT | landing | PASS | - | Keep in matrix. |
 | MetaTFT | data-dashboard | PASS | - | Keep in matrix. |
-| MetaTFT Augments | data-dashboard | PASS | Fake smoke dynamic probe passes | Keep in smoke gate. |
-| Tactics Tools Hover | hover-tooltip | WARN | Unit partial; dynamic ok | Review tooltip unit thresholds. |
-| StackOverflow | forum | WARN | Dynamic partial; translation otherwise healthy | Keep as WARN; dynamic action can be improved later. |
+| MetaTFT Augments | data-dashboard | PASS | Dynamic probe passes | Keep in smoke gate. |
+| Tactics Tools Hover | hover-tooltip | WARN | Unit partial from many short attribute/UI units; dynamic ok | Review tooltip unit thresholds and attribute-unit policy. |
+| StackOverflow | forum | PASS | Dynamic probe now passes | Keep in matrix. |
 | GitHub Blog | article | PASS | - | Keep in matrix. |
 | OpenAI Docs | docs-code | PASS | - | Keep in release gate. |
 | Nature Article | article | PASS | - | Keep in matrix. |
@@ -103,25 +104,25 @@ Real provider acceptance:
 | GitHub Issues | github | PASS | - | Keep in release gate. |
 | GitHub Trending | card-list | PASS | - | Keep in matrix. |
 | AlternativeTo | card-list | WARN | Unit partial; 7 units vs card-list target | Strengthen card selectors if prioritizing card-list breadth. |
-| Vimeo Watch | video-list | WARN | Unit partial and dynamic partial | Add Vimeo-specific content selectors if this site becomes priority. |
-| Dailymotion | video-list | PASS | - | Keep in matrix. |
-| eBay Search | commerce | WARN | Policy weak; duplicate render count on large page | Add stronger commerce root/exclude tuning later. |
+| Vimeo Watch | video-list | WARN | Unit partial and dynamic partial | Add Vimeo-specific content/dynamic actions only if Vimeo becomes priority. |
+| Dailymotion | video-list | PASS | Dynamic probe passes | Keep in matrix. |
+| eBay Search | commerce | WARN | Weak policy and duplicate render count on large page; 0 negative violations | Tune eBay-specific roots/excludes later. |
 | Etsy Search | commerce | PASS | - | Keep in matrix. |
-| Hacker News | forum | WARN | Dynamic partial; translation otherwise healthy | Keep as WARN; deterministic dynamic action later. |
+| Hacker News | forum | PASS | Dynamic probe now passes | Keep in matrix. |
 | Linear Landing | landing | PASS | - | Keep in matrix. |
-| Google Search | search-results | PASS | Native DeepSeek smoke dynamic probe passes | Keep in release gate. |
-| Bing Search | search-results | WARN | Dynamic partial; translation otherwise healthy | Keep as WARN; add deterministic dynamic action later. |
-| DuckDuckGo Search | search-results | WARN | Dynamic partial; translation otherwise healthy | Keep as WARN; add deterministic dynamic action later. |
-| Mobalytics TFT | data-dashboard | WARN | Unit partial; dynamic ok | Review dashboard UI-unit thresholds. |
+| Google Search | search-results | PASS | Dynamic probe passes in full matrix and DeepSeek smoke | Keep in release gate. |
+| Bing Search | search-results | PASS | Dynamic probe now passes | Keep in matrix. |
+| DuckDuckGo Search | search-results | WARN | Dynamic partial; translation otherwise healthy | Add deterministic dynamic action later. |
+| Mobalytics TFT | data-dashboard | WARN | Unit partial and pending dynamic roots | Review dashboard UI-unit thresholds and pending-root drain. |
 | U.GG Champions | hover-tooltip | PASS | Generic rule path, translation healthy | Consider dedicated rule only if coverage regresses. |
-| OP.GG Champions | hover-tooltip | PASS | Generic rule path, translation healthy | Consider dedicated rule only if coverage regresses. |
+| OP.GG Champions | hover-tooltip | WARN | Generic rule path and dynamic partial; translation otherwise healthy | Add dedicated rule or deterministic hover action only if prioritized. |
 | ChatGPT | ai-chat | GATED | Requires login | Use authenticated manual session for quality checks. |
 | Claude | ai-chat | GATED | Requires login | Use authenticated manual session for quality checks. |
 | Poe | ai-chat | GATED | Requires login | Use authenticated manual session for quality checks. |
 
 ## Next Repair Queue
 
-1. Keep P0 focused on regressions only: any future FAIL, critical negative violation, or restore failure blocks release.
-2. Improve deterministic dynamic actions for YouTube, forum, and search-result fixtures so dynamic partial WARNs become actionable.
+1. Keep P0 focused on regressions only: any future FAIL, critical negative violation, provider failure, render failure, or restore failure blocks release.
+2. Improve deterministic dynamic actions for DuckDuckGo, Vimeo, Mobalytics, and OP.GG only where the page has a natural content mutation.
 3. Review dense dashboard/list pages with debug overlay before changing thresholds: Tactics Tools, Mobalytics, AlternativeTo, Vimeo.
-4. Add eBay commerce root/exclude tuning only after inspecting duplicate render samples.
+4. Tune eBay commerce roots/excludes as a site-specific task; do not broaden commerce heuristics while Amazon and Etsy are passing.
