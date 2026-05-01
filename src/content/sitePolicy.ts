@@ -1,5 +1,6 @@
 import type { DynamicMode } from "../shared/config";
 import type {
+  AttributeBudgetPolicy,
   WebTranslationBodyRule,
   WebTranslationFallbackProfile,
   WebTranslationGlobalAttributes,
@@ -51,6 +52,7 @@ export type SitePolicy = {
   isHighDynamic: boolean;
   dynamicMode: DynamicTranslationMode;
   attributeNames: readonly TranslatableAttributeName[];
+  attributeBudget: AttributeBudgetPolicy;
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;

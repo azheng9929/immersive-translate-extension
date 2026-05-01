@@ -6,6 +6,7 @@ export type GranularityOptions = {
   hostname?: string;
   targetLang?: string;
   allowTooltip?: boolean;
+  allowInsideTranslatedRoot?: boolean;
   contentSelectors?: readonly ContentRule[];
   excludeSelectors?: readonly string[];
 };
@@ -541,7 +542,10 @@ export function resolveTextGranularity(
 }
 
 function globalSkipSelectors(options: GranularityOptions): readonly string[] {
-  return options.allowTooltip ? GLOBAL_SKIP_SELECTORS_WITH_ALLOWED_TOOLTIPS : GLOBAL_SKIP_SELECTORS;
+  const selectors = options.allowTooltip ? GLOBAL_SKIP_SELECTORS_WITH_ALLOWED_TOOLTIPS : GLOBAL_SKIP_SELECTORS;
+  return options.allowInsideTranslatedRoot
+    ? selectors.filter((selector) => selector !== '[data-imt-state="translated"]')
+    : selectors;
 }
 
 function resolvePolicy(hostname = ""): SiteGranularityPolicy | undefined {

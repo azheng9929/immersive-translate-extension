@@ -39,13 +39,14 @@ const UI_CATEGORIES = new Set<UnitCategory>([
 
 export type SkipRuleOptions = {
   allowTooltip?: boolean;
+  allowInsideTranslatedRoot?: boolean;
 };
 
 export function isSkippableElement(element: Element, options: SkipRuleOptions = {}): boolean {
   if (element.closest('[data-imt-managed="true"]')) return true;
   if (element.closest('[data-imt-skip="true"]')) return true;
   if (element.closest('[data-imt-state="loading"]')) return true;
-  if (element.closest('[data-imt-state="translated"]')) return true;
+  if (element.closest('[data-imt-state="translated"]') && !isAllowedDynamicRootContent(element, options)) return true;
   if (element.closest("[translate='no'], .notranslate")) return true;
   if (!options.allowTooltip && element.closest('[role="tooltip"], [popover]')) return true;
   if (element.closest('[role="button"], [role="menu"], [role="menuitem"], [role="navigation"]')) return true;
@@ -91,6 +92,14 @@ export function isSkippableElement(element: Element, options: SkipRuleOptions = 
   }
 
   return false;
+}
+
+function isAllowedDynamicRootContent(element: Element, options: SkipRuleOptions): boolean {
+  if (!options.allowInsideTranslatedRoot) return false;
+  const dynamicRoot = element.closest('[data-imt-dynamic-root="true"]');
+  if (!dynamicRoot) return false;
+  const translatedRoot = element.closest('[data-imt-state="translated"]');
+  return Boolean(translatedRoot && translatedRoot.contains(dynamicRoot));
 }
 
 export function isMeaningfulText(value: string, category: UnitCategory): boolean {

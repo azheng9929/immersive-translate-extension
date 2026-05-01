@@ -32,6 +32,16 @@ export type WebTranslationFallbackProfile = "none" | "article" | "video" | "soci
 export type SelectorFallbackPolicy = "none" | "conservative" | "generic";
 export type WebTranslationGlobalAttributes = Readonly<Record<string, Readonly<Record<string, string | null>>>>;
 
+export type AttributeBudgetPolicy = {
+  enabled?: boolean;
+  maxPerPage?: number;
+  maxPerRoot?: number;
+  maxRatioToTextUnits?: number;
+  allowedNames?: readonly TranslatableAttributeName[];
+  requireContentRoot?: boolean;
+  requireVisible?: boolean;
+};
+
 export type WebTranslationBodyRule = {
   enable?: boolean;
   minTextLength?: number;
@@ -78,6 +88,7 @@ export type WebTranslationRule = {
   wrapperSuffix?: string;
   contentSelectors?: RuleArrayValue<RuleContentSelector>;
   attributeNames?: RuleArrayValue<TranslatableAttributeName>;
+  attributeBudget?: AttributeBudgetPolicy;
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;

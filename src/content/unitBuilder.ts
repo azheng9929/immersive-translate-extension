@@ -28,6 +28,7 @@ type BuildInput = {
   targetLang: string;
   hostname?: string;
   allowTooltip?: boolean;
+  allowInsideTranslatedRoot?: boolean;
   contentSelectors?: GranularityOptions["contentSelectors"];
   excludeSelectors?: GranularityOptions["excludeSelectors"];
   filterRule?: CompiledFilterRule;
@@ -70,6 +71,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     const collected = collectUnitText(root, textNodes, {
       ...(input.hostname ? { hostname: input.hostname } : {}),
       ...(input.allowTooltip ? { allowTooltip: true } : {}),
+      ...(input.allowInsideTranslatedRoot ? { allowInsideTranslatedRoot: true } : {}),
       ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
       ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
       targetLang: input.targetLang,
@@ -83,6 +85,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     const piecePlan = buildTranslationPiecePlan(root, {
       ...(input.hostname ? { hostname: input.hostname } : {}),
       ...(input.allowTooltip ? { allowTooltip: true } : {}),
+      ...(input.allowInsideTranslatedRoot ? { allowInsideTranslatedRoot: true } : {}),
       ...(input.contentSelectors ? { contentSelectors: input.contentSelectors } : {}),
       ...(input.excludeSelectors ? { excludeSelectors: input.excludeSelectors } : {}),
       targetLang: input.targetLang,
@@ -140,7 +143,7 @@ export function buildTranslationUnits(input: BuildInput): TranslationUnit[] {
     });
   }
 
-  const dedupedUnits = dedupeNestedUnits(units);
+  const dedupedUnits = dedupeCardScopedUnits(dedupeNestedUnits(units));
   recordDuplicateUnits(input.diagnostics, units.length - dedupedUnits.length);
   return sortUnitsByDocumentOrder(dedupedUnits);
 }
@@ -371,6 +374,75 @@ function dedupeNestedUnits(units: TranslationUnit[]): TranslationUnit[] {
   }
 
   return accepted;
+}
+
+function dedupeCardScopedUnits(units: TranslationUnit[]): TranslationUnit[] {
+  const grouped = new Map<HTMLElement, TranslationUnit[]>();
+  for (const unit of units) {
+    const container = cardContainerOf(unit.root);
+    if (!container) continue;
+    const group = grouped.get(container) ?? [];
+    group.push(unit);
+    grouped.set(container, group);
+  }
+
+  const dropped = new Set<TranslationUnit>();
+  for (const group of grouped.values()) {
+    const highQualityTextUnits = group.filter((unit) => unit.category !== "attribute" && shouldPreferUnit(unit));
+    if (highQualityTextUnits.length === 0) continue;
+
+    const highQualityTexts = highQualityTextUnits.map((unit) => normalizeForCardDedupe(unit.originalText));
+    for (const unit of group) {
+      if (unit.category === "attribute") {
+        if (isUiAttributeRoot(unit.root) || isDuplicateCardAttribute(unit, highQualityTexts)) dropped.add(unit);
+        continue;
+      }
+
+      if (
+        unit.category === "fallback" &&
+        highQualityTextUnits.some((candidate) => candidate !== unit && rootsOverlap(unit.root, candidate.root))
+      ) {
+        dropped.add(unit);
+      }
+    }
+  }
+
+  return units.filter((unit) => !dropped.has(unit));
+}
+
+function cardContainerOf(root: HTMLElement): HTMLElement | null {
+  return root.closest<HTMLElement>(
+    [
+      "[data-testid]",
+      "li",
+      "article",
+      "[role='listitem']",
+      ".s-item",
+      ".card",
+      ".product",
+      ".item",
+      "[class*='card' i]",
+      "[class*='product' i]",
+      "[class*='item' i]",
+      "[class*='result' i]",
+    ].join(","),
+  );
+}
+
+function isUiAttributeRoot(root: HTMLElement): boolean {
+  return Boolean(root.closest("button,[role='button'],nav,menu,[role='menu'],[role='menuitem']"));
+}
+
+function isDuplicateCardAttribute(unit: TranslationUnit, highQualityTexts: readonly string[]): boolean {
+  const attributeText = normalizeForCardDedupe(unit.originalText);
+  if (attributeText.length < 6) return false;
+  return highQualityTexts.some((text) =>
+    text.length >= 6 && (text === attributeText || text.includes(attributeText) || attributeText.includes(text))
+  );
+}
+
+function normalizeForCardDedupe(text: string): string {
+  return text.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function rootsOverlap(a: HTMLElement, b: HTMLElement): boolean {

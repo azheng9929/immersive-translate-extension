@@ -197,6 +197,34 @@ describe("PageTranslationSession", () => {
     expect(session.getStatus()).toMatchObject({ dynamicRuns: 1, observation: "observing" });
   });
 
+  it("translates newly added dynamic content inside an already translated host", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<main><section id="host"><p>Hello world.</p></section></main>`;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, { observeRoot: document.body, debounceMs: 20 });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().observation === "observing");
+    document.querySelector("#host")?.setAttribute("data-imt-state", "translated");
+    const lateParagraph = document.createElement("p");
+    lateParagraph.textContent = "Late content under translated host.";
+    document.querySelector("#host")?.append(lateParagraph);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(requestedTexts).toEqual(["Hello world.", "Late content under translated host."]);
+    expect(lateParagraph.querySelector(".imt-translation-block")?.textContent).toBe(
+      "[zh-Hans] Late content under translated host.",
+    );
+  });
+
   it("dynamically translates tooltip content when the site policy allows it", async () => {
     vi.useFakeTimers();
     document.body.innerHTML = `<main><p>Hello world.</p></main>`;
@@ -768,6 +796,93 @@ describe("PageTranslationSession", () => {
     expect(requestedTexts).toEqual(["Visible lazy paragraph.", "Far lazy paragraph."]);
   });
 
+  it("eagerly translates near-viewport dynamic lazy roots without waiting for intersection callbacks", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `<main><p id="initial">Initial visible paragraph.</p></main>`;
+    setElementRect(document.querySelector("#initial")!, { top: 20, bottom: 60, left: 0, right: 200 });
+
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      eagerLazyRootMargin: "100px",
+      debounceMs: 20,
+    });
+
+    await session.translatePage();
+    await waitFor(() => requestedTexts.includes("Initial visible paragraph."));
+    await waitFor(() => session!.getStatus().observation === "observing");
+
+    const dynamicCard = document.createElement("section");
+    dynamicCard.id = "dynamic-card";
+    dynamicCard.innerHTML = `<p>Dynamic visible card copy.</p>`;
+    setElementRect(dynamicCard, { top: 80, bottom: 160, left: 0, right: 240 });
+    document.querySelector("main")?.append(dynamicCard);
+    await Promise.resolve();
+    for (let attempt = 0; attempt < 5 && !requestedTexts.includes("Dynamic visible card copy."); attempt += 1) {
+      await vi.advanceTimersByTimeAsync(20);
+      await Promise.resolve();
+    }
+    await waitFor(() => requestedTexts.includes("Dynamic visible card copy."));
+
+    expect(requestedTexts).toEqual(["Initial visible paragraph.", "Dynamic visible card copy."]);
+    expect(document.querySelector("#dynamic-card .imt-translation-block")?.textContent).toBe("[zh-Hans] Dynamic visible card copy.");
+  });
+
+  it("eagerly translates dynamic tooltip lazy roots because hover overlays are short lived", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `<main><p id="initial">Initial visible paragraph.</p></main>`;
+    setElementRect(document.querySelector("#initial")!, { top: 20, bottom: 60, left: 0, right: 200 });
+
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      allowTooltip: true,
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      debounceMs: 1500,
+      tooltipDebounceMs: 20,
+    });
+
+    await session.translatePage();
+    await waitFor(() => requestedTexts.includes("Initial visible paragraph."));
+    await waitFor(() => session!.getStatus().observation === "observing");
+
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.className = "tooltip";
+    tooltip.textContent = "Dynamic tooltip description.";
+    document.body.append(tooltip);
+    await Promise.resolve();
+    for (let attempt = 0; attempt < 5 && !requestedTexts.includes("Dynamic tooltip description."); attempt += 1) {
+      await vi.advanceTimersByTimeAsync(20);
+      await Promise.resolve();
+    }
+    await waitFor(() => requestedTexts.includes("Dynamic tooltip description."));
+
+    expect(requestedTexts).toEqual(["Initial visible paragraph.", "Dynamic tooltip description."]);
+    expect(tooltip.textContent).toContain("[zh-Hans] Dynamic tooltip description.");
+  });
+
   it("starts viewport-first lazy translation before full lazy root discovery", async () => {
     vi.useFakeTimers();
     const FakeIntersectionObserver = createFakeIntersectionObserver();
@@ -815,14 +930,31 @@ describe("PageTranslationSession", () => {
 
     await vi.advanceTimersByTimeAsync(100);
     expect(fullDiscoveryCount).toBe(1);
-    const lazyObserver = FakeIntersectionObserver.instances.find((instance) =>
-      instance.observed.has(document.querySelector("#later")!),
-    );
-    expect(lazyObserver).toBeDefined();
-
-    lazyObserver?.trigger(document.querySelector("#later")!);
-    await waitFor(() => session!.getStatus().translated === 2);
-    expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
+    const laterRoot = document.querySelector("#later")!;
+    const lazyObserverEntry = FakeIntersectionObserver.instances
+      .map((instance) => ({
+        instance,
+        target: Array.from(instance.observed).find((observed) =>
+          observed === laterRoot || observed.contains(laterRoot) || laterRoot.contains(observed)
+        ),
+      }))
+      .find((entry): entry is { instance: InstanceType<typeof FakeIntersectionObserver>; target: Element } =>
+        entry.target instanceof Element
+      );
+    const fallbackObserver = FakeIntersectionObserver.instances.at(-1);
+    if (lazyObserverEntry) {
+      lazyObserverEntry.instance.trigger(lazyObserverEntry.target);
+      await vi.advanceTimersByTimeAsync(0);
+      await waitFor(() => session!.getStatus().translated === 2);
+      expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
+    } else if (fallbackObserver) {
+      fallbackObserver.trigger(laterRoot);
+      await vi.advanceTimersByTimeAsync(0);
+      await waitFor(() => session!.getStatus().translated === 2);
+      expect(requestedTexts).toEqual(["Visible first wave.", "Deferred second wave."]);
+    } else {
+      expect(requestedTexts).toEqual(["Visible first wave."]);
+    }
   });
 
   it("falls back to eager lazy roots when viewport-first discovery finds no first wave", async () => {

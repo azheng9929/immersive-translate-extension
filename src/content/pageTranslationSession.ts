@@ -117,6 +117,10 @@ type PageTranslationSessionOptions = {
 
 type StatusListener = (status: PageTranslationStatus) => void;
 
+type PendingRootOptions = {
+  allowTranslatedRoot?: boolean;
+};
+
 export type PageTranslationUrlChange = {
   previousUrl: string;
   currentUrl: string;
@@ -149,7 +153,8 @@ export class PageTranslationSession {
     lastError: undefined,
   };
   private readonly listeners = new Set<StatusListener>();
-  private readonly pendingRoots = new Set<ParentNode>();
+  private readonly pendingRoots = new Set<HTMLElement>();
+  private readonly pendingRootOptions = new WeakMap<HTMLElement, PendingRootOptions>();
   private observer: MutationObserver | undefined;
   private lazyObserver: IntersectionObserver | undefined;
   private readonly lazyObservedRoots = new Set<HTMLElement>();
@@ -400,10 +405,10 @@ export class PageTranslationSession {
       if (mutation.type === "childList") {
         for (const node of mutation.addedNodes) {
           const root = rootFromAddedNode(node);
-          if (!root || !root.isConnected || this.shouldIgnoreRoot(root)) continue;
+          if (!root || !root.isConnected || this.shouldIgnoreRoot(root, true)) continue;
           if (!hasPotentialTranslatableContent(root)) continue;
           if (isLikelyHoverOverlayRoot(root)) hasHoverOverlayRoot = true;
-          roots.push({ root, allowTranslatedRoot: false });
+          roots.push({ root, allowTranslatedRoot: true });
         }
         continue;
       }
@@ -517,15 +522,29 @@ export class PageTranslationSession {
   private addPendingRoot(
     root: HTMLElement,
     notify = true,
-    options: { allowTranslatedRoot?: boolean } = {},
+    options: PendingRootOptions = {},
   ): boolean {
     if (this.dynamicSuspended || this.shouldIgnoreRoot(root, options.allowTranslatedRoot)) return true;
+    const allowTranslatedRoot = Boolean(options.allowTranslatedRoot);
 
     for (const pending of [...this.pendingRoots]) {
-      if (pending instanceof Node && pending.contains(root)) return true;
-      if (root.contains(pending as Node)) this.pendingRoots.delete(pending);
+      const pendingAllowsTranslatedRoot = Boolean(this.pendingRootOptions.get(pending)?.allowTranslatedRoot);
+      if (pending.contains(root)) {
+        if (allowTranslatedRoot && !pendingAllowsTranslatedRoot && root.closest('[data-imt-state="translated"]')) {
+          continue;
+        }
+        if (allowTranslatedRoot && !pendingAllowsTranslatedRoot) {
+          this.pendingRootOptions.set(pending, { allowTranslatedRoot: true });
+        }
+        return true;
+      }
+      if (root.contains(pending)) {
+        if (pendingAllowsTranslatedRoot && !allowTranslatedRoot) continue;
+        this.pendingRoots.delete(pending);
+      }
     }
     this.pendingRoots.add(root);
+    this.pendingRootOptions.set(root, { allowTranslatedRoot });
 
     if (this.pendingRoots.size > this.maxQueueSize()) {
       this.suspendDynamicTranslation();
@@ -564,16 +583,19 @@ export class PageTranslationSession {
       return;
     }
 
-    const allRoots = [...this.pendingRoots].filter(
-      (root): root is HTMLElement =>
-        root instanceof HTMLElement &&
+    const allRoots = [...this.pendingRoots]
+      .map((root) => ({ root, options: this.pendingRootOptions.get(root) ?? {} }))
+      .filter(({ root, options }) =>
         root.isConnected &&
-        !this.shouldIgnoreRoot(root, root.getAttribute("data-imt-state") === "translated"),
-    );
+        !this.shouldIgnoreRoot(root, options.allowTranslatedRoot || root.getAttribute("data-imt-state") === "translated")
+      );
     this.pendingRoots.clear();
 
-    const roots = allRoots.slice(0, this.maxRootsPerFlush());
-    for (const overflowRoot of allRoots.slice(this.maxRootsPerFlush())) this.addPendingRoot(overflowRoot, false);
+    const rootEntries = allRoots.slice(0, this.maxRootsPerFlush());
+    const roots = rootEntries.map(({ root }) => root);
+    for (const { root: overflowRoot, options } of allRoots.slice(this.maxRootsPerFlush())) {
+      this.addPendingRoot(overflowRoot, false, options);
+    }
 
     if (roots.length === 0) {
       this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
@@ -581,7 +603,12 @@ export class PageTranslationSession {
     }
 
     if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
-      this.observeLazyRoots(roots, true);
+      const { eagerRoots, deferredRoots } = this.partitionDynamicLazyRoots(roots);
+      this.observeLazyRoots(deferredRoots, true);
+      if (eagerRoots.length > 0) {
+        await this.translateRoots(eagerRoots, true);
+        return;
+      }
       if (this.pendingRoots.size > 0) this.scheduleFlush();
       else this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
       return;
@@ -601,7 +628,7 @@ export class PageTranslationSession {
     }
 
     for (const root of roots) {
-      if (!root.isConnected || this.shouldIgnoreRoot(root) || this.lazyObservedRoots.has(root)) continue;
+      if (!root.isConnected || this.shouldIgnoreRoot(root, countDynamicRun) || this.lazyObservedRoots.has(root)) continue;
       if (this.lazyObservedRoots.size >= this.maxObservedRoots()) {
         this.addPendingRoot(root, false);
         continue;
@@ -659,6 +686,23 @@ export class PageTranslationSession {
     return { eagerRoots, deferredRoots };
   }
 
+  private partitionDynamicLazyRoots(roots: HTMLElement[]): { eagerRoots: HTMLElement[]; deferredRoots: HTMLElement[] } {
+    const eagerRoots: HTMLElement[] = [];
+    const deferredRoots: HTMLElement[] = [];
+    const rootMargin = this.options.eagerLazyRootMargin ?? this.options.lazyRootMargin ?? "900px";
+    const maxEagerRoots = this.maxRootsPerFlush();
+
+    for (const root of roots) {
+      if (eagerRoots.length < maxEagerRoots && (isLikelyHoverOverlayRoot(root) || isNearViewport(root, rootMargin))) {
+        eagerRoots.push(root);
+      } else {
+        deferredRoots.push(root);
+      }
+    }
+
+    return { eagerRoots, deferredRoots };
+  }
+
   private handleLazyIntersections(entries: IntersectionObserverEntry[]): void {
     const visibleRoots: HTMLElement[] = [];
     let countDynamicRun = false;
@@ -668,8 +712,9 @@ export class PageTranslationSession {
       const root = entry.target;
       this.lazyObserver?.unobserve(root);
       this.lazyObservedRoots.delete(root);
-      if (this.shouldIgnoreRoot(root)) continue;
-      if (this.dynamicLazyRoots.has(root)) countDynamicRun = true;
+      const dynamicLazyRoot = this.dynamicLazyRoots.has(root);
+      if (this.shouldIgnoreRoot(root, dynamicLazyRoot)) continue;
+      if (dynamicLazyRoot) countDynamicRun = true;
       visibleRoots.push(root);
     }
 
@@ -690,6 +735,7 @@ export class PageTranslationSession {
     this.flushing = true;
     const operationId = this.operationId;
     const previousPhase = this.status.phase;
+    const cleanupDynamicRootMarkers = countDynamicRun ? markDynamicRoots(roots) : () => {};
     this.setStatus({ ...this.status, phase: "updating", observation: "observing", lastError: undefined });
 
     try {
@@ -730,13 +776,16 @@ export class PageTranslationSession {
         lastError: errorMessage(error),
       });
     } finally {
+      cleanupDynamicRootMarkers();
       this.flushing = false;
       if (operationId !== this.operationId) return;
 
-      const pendingVisibleRoots = [...this.pendingVisibleLazyRoots].filter(
-        (root) => root.isConnected && !this.shouldIgnoreRoot(root),
-      );
       const pendingVisibleDynamicRun = this.pendingVisibleLazyDynamicRun;
+      const pendingVisibleRoots = [...this.pendingVisibleLazyRoots].filter(
+        (root) =>
+          root.isConnected &&
+          !this.shouldIgnoreRoot(root, pendingVisibleDynamicRun || this.dynamicLazyRoots.has(root)),
+      );
       this.pendingVisibleLazyRoots.clear();
       this.pendingVisibleLazyDynamicRun = false;
 
@@ -989,7 +1038,7 @@ function shouldIgnoreDynamicRoot(
 ): boolean {
   for (const selector of selectors) {
     try {
-      if (options.allowTranslatedRoot && isTranslatedStateSelector(selector) && root.matches(selector)) continue;
+      if (options.allowTranslatedRoot && isTranslatedStateSelector(selector) && root.closest(selector)) continue;
       if (root.closest(selector)) return true;
     } catch {
       continue;
@@ -1047,6 +1096,20 @@ function isLikelyHoverOverlayRoot(root: HTMLElement): boolean {
   const style = window.getComputedStyle(root);
   const zIndex = Number.parseInt(style.zIndex, 10);
   return (style.position === "fixed" || style.position === "absolute") && Number.isFinite(zIndex) && zIndex >= 10;
+}
+
+function markDynamicRoots(roots: readonly HTMLElement[]): () => void {
+  const records: Array<{ root: HTMLElement; previous: string | null }> = [];
+  for (const root of roots) {
+    records.push({ root, previous: root.getAttribute("data-imt-dynamic-root") });
+    root.setAttribute("data-imt-dynamic-root", "true");
+  }
+  return () => {
+    for (const { root, previous } of records) {
+      if (previous === null) root.removeAttribute("data-imt-dynamic-root");
+      else root.setAttribute("data-imt-dynamic-root", previous);
+    }
+  };
 }
 
 function isNearViewport(element: HTMLElement, rootMargin: string): boolean {

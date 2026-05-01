@@ -1,4 +1,5 @@
 import { scanDocumentText, scanTranslatableAttributes } from "./domScanner";
+import { applyAttributeBudget } from "./attributeBudget";
 import { removeTranslationLoading, renderTranslation, renderTranslationLoading } from "./renderEngine";
 import { restoreAll, restoreRecords } from "./restoreEngine";
 import { selectHighConfidenceTranslationRoots } from "./rootScoring";
@@ -9,7 +10,7 @@ import { normalizeVisibleText } from "../shared/normalize";
 import { isMeaningfulText, isSkippableElement } from "../shared/skipRules";
 import { createTranslationCacheLookup, type TranslationCache, type TranslationCacheLookup, type TranslationCacheWrite } from "../shared/translationCache";
 import type { RenderMode, RestoreRecord, TranslatableAttributeName, TranslationUnit, UnitCategory } from "../shared/types";
-import type { SelectorFallbackPolicy, WebTranslationBodyRule, WebTranslationFallbackProfile } from "../shared/webRuleTypes";
+import type { AttributeBudgetPolicy, SelectorFallbackPolicy, WebTranslationBodyRule, WebTranslationFallbackProfile } from "../shared/webRuleTypes";
 import type { CompiledFilterRule } from "./compiledFilterRule";
 import type { SiteContentSelector } from "./sitePolicy";
 import {
@@ -42,6 +43,7 @@ type ControllerOptions = {
   cache?: TranslationCache;
   retry?: TranslationRetryOptions;
   attributeNames?: readonly TranslatableAttributeName[];
+  attributeBudget?: AttributeBudgetPolicy;
   mainFrameSelector?: string;
   mainFrameMinTextCount?: number;
   mainFrameMinWordCount?: number;
@@ -246,9 +248,13 @@ export class PageController {
     diagnostics: TranslationDiagnostics,
   ): TranslationUnit[] {
     const hostname = this.options.hostname ?? globalThis.location?.hostname ?? "";
+    const allowInsideTranslatedRoot = roots.some((root) =>
+      root instanceof HTMLElement && root.matches('[data-imt-dynamic-root="true"]')
+    );
     const scanOptions = {
       ...(hostname ? { hostname } : {}),
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
+      ...(allowInsideTranslatedRoot ? { allowInsideTranslatedRoot: true } : {}),
       ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
       ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
       ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),
@@ -261,9 +267,13 @@ export class PageController {
       ),
     );
     const scannedTexts = scanRoots.flatMap((scanRoot) => scanDocumentText(scanRoot, scanOptions));
-    const attributes = scanRoots.flatMap((scanRoot) =>
+    const rawAttributes = scanRoots.flatMap((scanRoot) =>
       scanTranslatableAttributes(scanRoot, this.options.attributeNames, scanOptions),
     );
+    const attributes = applyAttributeBudget(rawAttributes, scannedTexts, {
+      budget: this.options.attributeBudget,
+      diagnostics,
+    });
     return buildTranslationUnits({
       scannedTexts,
       attributes,
@@ -272,6 +282,7 @@ export class PageController {
       targetLang: this.options.targetLang,
       hostname,
       ...(this.options.allowTooltip ? { allowTooltip: true } : {}),
+      ...(allowInsideTranslatedRoot ? { allowInsideTranslatedRoot: true } : {}),
       ...(this.options.excludeSelectors ? { excludeSelectors: this.options.excludeSelectors } : {}),
       ...(this.options.contentSelectors ? { contentSelectors: this.options.contentSelectors } : {}),
       ...(this.options.filterRule ? { filterRule: this.options.filterRule } : {}),

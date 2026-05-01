@@ -253,6 +253,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     providerId: providerChainId(config),
     displayMode: config.displayMode,
     attributeNames: sitePolicy.attributeNames,
+    attributeBudget: sitePolicy.attributeBudget,
     ...(sitePolicy.mainFrameSelector ? { mainFrameSelector: sitePolicy.mainFrameSelector } : {}),
     ...(sitePolicy.mainFrameMinTextCount !== undefined ? { mainFrameMinTextCount: sitePolicy.mainFrameMinTextCount } : {}),
     ...(sitePolicy.mainFrameMinWordCount !== undefined ? { mainFrameMinWordCount: sitePolicy.mainFrameMinWordCount } : {}),

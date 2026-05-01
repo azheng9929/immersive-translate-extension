@@ -1,4 +1,10 @@
 import { SAFE_TRANSLATABLE_ATTRIBUTES } from "./domScanner";
+import {
+  DEFAULT_ATTRIBUTE_BUDGET,
+  DENSE_UI_ATTRIBUTE_BUDGET,
+  LIST_PAGE_ATTRIBUTE_BUDGET,
+  normalizeAttributeBudget,
+} from "./attributeBudget";
 import { compileFilterRule, type CompiledFilterRule } from "./compiledFilterRule";
 import type { DynamicMode } from "../shared/config";
 import { analyzeWebTranslationRuleCapability } from "../shared/webRuleCapability";
@@ -10,6 +16,7 @@ import {
 } from "../shared/webRuleMatcher";
 import type { TranslatableAttributeName } from "../shared/types";
 import type {
+  AttributeBudgetPolicy,
   RuleArrayValue,
   RuleContentSelector,
   RuleRecordValue,
@@ -55,6 +62,7 @@ export type ResolvedWebTranslationRule = Omit<
   | "translationClasses"
   | "contentSelectors"
   | "attributeNames"
+  | "attributeBudget"
   | "advanceMergeConfig"
 > & {
   ruleId: string;
@@ -79,6 +87,7 @@ export type ResolvedWebTranslationRule = Omit<
   translationClasses: readonly string[];
   contentSelectors: readonly RuleContentSelector[];
   attributeNames: readonly TranslatableAttributeName[];
+  attributeBudget: AttributeBudgetPolicy;
   bodyRule?: WebTranslationBodyRule;
   ruleResolution?: SitePolicyRuleResolution;
 };
@@ -132,6 +141,25 @@ export const DEFAULT_EXCLUDED_DYNAMIC_SELECTORS = [
 ] as const;
 
 const TOOLTIP_DYNAMIC_SELECTORS = ['[role="tooltip"]', "[popover]"] as const;
+const DENSE_DASHBOARD_EXCLUDE_SELECTORS = [
+  "header",
+  "footer",
+  "nav",
+  "menu",
+  "button",
+  "[role='button']",
+  "[role='menu']",
+  "[role='menuitem']",
+  "svg",
+  "canvas",
+  "input",
+  "select",
+  "textarea",
+  "[class*='nav' i]",
+  "[class*='menu' i]",
+  "[class*='popover' i]",
+  "[class*='ad' i]",
+] as const;
 
 const DEFAULT_SITE_POLICY = {
   hostname: "",
@@ -155,6 +183,7 @@ const DEFAULT_SITE_POLICY = {
   isHighDynamic: false,
   dynamicMode: "normal" as DynamicMode,
   attributeNames: SAFE_TRANSLATABLE_ATTRIBUTES,
+  attributeBudget: DEFAULT_ATTRIBUTE_BUDGET,
   buildContainerSelectors: [],
   skipBuildContainerSelectors: [],
   preferredScanRootSelectors: [],
@@ -352,6 +381,7 @@ export const CORE_WEB_TRANSLATION_RULES: readonly WebTranslationRule[] = [
 `,
     ],
     attributeNames: [],
+    attributeBudget: LIST_PAGE_ATTRIBUTE_BUDGET,
     observeUrlChange: true,
     urlChangeDelay: 500,
     detectParagraphLanguage: true,
@@ -512,6 +542,7 @@ h4,
       "[class*='breadcrumb' i]",
       "[class*='menu' i]",
     ],
+    attributeBudget: LIST_PAGE_ATTRIBUTE_BUDGET,
     mutationExcludeSelectors: ["form", "nav", "header", "button", "[role='button']"],
     injectedCss: [
       `
@@ -1193,6 +1224,7 @@ p.title > a.title,
     siteKey: "metatft.com",
     matches: ["*://metatft.com/*", "*://*.metatft.com/*"],
     dynamicPreset: "metatft-fast",
+    attributeBudget: DENSE_UI_ATTRIBUTE_BUDGET,
     isHighDynamic: true,
   },
   {
@@ -1200,6 +1232,78 @@ p.title > a.title,
     siteKey: "tactics.tools",
     matches: ["*://tactics.tools/*", "*://*.tactics.tools/*"],
     dynamicPreset: "tactics-fast",
+    attributeBudget: DENSE_UI_ATTRIBUTE_BUDGET,
+    allowTooltip: true,
+    isHighDynamic: true,
+  },
+  {
+    id: "mobalytics-tft",
+    siteKey: "mobalytics.gg",
+    matches: ["*://mobalytics.gg/tft/*", "*://*.mobalytics.gg/tft/*"],
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main p",
+      "[class*='card' i] h2",
+      "[class*='card' i] h3",
+      "[class*='description' i]",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3, [class*='card' i] h2, [class*='card' i] h3", category: "heading" },
+      { selector: "main p, [class*='description' i]", category: "content-block" },
+    ],
+    excludeSelectors: [
+      ...DENSE_DASHBOARD_EXCLUDE_SELECTORS,
+      "[class*='percent' i]",
+      "[class*='rank' i]",
+      "[class*='price' i]",
+      "[class*='rating' i]",
+    ],
+    mutationExcludeSelectors: [
+      ...DENSE_DASHBOARD_EXCLUDE_SELECTORS,
+      "[aria-live]",
+      "[data-popper-placement]",
+      "[class*='tooltip' i]",
+    ],
+    dynamicPreset: "tactics-fast",
+    attributeBudget: DENSE_UI_ATTRIBUTE_BUDGET,
+    allowTooltip: true,
+    isHighDynamic: true,
+  },
+  {
+    id: "opgg",
+    siteKey: "op.gg",
+    matches: ["*://op.gg/*", "*://*.op.gg/*"],
+    selectors: [
+      "main h1",
+      "main h2",
+      "main h3",
+      "main p",
+      "[role='tooltip']",
+      ".tooltip",
+      "[class*='tooltip' i]",
+    ],
+    contentSelectors: [
+      { selector: "main h1, main h2, main h3", category: "heading" },
+      { selector: "main p", category: "content-block" },
+      { selector: "[role='tooltip'], .tooltip, [class*='tooltip' i]", category: "card-text" },
+    ],
+    excludeSelectors: [
+      ...DENSE_DASHBOARD_EXCLUDE_SELECTORS,
+      "[class*='gnb' i]",
+      "[class*='language' i]",
+      "[class*='summoner' i]",
+      "[class*='rank' i]",
+      "[class*='tier' i]",
+    ],
+    mutationExcludeSelectors: [
+      ...DENSE_DASHBOARD_EXCLUDE_SELECTORS,
+      "[aria-live]",
+      "[data-popper-placement]",
+    ],
+    dynamicPreset: "tactics-fast",
+    attributeBudget: DENSE_UI_ATTRIBUTE_BUDGET,
     allowTooltip: true,
     isHighDynamic: true,
   },
@@ -1776,10 +1880,23 @@ h5 + p,
       ".md_Compact p",
       "[class*='line-clamp']",
       "a[href*='/software/'] h2",
+      "main article a[href*='/software/']",
+      "main article [class*='description' i]",
+      "main article [class*='summary' i]",
+      "[data-testid*='app' i] h2",
+      "[data-testid*='app' i] h3",
     ],
     contentSelectors: [
-      { selector: "main h1, main h2, main h3, article h2, article h3, a[href*='/software/'] h2", category: "heading" },
-      { selector: "main p, article p, .md_Compact p, [class*='line-clamp']", category: "card-text" },
+      {
+        selector:
+          "main h1, main h2, main h3, article h2, article h3, a[href*='/software/'] h2, main article a[href*='/software/'], [data-testid*='app' i] h2, [data-testid*='app' i] h3",
+        category: "heading",
+      },
+      {
+        selector:
+          "main p, article p, .md_Compact p, [class*='line-clamp'], main article [class*='description' i], main article [class*='summary' i]",
+        category: "card-text",
+      },
     ],
     excludeSelectors: [
       "header",
@@ -1798,6 +1915,7 @@ h5 + p,
       "select",
     ],
     mutationExcludeSelectors: ["header", "footer", "nav", "button", "[role='button']"],
+    attributeBudget: LIST_PAGE_ATTRIBUTE_BUDGET,
     injectedCss: [
       `
 main h2,
@@ -1814,6 +1932,67 @@ main h3,
     detectParagraphLanguage: true,
   },
   {
+    id: "vimeo",
+    siteKey: "vimeo.com",
+    matches: ["*://vimeo.com/*", "*://*.vimeo.com/*"],
+    selectors: [
+      "h1",
+      "#video-title",
+      "[data-testid*='title' i]",
+      "a[href*='/videos/'] [class*='title' i]",
+      ".metadata-snippet-text",
+      "[data-testid*='description' i]",
+      "[class*='description' i]",
+      "[class*='summary' i]",
+    ],
+    contentSelectors: [
+      { selector: "h1, #video-title, [data-testid*='title' i], a[href*='/videos/'] [class*='title' i]", category: "heading" },
+      {
+        selector: ".metadata-snippet-text, [data-testid*='description' i], [class*='description' i], [class*='summary' i]",
+        category: "card-text",
+      },
+    ],
+    excludeSelectors: [
+      "header",
+      "footer",
+      "nav",
+      "button",
+      "[role='button']",
+      "input",
+      "textarea",
+      "select",
+      "[class*='duration' i]",
+      "[class*='views' i]",
+      "[class*='metadata' i]",
+      "[class*='stats' i]",
+      "[class*='avatar' i]",
+    ],
+    mutationExcludeSelectors: ["header", "footer", "nav", "button", "[role='button']"],
+    attributeNames: [],
+    attributeBudget: LIST_PAGE_ATTRIBUTE_BUDGET,
+    injectedCss: [
+      `
+h1,
+#video-title,
+[data-testid*='title' i],
+a[href*='/videos/'] [class*='title' i],
+.metadata-snippet-text,
+[data-testid*='description' i],
+[class*='description' i],
+[class*='summary' i] {
+  max-height: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+}
+`,
+    ],
+    allowTooltip: false,
+    detectParagraphLanguage: true,
+    dynamicPreset: "youtube-fast",
+    isHighDynamic: true,
+  },
+  {
     id: "ebay",
     siteKey: "ebay.com",
     matches: ["*://www.ebay.com/sch/*", "*://www.ebay.com/itm/*", "*://ebay.com/sch/*", "*://ebay.com/itm/*"],
@@ -1821,13 +2000,18 @@ main h3,
       ".s-item__title",
       ".s-item__subtitle",
       ".s-item__dynamic",
+      "body a",
+      "main a",
+      "main a[href*='/itm/']",
+      "main [class*='item' i] a[href*='/itm/']",
+      "main [class*='title' i]",
       "h1.x-item-title__mainTitle",
       ".ux-layout-section__textual-display",
       ".ux-labels-values__values-content",
       ".d-item-description",
     ],
     contentSelectors: [
-      { selector: ".s-item__title, h1.x-item-title__mainTitle", category: "heading" },
+      { selector: ".s-item__title, body a, main a, main a[href*='/itm/'], main [class*='item' i] a[href*='/itm/'], main [class*='title' i], h1.x-item-title__mainTitle", category: "heading" },
       { selector: ".s-item__subtitle, .s-item__dynamic", category: "card-text" },
       { selector: ".ux-layout-section__textual-display, .ux-labels-values__values-content, .d-item-description", category: "content-block" },
     ],
@@ -1835,6 +2019,10 @@ main h3,
       ".srp-rail__left",
       ".x-refine__left__nav",
       ".srp-controls",
+      "[class*='filter' i]",
+      "[class*='refine' i]",
+      "[aria-label*='filter' i]",
+      "aside",
       ".s-item__price",
       ".s-item__shipping",
       ".s-item__bids",
@@ -1851,12 +2039,25 @@ main h3,
       "select",
       "textarea",
     ],
-    mutationExcludeSelectors: [".srp-rail__left", ".x-refine__left__nav", ".srp-controls", "button", "[role='button']"],
+    mutationExcludeSelectors: [
+      ".srp-rail__left",
+      ".x-refine__left__nav",
+      ".srp-controls",
+      "[class*='filter' i]",
+      "[class*='refine' i]",
+      "[aria-label*='filter' i]",
+      "aside",
+      "button",
+      "[role='button']",
+    ],
+    attributeBudget: LIST_PAGE_ATTRIBUTE_BUDGET,
     injectedCss: [
       `
 .s-item__title,
 .s-item__subtitle,
 .s-item__dynamic,
+main a[href*='/itm/'],
+main [class*='title' i],
 h1.x-item-title__mainTitle {
   max-height: unset !important;
   -webkit-line-clamp: unset !important;
@@ -2598,6 +2799,7 @@ export function compileRulePolicy(
     ruleResolution: rule.ruleResolution ?? defaultRuleResolutionForRule(rule, effectiveCapability),
     isHighDynamic: Boolean(rule.isHighDynamic),
     attributeNames: rule.attributeNames,
+    attributeBudget: normalizeAttributeBudget(rule.attributeBudget, DEFAULT_SITE_POLICY.attributeBudget),
     ...(rule.mainFrameSelector ? { mainFrameSelector: rule.mainFrameSelector } : {}),
     ...(rule.mainFrameMinTextCount !== undefined ? { mainFrameMinTextCount: rule.mainFrameMinTextCount } : {}),
     ...(rule.mainFrameMinWordCount !== undefined ? { mainFrameMinWordCount: rule.mainFrameMinWordCount } : {}),
@@ -2991,6 +3193,7 @@ function baseStackDelta(rule: WebTranslationRule): WebTranslationRule {
     ...(rule.ruleCapability ? { ruleCapability: rule.ruleCapability } : {}),
     ...(rule.fallbackProfile ? { fallbackProfile: rule.fallbackProfile } : {}),
     ...(rule.selectorFallbackPolicy ? { selectorFallbackPolicy: rule.selectorFallbackPolicy } : {}),
+    ...(rule.attributeBudget ? { attributeBudget: rule.attributeBudget } : {}),
   };
 }
 
@@ -3372,6 +3575,7 @@ function mergeOneRule(base: ResolvedWebTranslationRule, delta: WebTranslationRul
     translationClasses: mergeArray(base.translationClasses, delta.translationClasses),
     contentSelectors: mergeArray(base.contentSelectors, delta.contentSelectors, contentSelectorKey),
     attributeNames: mergeArray(base.attributeNames, delta.attributeNames),
+    attributeBudget: mergeAttributeBudget(base.attributeBudget, delta.attributeBudget),
   };
 }
 
@@ -3401,6 +3605,7 @@ function toResolvedRule(rule: WebTranslationRule): ResolvedWebTranslationRule {
     translationClasses: arrayValue(rule.translationClasses),
     contentSelectors: arrayValue(rule.contentSelectors, contentSelectorKey),
     attributeNames: arrayValue(rule.attributeNames),
+    attributeBudget: normalizeAttributeBudget(rule.attributeBudget),
   };
 }
 
@@ -3461,6 +3666,14 @@ function arrayValue<T>(
   if (!value) return [];
   if (!isRuleArrayOperation(value)) return unique(listValue(value), keyOf);
   return unique(value.replace !== undefined ? listValue(value.replace) : listValue(value.add), keyOf);
+}
+
+function mergeAttributeBudget(
+  base: AttributeBudgetPolicy,
+  delta: AttributeBudgetPolicy | undefined,
+): AttributeBudgetPolicy {
+  if (!delta) return base;
+  return normalizeAttributeBudget(delta, base);
 }
 
 function coreWebTranslationRule(id: string): WebTranslationRule {

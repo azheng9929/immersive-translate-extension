@@ -931,6 +931,7 @@ describe("PageController", () => {
   it("uses conservative safe attribute translation by default", async () => {
     document.body.innerHTML = `
       <main>
+        <p>Readable product media overview that should anchor nearby image metadata.</p>
         <input placeholder="Search docs" title="Tooltip label" aria-label="Search input" />
         <img alt="Diagram description" title="Image hover text" />
       </main>
@@ -946,7 +947,10 @@ describe("PageController", () => {
 
     await controller.translatePage();
 
-    expect(requestedTexts).toEqual(["Diagram description"]);
+    expect(requestedTexts).toEqual([
+      "Readable product media overview that should anchor nearby image metadata.",
+      "Diagram description",
+    ]);
     expect(document.querySelector("input")?.getAttribute("placeholder")).toBe("Search docs");
     expect(document.querySelector("img")?.getAttribute("alt")).toBe("[zh-Hans] Diagram description");
     expect(document.querySelector("input")?.getAttribute("title")).toBe("Tooltip label");
@@ -955,11 +959,24 @@ describe("PageController", () => {
   });
 
   it("can translate title and aria-label attributes when explicitly enabled", async () => {
-    document.body.innerHTML = `<main><input title="Tooltip label" aria-label="Search input" /></main>`;
+    document.body.innerHTML = `
+      <main>
+        <p>Readable page copy that anchors attribute scanning.</p>
+        <span id="attr-target" title="Tooltip label" aria-label="Search input">.</span>
+      </main>
+    `;
     const requestedTexts: string[] = [];
     const controller = new PageController({
       targetLang: "zh-Hans",
       attributeNames: ["title", "aria-label"],
+      attributeBudget: {
+        enabled: true,
+        allowedNames: ["title", "aria-label"],
+        maxPerPage: 2,
+        maxPerRoot: 2,
+        maxRatioToTextUnits: 2,
+        requireContentRoot: false,
+      },
       translateBatch: async (items) => {
         requestedTexts.push(...items.map((item) => item.text));
         return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
@@ -968,9 +985,53 @@ describe("PageController", () => {
 
     await controller.translatePage();
 
-    expect(requestedTexts).toEqual(["Tooltip label", "Search input"]);
-    expect(document.querySelector("input")?.getAttribute("title")).toBe("[zh-Hans] Tooltip label");
-    expect(document.querySelector("input")?.getAttribute("aria-label")).toBe("[zh-Hans] Search input");
+    expect(requestedTexts).toContain("Tooltip label");
+    expect(requestedTexts).toContain("Search input");
+    expect(document.querySelector("#attr-target")?.getAttribute("title")).toBe("[zh-Hans] Tooltip label");
+    expect(document.querySelector("#attr-target")?.getAttribute("aria-label")).toBe("[zh-Hans] Search input");
+  });
+
+  it("applies an attribute budget before building translation units", async () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="card">
+          <p>Readable card copy that should be translated before image metadata.</p>
+          <img id="hero" alt="Hero product image" />
+          <img id="secondary" alt="Secondary product image" />
+        </section>
+        <aside>
+          <img id="ad" alt="Sponsored sidebar image" />
+        </aside>
+      </main>
+    `;
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      attributeNames: ["alt"],
+      attributeBudget: {
+        enabled: true,
+        allowedNames: ["alt"],
+        maxPerPage: 4,
+        maxPerRoot: 1,
+        maxRatioToTextUnits: 1,
+        requireContentRoot: true,
+      },
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+
+    await controller.translatePage();
+
+    expect(requestedTexts).toEqual([
+      "Readable card copy that should be translated before image metadata.",
+      "Hero product image",
+    ]);
+    expect(document.querySelector("#hero")?.getAttribute("alt")).toBe("[zh-Hans] Hero product image");
+    expect(document.querySelector("#secondary")?.getAttribute("alt")).toBe("Secondary product image");
+    expect(document.querySelector("#ad")?.getAttribute("alt")).toBe("Sponsored sidebar image");
+    expect(controller.getDiagnostics().scan.attributes.skippedByReason["attribute-budget"]).toBe(2);
   });
 
   it("passes only semantic site content to the translator on high-dynamic pages", async () => {

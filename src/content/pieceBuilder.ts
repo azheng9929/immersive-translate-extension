@@ -11,6 +11,7 @@ import { isVisibleElement } from "./visibility";
 
 type PieceBuilderOptions = GranularityOptions & {
   allowTooltip?: boolean;
+  allowInsideTranslatedRoot?: boolean;
   lineBreakMaxTextCount?: number;
 };
 

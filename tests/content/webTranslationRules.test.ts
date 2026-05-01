@@ -272,6 +272,32 @@ describe("webTranslationRules", () => {
     expect(policy.lineBreakMaxTextCount).toBe(120);
   });
 
+  it("merges and compiles attribute budget policy", () => {
+    const policy = compileRulePolicy(
+      mergeWebTranslationRules(generalRule, {
+        id: "attribute-budget",
+        attributeBudget: {
+          maxPerPage: 12,
+          maxPerRoot: 1,
+          maxRatioToTextUnits: 0.15,
+          allowedNames: ["alt", "title"],
+          requireContentRoot: true,
+        },
+      }),
+      "example.com",
+    );
+
+    expect(policy.attributeBudget).toMatchObject({
+      enabled: true,
+      maxPerPage: 12,
+      maxPerRoot: 1,
+      maxRatioToTextUnits: 0.15,
+      allowedNames: ["alt", "title"],
+      requireContentRoot: true,
+      requireVisible: true,
+    });
+  });
+
   it("keeps body and container rule fields in compiled site policy", () => {
     const policy = compileRulePolicy(
       mergeWebTranslationRules(generalRule, {
@@ -629,8 +655,14 @@ describe("webTranslationRules", () => {
       {
         url: "https://alternativeto.net/",
         ruleId: "alternativeto",
-        selectors: ["main h2", ".md_Compact p", "[class*='line-clamp']"],
+        selectors: ["main h2", ".md_Compact p", "[class*='line-clamp']", "main article a[href*='/software/']", "[data-testid*='app' i] h2"],
         excludes: ["[aria-label*='lightbox' i]", "[role='button']"],
+      },
+      {
+        url: "https://vimeo.com/watch",
+        ruleId: "vimeo",
+        selectors: ["h1", "#video-title", "[data-testid*='title' i]", ".metadata-snippet-text"],
+        excludes: ["[class*='duration' i]", "button"],
       },
       {
         url: "https://news.google.com/home",
@@ -659,8 +691,20 @@ describe("webTranslationRules", () => {
       {
         url: "https://www.ebay.com/sch/i.html?_nkw=kindle",
         ruleId: "ebay",
-        selectors: [".s-item__title", ".s-item__subtitle", "h1.x-item-title__mainTitle"],
-        excludes: [".srp-rail__left", ".s-item__price"],
+        selectors: [".s-item__title", "body a", "main a", "main a[href*='/itm/']", "main [class*='title' i]", "h1.x-item-title__mainTitle"],
+        excludes: [".srp-rail__left", "[class*='filter' i]", ".s-item__price"],
+      },
+      {
+        url: "https://mobalytics.gg/tft/team-comps",
+        ruleId: "mobalytics-tft",
+        selectors: ["main h1", "[class*='card' i] h2", "[class*='description' i]"],
+        excludes: ["[class*='percent' i]", "[class*='rank' i]"],
+      },
+      {
+        url: "https://www.op.gg/champions",
+        ruleId: "opgg",
+        selectors: ["main h1", "[role='tooltip']", "[class*='tooltip' i]"],
+        excludes: ["[class*='gnb' i]", "[class*='summoner' i]"],
       },
       {
         url: "https://www.etsy.com/search?q=planner",

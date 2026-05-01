@@ -8,6 +8,15 @@ describe("sitePolicy", () => {
 
     expect(policy.dynamicMode).toBe("normal");
     expect(policy.attributeNames).toEqual(SAFE_TRANSLATABLE_ATTRIBUTES);
+    expect(policy.attributeBudget).toMatchObject({
+      enabled: true,
+      maxPerPage: 40,
+      maxPerRoot: 1,
+      maxRatioToTextUnits: 0.25,
+      allowedNames: ["alt"],
+      requireContentRoot: true,
+      requireVisible: true,
+    });
     expect(policy.allowTooltip).toBe(true);
     expect(policy.debounceMs).toBeGreaterThanOrEqual(1000);
     expect(policy.maxQueueSize).toBeGreaterThan(0);
@@ -102,6 +111,12 @@ describe("sitePolicy", () => {
     expect(policy.isHighDynamic).toBe(true);
     expect(policy.allowTooltip).toBe(true);
     expect(policy.debounceMs).toBeLessThan(normal.debounceMs);
+    expect(policy.attributeBudget).toMatchObject({
+      maxPerPage: 50,
+      maxPerRoot: 1,
+      maxRatioToTextUnits: 0.2,
+      allowedNames: ["title", "aria-label", "alt"],
+    });
     expect(policy.excludedDynamicSelectors).not.toContain('[role="tooltip"]');
     expect(policy.excludedDynamicSelectors).not.toContain("[popover]");
   });

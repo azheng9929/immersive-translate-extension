@@ -122,6 +122,28 @@ describe("buildTranslationUnits", () => {
     expect(units[0]!.originalText).toBe("Product photo");
   });
 
+  it("drops duplicate attribute units inside the same card when text already covers them", () => {
+    mountFixture(`
+      <ul>
+        <li class="s-item">
+          <h3>Portable power station</h3>
+          <img alt="Portable power station" />
+        </li>
+      </ul>
+    `);
+
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: scanTranslatableAttributes(document.body),
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    });
+
+    expect(units.map((unit) => unit.originalText)).toEqual(["Portable power station"]);
+    expect(units.map((unit) => unit.category)).toEqual(["heading"]);
+  });
+
   it("carries site granularity roots and categories into translation units", () => {
     mountFixture(`
       <article>
