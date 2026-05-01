@@ -19,10 +19,43 @@ Provider: `fake`
 | Rule semantic audit | PASS | `npm.cmd run audit:rule-semantics` |
 | Real-site smoke | WARN | 1 WARN, 0 FAIL |
 | Fixture matrix | PASS | 22 PASS, 13 WARN, 5 GATED, 0 FAIL |
+| Real provider smoke | PASS | DeepSeek `deepseek-v4-flash`: 4 PASS, 2 WARN, 0 FAIL |
 | Critical negative violations | PASS | 0 critical violations |
 | Restore failures | PASS | 0 restore failures |
 
 Current release gate result: PASS for a first usable version. High-dynamic pages still have WARN items, but there are no FAIL results and no critical negative violations.
+
+## Real Provider Smoke
+
+Report: `.tmp/real-site-regression-reports/report-2026-05-01T00-25-28-656Z.json`
+
+Provider: `openai-compatible`
+
+Endpoint: `https://api.deepseek.com/chat/completions`
+
+Model: `deepseek-v4-flash`
+
+Site filter: OpenAI Docs, GitHub README, YouTube, Google Search, Amazon Product, Product Hunt
+
+| Site | Verdict | Provider | Render | Negative | Restore | First translation | Full translation | Notes |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | --- |
+| YouTube | WARN | ok 17/17 | ok, 0 loading | ok, 0 critical | ok | 3682ms | 19080ms | Dynamic partial only. |
+| OpenAI Docs | PASS | ok 13/13 | ok, 0 loading | ok, 0 critical | ok | 5759ms | 12842ms | - |
+| Product Hunt | PASS | ok 56/56 | ok, 0 loading | ok, 0 critical | ok | 5029ms | 69699ms | Slow full page due many card units. |
+| Amazon Product | PASS | ok 6/6 | ok, 0 loading | ok, 0 critical | ok | 9231ms | 18016ms | - |
+| GitHub README | PASS | ok 13/13 | ok, 0 loading | ok, 0 critical | ok | 10471ms | 24878ms | - |
+| Google Search | WARN | ok 24/24 | ok, 0 loading | ok, 0 critical | ok | 4611ms | 17116ms | Dynamic partial only. |
+
+Real provider acceptance:
+
+| Gate | Status |
+| --- | --- |
+| FAIL count | PASS - 0 |
+| Critical negative violations | PASS - 0 |
+| Restore failed | PASS - 0 |
+| Provider failed | PASS - 0 |
+| JSON parse / missing provider result | PASS - 0 |
+| Loading cleanup | PASS - 0 loading markers at capture |
 
 ## Baseline Summary
 

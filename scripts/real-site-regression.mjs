@@ -43,6 +43,9 @@ const baseConfig = {
   openaiMaxBatchItems: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_ITEMS ?? 16),
   openaiMaxBatchChars: Number(process.env.IMT_REGRESSION_OPENAI_BATCH_CHARS ?? 6000),
   openaiRequestTimeoutMs: Number(process.env.IMT_REGRESSION_OPENAI_TIMEOUT_MS ?? 45000),
+  firstTranslationTimeoutMs: Number(process.env.IMT_REGRESSION_FIRST_TRANSLATION_TIMEOUT_MS ?? (provider === "fake" ? 8000 : 20000)),
+  translationSettleTimeoutMs: Number(process.env.IMT_REGRESSION_TRANSLATION_SETTLE_TIMEOUT_MS ?? (provider === "fake" ? 5000 : 45000)),
+  translationSettleQuietMs: Number(process.env.IMT_REGRESSION_TRANSLATION_SETTLE_QUIET_MS ?? 1000),
   geminiEndpoint: process.env.IMT_REGRESSION_GEMINI_ENDPOINT ?? "https://generativelanguage.googleapis.com/v1beta",
   geminiApiKey: process.env.IMT_REGRESSION_GEMINI_API_KEY ?? "",
   geminiModel: process.env.IMT_REGRESSION_GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
@@ -163,11 +166,17 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
 
     const translateStartedAt = Date.now();
     const translateResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_TRANSLATE_PAGE" });
-    const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, 8000);
+    const firstProgress = await waitForTranslationProgress(pageSession, translateStartedAt, config.firstTranslationTimeoutMs);
     await delay(500);
     const hoverResult = site.hoverTooltip ? await runHoverTooltipRegression(pageSession, site) : undefined;
     await scrollPage(pageSession);
-    await delay(3500);
+    await waitForTranslationSettled(
+      pageSession,
+      translateStartedAt,
+      config.translationSettleTimeoutMs,
+      config.translationSettleQuietMs,
+    );
+    const fullTranslationMs = Date.now() - translateStartedAt;
     const pageStatusResponse = await sendContentMessage(serviceWorkerSession, site.host, { type: "IMT_GET_PAGE_STATUS" });
 
     const ruleVisualizationSelectors = pageStatusResponse?.ok
@@ -202,7 +211,7 @@ async function runSiteRegression(browserSession, serviceWorkerSession, extension
       timings: {
         pageLoadMs,
         firstTranslationMs: firstProgress.elapsedMs,
-        fullTranslationMs: Date.now() - translateStartedAt,
+        fullTranslationMs,
         restoreMs: skipReason ? undefined : Date.now() - restoreStartedAt,
       },
       screenshotPath,
@@ -773,7 +782,48 @@ async function readTranslationProgress(pageSession) {
   return evaluate(pageSession, `(() => ({
     translatedBlocks: document.querySelectorAll('.imt-translation-block, .imt-translation-compact').length,
     translatedRoots: document.querySelectorAll('[data-imt-state="translated"]').length,
+    loadingDomCount: document.querySelectorAll('[data-imt-state="loading"], .imt-translation-loading[data-imt-loading="true"]').length,
   }))()`);
+}
+
+async function waitForTranslationSettled(pageSession, startedAt, timeoutMs, quietMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastProgress = await readTranslationProgress(pageSession);
+  let lastChangedAt = Date.now();
+
+  while (Date.now() < deadline) {
+    const progress = await readTranslationProgress(pageSession);
+    if (hasTranslationProgressChanged(progress, lastProgress)) {
+      lastProgress = progress;
+      lastChangedAt = Date.now();
+    }
+
+    const hasTranslation = progress.translatedBlocks > 0 || progress.translatedRoots > 0;
+    const quietForLongEnough = Date.now() - lastChangedAt >= quietMs;
+    if (hasTranslation && progress.loadingDomCount === 0 && quietForLongEnough) {
+      return {
+        ...progress,
+        elapsedMs: Date.now() - startedAt,
+        timedOut: false,
+      };
+    }
+
+    await delay(250);
+  }
+
+  return {
+    ...lastProgress,
+    elapsedMs: Date.now() - startedAt,
+    timedOut: true,
+  };
+}
+
+function hasTranslationProgressChanged(left, right) {
+  return (
+    left.translatedBlocks !== right.translatedBlocks ||
+    left.translatedRoots !== right.translatedRoots ||
+    left.loadingDomCount !== right.loadingDomCount
+  );
 }
 
 async function captureScreenshot(pageSession, siteName) {
