@@ -1,4 +1,4 @@
-import type { PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
+import type { BatchProfile, PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
 import {
   DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   type DynamicModeSource,
@@ -239,7 +239,7 @@ export class PageTranslationSession {
           });
           if (firstWaveRoots.length > 0) {
             this.scheduleLazyRootDiscovery(root, operationId, firstWaveRoots);
-            void this.translateRoots(firstWaveRoots, false);
+            void this.translateRoots(firstWaveRoots, false, "first-wave");
           } else {
             const fallbackRoots = this.controller.collectTranslatableRoots(root);
             const maxEagerRoots = this.options.maxEagerLazyRoots ?? 120;
@@ -253,10 +253,10 @@ export class PageTranslationSession {
               dynamicRuns: 0,
               lastError: undefined,
             });
-            if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
+            if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false, "first-wave");
             else if (fallbackRoots.length === 0) {
               const rootElement = root instanceof HTMLElement ? root : root instanceof Document ? root.body : undefined;
-              if (rootElement) void this.translateRoots([rootElement], false);
+              if (rootElement) void this.translateRoots([rootElement], false, "first-wave");
             }
           }
           return this.getStatus();
@@ -273,7 +273,7 @@ export class PageTranslationSession {
           dynamicRuns: 0,
           lastError: undefined,
         });
-        if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
+        if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false, "first-wave");
         return this.getStatus();
       }
 
@@ -516,7 +516,7 @@ export class PageTranslationSession {
       return;
     }
 
-    await this.translateRoots(roots, true);
+    await this.translateRoots(roots, true, "dynamic");
   }
 
   private addPendingRoot(
@@ -606,7 +606,7 @@ export class PageTranslationSession {
       const { eagerRoots, deferredRoots } = this.partitionDynamicLazyRoots(roots);
       this.observeLazyRoots(deferredRoots, true);
       if (eagerRoots.length > 0) {
-        await this.translateRoots(eagerRoots, true);
+        await this.translateRoots(eagerRoots, true, "dynamic");
         return;
       }
       if (this.pendingRoots.size > 0) this.scheduleFlush();
@@ -614,7 +614,7 @@ export class PageTranslationSession {
       return;
     }
 
-    await this.translateRoots(roots, true);
+    await this.translateRoots(roots, true, "dynamic");
   }
 
   private observeLazyRoots(roots: HTMLElement[], countDynamicRun: boolean): void {
@@ -661,7 +661,7 @@ export class PageTranslationSession {
     const { eagerRoots, deferredRoots } = this.partitionInitialLazyRoots(initialRoots);
     this.observeLazyRoots(deferredRoots, false);
     if (eagerRoots.length > 0) {
-      void this.translateRoots(eagerRoots, false);
+      void this.translateRoots(eagerRoots, false, "normal");
       return;
     }
     this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
@@ -718,10 +718,16 @@ export class PageTranslationSession {
       visibleRoots.push(root);
     }
 
-    if (visibleRoots.length > 0) void this.translateRoots(visibleRoots, countDynamicRun);
+    if (visibleRoots.length > 0) {
+      void this.translateRoots(visibleRoots, countDynamicRun, countDynamicRun ? "dynamic" : "normal");
+    }
   }
 
-  private async translateRoots(roots: HTMLElement[], countDynamicRun: boolean): Promise<void> {
+  private async translateRoots(
+    roots: HTMLElement[],
+    countDynamicRun: boolean,
+    batchProfile: BatchProfile = countDynamicRun ? "dynamic" : "normal",
+  ): Promise<void> {
     if (this.flushing) {
       if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
         for (const root of roots) this.pendingVisibleLazyRoots.add(root);
@@ -753,7 +759,7 @@ export class PageTranslationSession {
         });
       };
 
-      const dynamicSummary = await this.controller.translateNewContents(roots, reportProgress);
+      const dynamicSummary = await this.controller.translateNewContents(roots, reportProgress, { batchProfile });
 
       if (operationId !== this.operationId) return;
       const summary = mergeSummary(this.status, subtractSummary(dynamicSummary, reportedSummary));
@@ -790,7 +796,11 @@ export class PageTranslationSession {
       this.pendingVisibleLazyDynamicRun = false;
 
       if (pendingVisibleRoots.length > 0 && this.canHandleDynamicMutations()) {
-        void this.translateRoots(pendingVisibleRoots, pendingVisibleDynamicRun);
+        void this.translateRoots(
+          pendingVisibleRoots,
+          pendingVisibleDynamicRun,
+          pendingVisibleDynamicRun ? "dynamic" : "normal",
+        );
         return;
       }
 

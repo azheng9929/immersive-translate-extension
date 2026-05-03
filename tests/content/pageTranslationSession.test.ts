@@ -957,6 +957,45 @@ describe("PageTranslationSession", () => {
     }
   });
 
+  it("uses the first-wave batch profile for viewport-first lazy roots", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible first paragraph.</p>
+        <p id="also-visible">Another visible paragraph.</p>
+      </main>
+    `;
+    const visibleRoots = [
+      document.querySelector<HTMLElement>("#visible")!,
+      document.querySelector<HTMLElement>("#also-visible")!,
+    ];
+    const profiles: Array<string | undefined> = [];
+    const controller = {
+      restorePage: vi.fn(),
+      collectViewportTranslatableRoots: vi.fn(() => visibleRoots),
+      collectTranslatableRoots: vi.fn(() => []),
+      translateNewContents: vi.fn(async (_roots, _onProgress, options) => {
+        profiles.push(options?.batchProfile);
+        return { total: 2, translated: 2, failed: 0, skipped: 0 };
+      }),
+      getDiagnostics: vi.fn(() => undefined),
+    } as unknown as PageController;
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      viewportFirst: true,
+      eagerLazy: true,
+      lazyDiscoveryDelayMs: 100,
+    });
+
+    await session.translatePage();
+    await waitFor(() => profiles.length === 1);
+
+    expect(profiles).toEqual(["first-wave"]);
+  });
+
   it("falls back to eager lazy roots when viewport-first discovery finds no first wave", async () => {
     const FakeIntersectionObserver = createFakeIntersectionObserver();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
