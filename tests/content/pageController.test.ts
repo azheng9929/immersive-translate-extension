@@ -275,40 +275,6 @@ describe("PageController", () => {
     expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Second paragraph.");
   });
 
-  it("uses smaller first-wave and dynamic batch profiles without shrinking normal batches", async () => {
-    document.body.innerHTML = `
-      <main>
-        <p>First paragraph.</p>
-        <p>Second paragraph.</p>
-        <p>Third paragraph.</p>
-        <p>Fourth paragraph.</p>
-        <p>Fifth paragraph.</p>
-      </main>
-    `;
-    const batchSizes: number[] = [];
-    const controller = new PageController({
-      targetLang: "zh-Hans",
-      firstWaveBatchItems: 2,
-      dynamicBatchItems: 3,
-      progressiveBatchItems: 5,
-      translateBatch: async (items) => {
-        batchSizes.push(items.length);
-        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
-      },
-    });
-
-    await controller.translatePage(document.body, undefined, { batchProfile: "first-wave" });
-    expect(batchSizes).toEqual([2, 2, 1]);
-
-    batchSizes.length = 0;
-    await controller.translatePage(document.body);
-    expect(batchSizes).toEqual([5]);
-
-    batchSizes.length = 0;
-    await controller.translatePage(document.body, undefined, { batchProfile: "dynamic" });
-    expect(batchSizes).toEqual([3, 2]);
-  });
-
   it("collects only near-viewport roots for the first translation wave", () => {
     document.body.innerHTML = `
       <main>

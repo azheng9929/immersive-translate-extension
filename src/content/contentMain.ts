@@ -583,74 +583,50 @@ function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProv
 }
 
 function progressivePageBatchOptions(config: ExtensionConfig) {
-  if (config.provider === "deepseek") {
-    return providerBatchProfileOptions({
-      maxBatchItems: config.deepseekMaxBatchItems,
-      maxBatchChars: config.deepseekMaxBatchChars,
-      maxConcurrentRequests: config.deepseekMaxConcurrentRequests,
-    });
-  }
-
   if (config.provider === "openai-compatible") {
-    return providerBatchProfileOptions({
-      maxBatchItems: config.openaiMaxBatchItems,
-      maxBatchChars: config.openaiMaxBatchChars,
-      maxConcurrentRequests: config.openaiMaxConcurrentRequests,
-    });
+    return {
+      progressiveBatchItems: Math.min(config.openaiMaxBatchItems, 8),
+      progressiveBatchChars: config.openaiMaxBatchChars,
+      progressiveConcurrentBatches: config.openaiMaxConcurrentRequests,
+    };
   }
 
   if (config.provider === "gemini") {
-    return providerBatchProfileOptions({
-      maxBatchItems: config.geminiMaxBatchItems,
-      maxBatchChars: config.geminiMaxBatchChars,
-      maxConcurrentRequests: config.geminiMaxConcurrentRequests,
-    });
+    return {
+      progressiveBatchItems: Math.min(config.geminiMaxBatchItems, 8),
+      progressiveBatchChars: config.geminiMaxBatchChars,
+      progressiveConcurrentBatches: config.geminiMaxConcurrentRequests,
+    };
+  }
+
+  if (config.provider === "deepseek") {
+    return {
+      progressiveBatchItems: Math.min(config.deepseekMaxBatchItems, 8),
+      progressiveBatchChars: config.deepseekMaxBatchChars,
+      progressiveConcurrentBatches: config.deepseekMaxConcurrentRequests,
+    };
   }
 
   if (config.provider === "anthropic") {
-    return providerBatchProfileOptions({
-      maxBatchItems: config.anthropicMaxBatchItems,
-      maxBatchChars: config.anthropicMaxBatchChars,
-      maxConcurrentRequests: config.anthropicMaxConcurrentRequests,
-    });
+    return {
+      progressiveBatchItems: Math.min(config.anthropicMaxBatchItems, 8),
+      progressiveBatchChars: config.anthropicMaxBatchChars,
+      progressiveConcurrentBatches: config.anthropicMaxConcurrentRequests,
+    };
   }
 
   if (config.provider === "openrouter") {
-    return providerBatchProfileOptions({
-      maxBatchItems: config.openrouterMaxBatchItems,
-      maxBatchChars: config.openrouterMaxBatchChars,
-      maxConcurrentRequests: config.openrouterMaxConcurrentRequests,
-    });
+    return {
+      progressiveBatchItems: Math.min(config.openrouterMaxBatchItems, 8),
+      progressiveBatchChars: config.openrouterMaxBatchChars,
+      progressiveConcurrentBatches: config.openrouterMaxConcurrentRequests,
+    };
   }
 
   return {
-    firstWaveBatchItems: 4,
-    firstWaveBatchChars: 1500,
-    firstWaveConcurrentBatches: 2,
     progressiveBatchItems: 16,
     progressiveBatchChars: 6000,
     progressiveConcurrentBatches: 4,
-    dynamicBatchItems: 4,
-    dynamicBatchChars: 1600,
-    dynamicConcurrentBatches: 2,
-  };
-}
-
-function providerBatchProfileOptions(input: {
-  maxBatchItems: number;
-  maxBatchChars: number;
-  maxConcurrentRequests: number;
-}) {
-  return {
-    firstWaveBatchItems: Math.min(input.maxBatchItems, 3),
-    firstWaveBatchChars: Math.min(input.maxBatchChars, 1000),
-    firstWaveConcurrentBatches: Math.min(input.maxConcurrentRequests, 2),
-    progressiveBatchItems: Math.min(input.maxBatchItems, 8),
-    progressiveBatchChars: input.maxBatchChars,
-    progressiveConcurrentBatches: input.maxConcurrentRequests,
-    dynamicBatchItems: Math.min(input.maxBatchItems, 4),
-    dynamicBatchChars: Math.min(input.maxBatchChars, 1600),
-    dynamicConcurrentBatches: Math.min(input.maxConcurrentRequests, 2),
   };
 }
 

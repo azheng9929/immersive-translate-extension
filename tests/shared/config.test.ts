@@ -6,14 +6,6 @@ describe("normalizeExtensionConfig", () => {
     expect(normalizeExtensionConfig(undefined)).toEqual(DEFAULT_EXTENSION_CONFIG);
   });
 
-  it("defaults DeepSeek full-page batches for throughput while profile caps keep first wave small", () => {
-    expect(DEFAULT_EXTENSION_CONFIG).toMatchObject({
-      deepseekMaxConcurrentRequests: 4,
-      deepseekMaxBatchItems: 6,
-      deepseekMaxBatchChars: 2400,
-    });
-  });
-
   it("keeps supported basic settings", () => {
     expect(
       normalizeExtensionConfig({

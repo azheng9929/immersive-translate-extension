@@ -35,15 +35,6 @@ type ViewportRootOptions = {
   rootMargin?: string;
   maxRoots?: number;
 };
-export type BatchProfile = "first-wave" | "normal" | "dynamic";
-type TranslateRootsOptions = {
-  batchProfile?: BatchProfile;
-};
-type BatchSettings = {
-  batchItems: number;
-  batchChars: number;
-  concurrentBatches: number;
-};
 type ControllerOptions = {
   targetLang: string;
   hostname?: string;
@@ -73,15 +64,9 @@ type ControllerOptions = {
   lineBreakMaxTextCount?: number;
   allowTooltip?: boolean;
   getPageTitle?: () => string | undefined;
-  firstWaveBatchItems?: number;
-  firstWaveBatchChars?: number;
-  firstWaveConcurrentBatches?: number;
   progressiveBatchItems?: number;
   progressiveBatchChars?: number;
   progressiveConcurrentBatches?: number;
-  dynamicBatchItems?: number;
-  dynamicBatchChars?: number;
-  dynamicConcurrentBatches?: number;
   translateBatch: (items: BatchItem[]) => Promise<BatchResult[]>;
 };
 
@@ -107,26 +92,23 @@ export class PageController {
   async translatePage(
     root: ParentNode = document.body,
     onProgress?: TranslationProgressListener,
-    options: TranslateRootsOptions = {},
   ): Promise<TranslationPageSummary> {
     this.restorePage();
-    return this.translateRoots([root], onProgress, options);
+    return this.translateRoots([root], onProgress);
   }
 
   async translateNewContent(
     root: ParentNode,
     onProgress?: TranslationProgressListener,
-    options: TranslateRootsOptions = {},
   ): Promise<TranslationPageSummary> {
-    return this.translateRoots([root], onProgress, options);
+    return this.translateRoots([root], onProgress);
   }
 
   async translateNewContents(
     roots: readonly ParentNode[],
     onProgress?: TranslationProgressListener,
-    options: TranslateRootsOptions = {},
   ): Promise<TranslationPageSummary> {
-    return this.translateRoots(roots, onProgress, options);
+    return this.translateRoots(roots, onProgress);
   }
 
   collectTranslatableRoots(root: ParentNode = document.body): HTMLElement[] {
@@ -191,7 +173,6 @@ export class PageController {
   private async translateRoots(
     roots: readonly ParentNode[],
     onProgress?: TranslationProgressListener,
-    options: TranslateRootsOptions = {},
   ): Promise<TranslationPageSummary> {
     if (roots.length === 0) return { total: 0, translated: 0, failed: 0, skipped: 0 };
 
@@ -251,7 +232,6 @@ export class PageController {
       summary,
       revision,
       onProgress,
-      options.batchProfile ?? "normal",
     );
 
     await this.writeCache(cacheWrites);
@@ -475,18 +455,16 @@ export class PageController {
     summary: TranslationPageSummary,
     revision: number,
     onProgress: TranslationProgressListener | undefined,
-    batchProfile: BatchProfile,
   ): Promise<void> {
     if (missingUnits.length === 0) return;
 
     const groups = groupMissingUnitsByCacheKey(missingUnits, lookupByUnitId);
-    const settings = this.batchSettings(batchProfile, missingUnits.length);
     const chunks = chunkMissingUnitGroups(
       groups,
-      settings.batchItems,
-      settings.batchChars,
+      this.progressiveBatchItems(missingUnits.length),
+      this.progressiveBatchChars(),
     );
-    const workerCount = Math.min(settings.concurrentBatches, chunks.length);
+    const workerCount = Math.min(this.progressiveConcurrentBatches(), chunks.length);
     let nextChunkIndex = 0;
 
     const runWorker = async (): Promise<void> => {
@@ -555,60 +533,6 @@ export class PageController {
     }
 
     notifyProgress(onProgress, delta);
-  }
-
-  private batchSettings(profile: BatchProfile, fallbackItems: number): BatchSettings {
-    if (profile === "first-wave") {
-      return {
-        batchItems: normalizeInteger(
-          this.options.firstWaveBatchItems,
-          Math.min(this.progressiveBatchItems(fallbackItems), 3),
-          1,
-          8,
-        ),
-        batchChars: normalizeInteger(
-          this.options.firstWaveBatchChars,
-          Math.min(this.progressiveBatchChars(), 1000),
-          300,
-          3000,
-        ),
-        concurrentBatches: normalizeInteger(
-          this.options.firstWaveConcurrentBatches,
-          Math.min(this.progressiveConcurrentBatches(), 2),
-          1,
-          4,
-        ),
-      };
-    }
-
-    if (profile === "dynamic") {
-      return {
-        batchItems: normalizeInteger(
-          this.options.dynamicBatchItems,
-          Math.min(this.progressiveBatchItems(fallbackItems), 4),
-          1,
-          12,
-        ),
-        batchChars: normalizeInteger(
-          this.options.dynamicBatchChars,
-          Math.min(this.progressiveBatchChars(), 1600),
-          300,
-          5000,
-        ),
-        concurrentBatches: normalizeInteger(
-          this.options.dynamicConcurrentBatches,
-          Math.min(this.progressiveConcurrentBatches(), 2),
-          1,
-          4,
-        ),
-      };
-    }
-
-    return {
-      batchItems: this.progressiveBatchItems(fallbackItems),
-      batchChars: this.progressiveBatchChars(),
-      concurrentBatches: this.progressiveConcurrentBatches(),
-    };
   }
 
   private progressiveBatchItems(fallback: number): number {
