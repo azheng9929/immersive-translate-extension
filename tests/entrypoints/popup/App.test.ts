@@ -349,6 +349,63 @@ describe("popup App", () => {
     });
   });
 
+  it("persists current-site auto translate by hostname when the policy site key is a wildcard", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, siteRules: {} };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_POPUP_GET_ACTIVE_TAB_STATUS") {
+        return {
+          ok: true,
+          status: {
+            phase: "ready",
+            observation: "idle",
+            pendingRoots: 0,
+            observedRoots: 0,
+            total: 0,
+            translated: 0,
+            failed: 0,
+            skipped: 0,
+            dynamicRuns: 0,
+            lastError: undefined,
+            site: {
+              hostname: "www.google.com",
+              siteKey: "www.google.*",
+              dynamicMode: "normal",
+              dynamicModeSource: "global",
+              isHighDynamic: false,
+            },
+          },
+        };
+      }
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const toggle = wrapper.find<HTMLInputElement>("[data-testid='site-auto-translate-toggle']");
+    expect(toggle.element.checked).toBe(false);
+
+    await toggle.setValue(true);
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { siteRules: { "google.com": { autoTranslate: true } } },
+    });
+
+    wrapper.unmount();
+    const reopened = mount(App);
+    await flushPromises();
+
+    expect(reopened.find<HTMLInputElement>("[data-testid='site-auto-translate-toggle']").element.checked).toBe(true);
+  });
+
   it("switches active page render state from the popup display controls", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, displayMode: "bilingual" };
     const sendMessage = vi.fn(async (message) => {

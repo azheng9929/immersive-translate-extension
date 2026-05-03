@@ -12,7 +12,7 @@ import {
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
 import type { DiagnosticReasonCounts, TranslationDiagnostics } from "../../src/content/translationDiagnostics";
-import { setSiteRule } from "../../src/shared/siteRules";
+import { normalizeSiteRuleKey, setSiteRule } from "../../src/shared/siteRules";
 
 const config = reactive<ExtensionConfig>({ ...DEFAULT_EXTENSION_CONFIG });
 const isLoading = ref(true);
@@ -123,11 +123,11 @@ const showOriginal = () => {
 };
 
 const setCurrentSiteAutoTranslate = async (enabled: boolean) => {
-  const site = currentSite.value;
-  if (!site) return;
-  const currentRule = config.siteRules[site.siteKey] ?? {};
+  const siteKey = currentSiteRuleKey.value;
+  if (!siteKey) return;
+  const currentRule = config.siteRules[siteKey] ?? {};
   await updateConfig({
-    siteRules: setSiteRule(config.siteRules, site.siteKey, { ...currentRule, autoTranslate: enabled }),
+    siteRules: setSiteRule(config.siteRules, siteKey, { ...currentRule, autoTranslate: enabled }),
   });
   await loadPageStatus();
 };
@@ -158,16 +158,22 @@ const pageDiagnosticsRows = computed(() => detailedDiagnosticsLabels(pageStatus.
 
 const currentSite = computed(() => pageStatus.value?.site);
 
-const currentSiteAutoTranslate = computed(() => {
+const currentSiteRuleKey = computed(() => {
   const site = currentSite.value;
-  if (!site) return false;
-  return config.siteRules[site.siteKey]?.autoTranslate === true;
+  if (!site) return "";
+  return normalizeSiteRuleKey(site.hostname) || normalizeSiteRuleKey(site.siteKey);
+});
+
+const currentSiteAutoTranslate = computed(() => {
+  const siteKey = currentSiteRuleKey.value;
+  if (!siteKey) return false;
+  return config.siteRules[siteKey]?.autoTranslate === true;
 });
 
 const currentSiteSummary = computed(() => {
   const site = currentSite.value;
   if (!site) return "暂无站点策略";
-  return `${site.siteKey} - 新内容自动处理`;
+  return `${currentSiteRuleKey.value || site.siteKey} - 新内容自动处理`;
 });
 
 const openAIStatus = computed(() => {
