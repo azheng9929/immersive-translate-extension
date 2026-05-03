@@ -8,7 +8,7 @@ describe("popup App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not expose dynamic mode choices in the popup", async () => {
+  it("shows and saves dynamic page tuning from the popup", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, dynamicMode: "normal" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -23,13 +23,54 @@ describe("popup App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='dynamic-mode-off']").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='dynamic-mode-conservative']").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='dynamic-mode-normal']").exists()).toBe(false);
-    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+    const dynamicMode = wrapper.find<HTMLSelectElement>("[data-testid='popup-dynamic-mode']");
+    expect(dynamicMode.exists()).toBe(true);
+    expect(dynamicMode.element.value).toBe("normal");
+
+    await dynamicMode.setValue("conservative");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: "IMT_UPDATE_CONFIG",
-      patch: expect.objectContaining({ dynamicMode: expect.any(String) }),
+      patch: { dynamicMode: "conservative" },
     }));
+  });
+
+  it("shows and saves the fast translation strategy from the popup", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "balanced" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const profile = wrapper.find<HTMLSelectElement>("[data-testid='popup-request-profile']");
+    expect(profile.exists()).toBe(true);
+    expect(profile.element.value).toBe("balanced");
+
+    await profile.setValue("fast");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: expect.objectContaining({
+        requestProfile: "fast",
+        dynamicMode: "normal",
+        openaiMaxConcurrentRequests: 6,
+        openaiMaxBatchItems: 10,
+        openaiMaxBatchChars: 3500,
+        deepseekMaxConcurrentRequests: 6,
+        deepseekMaxBatchItems: 10,
+        deepseekMaxBatchChars: 3500,
+      }),
+    });
   });
 
   it("keeps input translation off by default and saves the popup toggle", async () => {

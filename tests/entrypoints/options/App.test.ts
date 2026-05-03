@@ -8,7 +8,7 @@ describe("options App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("hides dynamic mode presets from the settings page", async () => {
+  it("shows and saves dynamic page tuning from the settings page", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, dynamicMode: "normal" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -28,10 +28,59 @@ describe("options App", () => {
     expect(wrapper.text()).toContain("交互入口");
     expect(wrapper.text()).toContain("术语表");
     expect(wrapper.text()).toContain("站点规则");
-    expect(wrapper.find("[data-testid='options-dynamic-mode-off']").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='options-dynamic-mode-conservative']").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='options-dynamic-mode-normal']").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(true);
+
+    const dynamicMode = wrapper.find<HTMLSelectElement>("[data-testid='options-dynamic-mode']");
+    expect(dynamicMode.exists()).toBe(true);
+    expect(dynamicMode.element.value).toBe("normal");
+
+    await dynamicMode.setValue("conservative");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: { dynamicMode: "conservative" },
+    });
+  });
+
+  it("shows and saves the fast translation strategy from the settings page", async () => {
+    let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "balanced" };
+    const sendMessage = vi.fn(async (message) => {
+      if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
+      if (message.type === "IMT_UPDATE_CONFIG") {
+        config = { ...config, ...message.patch };
+        return { ok: true, config };
+      }
+      if (message.type === "IMT_GET_PARAGRAPH_CACHE_STATS") {
+        return { ok: true, cacheStats: { entries: 0, estimatedBytes: 0, providers: [], targetLangs: [] } };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal("chrome", { runtime: { sendMessage } });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const profile = wrapper.find<HTMLSelectElement>("[data-testid='options-request-profile']");
+    expect(profile.exists()).toBe(true);
+    expect(profile.element.value).toBe("balanced");
+
+    await profile.setValue("fast");
+    await flushPromises();
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "IMT_UPDATE_CONFIG",
+      patch: expect.objectContaining({
+        requestProfile: "fast",
+        dynamicMode: "normal",
+        openaiMaxConcurrentRequests: 6,
+        openaiMaxBatchItems: 10,
+        openaiMaxBatchChars: 3500,
+        deepseekMaxConcurrentRequests: 6,
+        deepseekMaxBatchItems: 10,
+        deepseekMaxBatchChars: 3500,
+      }),
+    });
   });
 
   it("keeps input translation off by default and saves interaction toggles", async () => {
@@ -363,7 +412,7 @@ describe("options App", () => {
     });
   });
 
-  it("saves fallback provider without exposing request presets", async () => {
+  it("saves fallback provider while exposing request presets", async () => {
     let config: ExtensionConfig = { ...DEFAULT_EXTENSION_CONFIG, provider: "openai-compatible" };
     const sendMessage = vi.fn(async (message) => {
       if (message.type === "IMT_GET_CONFIG") return { ok: true, config };
@@ -378,7 +427,7 @@ describe("options App", () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='request-profile-high-dynamic']").exists()).toBe(true);
     await wrapper.find<HTMLSelectElement>("[data-testid='fallback-provider']").setValue("microsoft");
     await flushPromises();
 

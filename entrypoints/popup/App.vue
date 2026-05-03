@@ -3,11 +3,14 @@ import { computed, onMounted, reactive, ref } from "vue";
 import {
   DEFAULT_EXTENSION_CONFIG,
   displayModeToPageRenderState,
+  requestProfilePatch,
   type DisplayMode,
+  type DynamicMode,
   type ExtensionConfig,
   type ExtensionConfigPatch,
   type ExtensionProvider,
   type PageRenderState,
+  type RequestProfile,
 } from "../../src/shared/config";
 import type { BackgroundMessage, MessageResponse } from "../../src/shared/messages";
 import type { PageTranslationStatus } from "../../src/content/pageTranslationSession";
@@ -40,6 +43,14 @@ const setTargetLang = (event: Event) => {
 
 const setProvider = (event: Event) => {
   void updateConfig({ provider: (event.target as HTMLSelectElement).value as ExtensionProvider });
+};
+
+const setRequestProfile = (event: Event) => {
+  void updateConfig(requestProfilePatch((event.target as HTMLSelectElement).value as RequestProfile));
+};
+
+const setDynamicMode = (event: Event) => {
+  void updateConfig({ dynamicMode: (event.target as HTMLSelectElement).value as DynamicMode });
 };
 
 const setOpenAIEndpoint = (event: Event) => {
@@ -363,6 +374,25 @@ function endpointSummary(value: string): string {
           <option value="anthropic">Claude</option>
           <option value="openrouter">OpenRouter</option>
           <option value="fake">本地测试</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>翻译策略</span>
+        <select data-testid="popup-request-profile" :value="config.requestProfile" @change="setRequestProfile">
+          <option value="stable">稳定</option>
+          <option value="balanced">均衡</option>
+          <option value="fast">极速</option>
+          <option data-testid="popup-request-profile-high-dynamic" value="high-dynamic">高动态</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>动态补翻</span>
+        <select data-testid="popup-dynamic-mode" :value="config.dynamicMode" @change="setDynamicMode">
+          <option value="off">关闭</option>
+          <option value="conservative">保守</option>
+          <option value="normal">正常</option>
         </select>
       </label>
 
