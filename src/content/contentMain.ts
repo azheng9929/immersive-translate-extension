@@ -274,7 +274,7 @@ function createController(config: ExtensionConfig, sitePolicy: SitePolicy): Page
     ...(sitePolicy.lineBreakMaxTextCount !== undefined ? { lineBreakMaxTextCount: sitePolicy.lineBreakMaxTextCount } : {}),
     allowTooltip: sitePolicy.allowTooltip,
     getPageTitle: readPageTitleContext,
-    ...progressivePageBatchOptions(config),
+    ...progressivePageBatchOptions(config, sitePolicy),
     retry: { maxAttempts: 3, delayMs: 800 },
     translateBatch: (items) => translateBatchWithProviderFallback(
       config,
@@ -314,6 +314,7 @@ function createPageSession(
   sitePolicy: SitePolicy,
   onUrlChange?: PageTranslationUrlChangeHandler,
 ): PageTranslationSession {
+  const fastFullPage = isFastFullPageMode(config, sitePolicy);
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,
@@ -322,13 +323,17 @@ function createPageSession(
     lazyRootMargin: sitePolicy.lazyRootMargin,
     lazyThreshold: sitePolicy.lazyThreshold,
     eagerLazy: true,
-    eagerLazyRootMargin: sitePolicy.eagerLazyRootMargin,
-    maxEagerLazyRoots: sitePolicy.maxEagerLazyRoots,
+    eagerLazyRootMargin: fastFullPage ? "1600px" : sitePolicy.eagerLazyRootMargin,
+    maxEagerLazyRoots: fastFullPage ? 28 : sitePolicy.maxEagerLazyRoots,
+    firstWaveMaxRoots: fastFullPage ? 28 : sitePolicy.maxEagerLazyRoots,
+    eagerTranslateRest: fastFullPage,
+    backgroundEagerMaxRoots: fastFullPage ? 420 : 0,
+    useBatchProfiles: fastFullPage,
     viewportSupplement: sitePolicy.viewportSupplement,
     viewportSupplementDebounceMs: sitePolicy.viewportSupplementDebounceMs,
     viewportSupplementRootMargin: sitePolicy.viewportSupplementRootMargin,
     viewportSupplementMaxRoots: sitePolicy.viewportSupplementMaxRoots,
-    lazyDiscoveryDelayMs: sitePolicy.isHighDynamic ? 180 : 80,
+    lazyDiscoveryDelayMs: fastFullPage ? 0 : sitePolicy.isHighDynamic ? 180 : 80,
     dynamicMode: sitePolicy.dynamicMode,
     excludedDynamicSelectors: sitePolicy.excludedDynamicSelectors,
     maxQueueSize: sitePolicy.maxQueueSize,
@@ -582,51 +587,89 @@ function providerRequestOptions(config: ExtensionConfig, provider: ExtensionProv
   };
 }
 
-function progressivePageBatchOptions(config: ExtensionConfig) {
+export function isFastFullPageMode(config: ExtensionConfig, sitePolicy: SitePolicy): boolean {
+  if (config.requestProfile !== "fast") return false;
+  if (sitePolicy.isHighDynamic && sitePolicy.fallbackProfile === "social") return false;
+  return true;
+}
+
+export function progressivePageBatchOptions(config: ExtensionConfig, sitePolicy: SitePolicy) {
+  const fastFullPage = isFastFullPageMode(config, sitePolicy);
+
   if (config.provider === "openai-compatible") {
-    return {
-      progressiveBatchItems: Math.min(config.openaiMaxBatchItems, 8),
-      progressiveBatchChars: config.openaiMaxBatchChars,
-      progressiveConcurrentBatches: config.openaiMaxConcurrentRequests,
-    };
+    return providerBatchProfileOptions({
+      maxBatchItems: config.openaiMaxBatchItems,
+      maxBatchChars: config.openaiMaxBatchChars,
+      maxConcurrentRequests: config.openaiMaxConcurrentRequests,
+      fastFullPage,
+    });
   }
 
   if (config.provider === "gemini") {
-    return {
-      progressiveBatchItems: Math.min(config.geminiMaxBatchItems, 8),
-      progressiveBatchChars: config.geminiMaxBatchChars,
-      progressiveConcurrentBatches: config.geminiMaxConcurrentRequests,
-    };
+    return providerBatchProfileOptions({
+      maxBatchItems: config.geminiMaxBatchItems,
+      maxBatchChars: config.geminiMaxBatchChars,
+      maxConcurrentRequests: config.geminiMaxConcurrentRequests,
+      fastFullPage,
+    });
   }
 
   if (config.provider === "deepseek") {
-    return {
-      progressiveBatchItems: Math.min(config.deepseekMaxBatchItems, 8),
-      progressiveBatchChars: config.deepseekMaxBatchChars,
-      progressiveConcurrentBatches: config.deepseekMaxConcurrentRequests,
-    };
+    return providerBatchProfileOptions({
+      maxBatchItems: config.deepseekMaxBatchItems,
+      maxBatchChars: config.deepseekMaxBatchChars,
+      maxConcurrentRequests: config.deepseekMaxConcurrentRequests,
+      fastFullPage,
+    });
   }
 
   if (config.provider === "anthropic") {
-    return {
-      progressiveBatchItems: Math.min(config.anthropicMaxBatchItems, 8),
-      progressiveBatchChars: config.anthropicMaxBatchChars,
-      progressiveConcurrentBatches: config.anthropicMaxConcurrentRequests,
-    };
+    return providerBatchProfileOptions({
+      maxBatchItems: config.anthropicMaxBatchItems,
+      maxBatchChars: config.anthropicMaxBatchChars,
+      maxConcurrentRequests: config.anthropicMaxConcurrentRequests,
+      fastFullPage,
+    });
   }
 
   if (config.provider === "openrouter") {
-    return {
-      progressiveBatchItems: Math.min(config.openrouterMaxBatchItems, 8),
-      progressiveBatchChars: config.openrouterMaxBatchChars,
-      progressiveConcurrentBatches: config.openrouterMaxConcurrentRequests,
-    };
+    return providerBatchProfileOptions({
+      maxBatchItems: config.openrouterMaxBatchItems,
+      maxBatchChars: config.openrouterMaxBatchChars,
+      maxConcurrentRequests: config.openrouterMaxConcurrentRequests,
+      fastFullPage,
+    });
   }
 
   return {
+    firstWaveBatchItems: 3,
+    firstWaveBatchChars: 1000,
+    firstWaveConcurrentBatches: 2,
     progressiveBatchItems: 16,
     progressiveBatchChars: 6000,
     progressiveConcurrentBatches: 4,
+    dynamicBatchItems: 4,
+    dynamicBatchChars: 1600,
+    dynamicConcurrentBatches: 2,
+  };
+}
+
+function providerBatchProfileOptions(input: {
+  maxBatchItems: number;
+  maxBatchChars: number;
+  maxConcurrentRequests: number;
+  fastFullPage: boolean;
+}) {
+  return {
+    firstWaveBatchItems: 3,
+    firstWaveBatchChars: 1000,
+    firstWaveConcurrentBatches: 2,
+    progressiveBatchItems: Math.min(input.maxBatchItems, input.fastFullPage ? 10 : 8),
+    progressiveBatchChars: input.maxBatchChars,
+    progressiveConcurrentBatches: input.maxConcurrentRequests,
+    dynamicBatchItems: 4,
+    dynamicBatchChars: Math.min(input.maxBatchChars, 1600),
+    dynamicConcurrentBatches: Math.min(input.maxConcurrentRequests, 2),
   };
 }
 

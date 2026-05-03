@@ -957,6 +957,57 @@ describe("PageTranslationSession", () => {
     }
   });
 
+  it("translates remaining initial lazy roots in the background when eager rest is enabled", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `
+      <main>
+        <p id="visible">Visible first wave.</p>
+        <p id="later-one">Background second wave.</p>
+        <p id="later-two">Background third wave.</p>
+      </main>
+    `;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    setElementRect(document.querySelector("#later-one")!, { top: 2400, bottom: 2440, left: 0, right: 200 });
+    setElementRect(document.querySelector("#later-two")!, { top: 2800, bottom: 2840, left: 0, right: 200 });
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      lazy: true,
+      eagerLazy: true,
+      viewportFirst: true,
+      eagerLazyRootMargin: "100px",
+      lazyDiscoveryDelayMs: 0,
+      firstWaveMaxRoots: 1,
+      eagerTranslateRest: true,
+      backgroundEagerMaxRoots: 10,
+    });
+
+    await session.translatePage();
+    await waitFor(() => session!.getStatus().translated === 1);
+    expect(requestedTexts).toEqual(["Visible first wave."]);
+
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => session!.getStatus().translated === 3);
+
+    expect(requestedTexts).toEqual([
+      "Visible first wave.",
+      "Background second wave.",
+      "Background third wave.",
+    ]);
+    expect(FakeIntersectionObserver.instances.flatMap((instance) => Array.from(instance.observed))).not.toContain(
+      document.querySelector("#later-one"),
+    );
+  });
+
   it("falls back to eager lazy roots when viewport-first discovery finds no first wave", async () => {
     const FakeIntersectionObserver = createFakeIntersectionObserver();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);

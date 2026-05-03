@@ -1,4 +1,4 @@
-import type { PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
+import type { BatchProfile, PageController, TranslationPageSummary, TranslationProgressDelta } from "./pageController";
 import {
   DEFAULT_EXCLUDED_DYNAMIC_SELECTORS,
   type DynamicModeSource,
@@ -94,6 +94,10 @@ type PageTranslationSessionOptions = {
   eagerLazy?: boolean;
   eagerLazyRootMargin?: string;
   maxEagerLazyRoots?: number;
+  firstWaveMaxRoots?: number;
+  eagerTranslateRest?: boolean;
+  backgroundEagerMaxRoots?: number;
+  useBatchProfiles?: boolean;
   viewportFirst?: boolean;
   viewportSupplement?: boolean;
   viewportSupplementDebounceMs?: number;
@@ -161,6 +165,7 @@ export class PageTranslationSession {
   private readonly dynamicLazyRoots = new WeakSet<HTMLElement>();
   private readonly pendingVisibleLazyRoots = new Set<HTMLElement>();
   private pendingVisibleLazyDynamicRun = false;
+  private pendingVisibleLazyBatchProfile: BatchProfile = "normal";
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private lazyDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
   private debounceDueAt = 0;
@@ -210,6 +215,7 @@ export class PageTranslationSession {
     this.pendingRoots.clear();
     this.pendingVisibleLazyRoots.clear();
     this.pendingVisibleLazyDynamicRun = false;
+    this.pendingVisibleLazyBatchProfile = "normal";
     this.dynamicSuspended = false;
     this.resetMutationWindow();
     this.lastObservedUrl = globalThis.location?.href ?? this.lastObservedUrl;
@@ -227,7 +233,7 @@ export class PageTranslationSession {
         if (this.options.viewportFirst) {
           const firstWaveRoots = this.controller.collectViewportTranslatableRoots(root, {
             rootMargin: this.options.eagerLazyRootMargin ?? this.options.lazyRootMargin ?? "900px",
-            maxRoots: this.options.maxEagerLazyRoots ?? 120,
+            maxRoots: this.options.firstWaveMaxRoots ?? this.options.maxEagerLazyRoots ?? 120,
           });
           const observation = this.activateDynamicObserver("translated");
           this.setStatus({
@@ -239,10 +245,10 @@ export class PageTranslationSession {
           });
           if (firstWaveRoots.length > 0) {
             this.scheduleLazyRootDiscovery(root, operationId, firstWaveRoots);
-            void this.translateRoots(firstWaveRoots, false);
+            void this.translateRoots(firstWaveRoots, false, this.batchProfile("first-wave"));
           } else {
             const fallbackRoots = this.controller.collectTranslatableRoots(root);
-            const maxEagerRoots = this.options.maxEagerLazyRoots ?? 120;
+            const maxEagerRoots = this.options.firstWaveMaxRoots ?? this.options.maxEagerLazyRoots ?? 120;
             const eagerRoots = fallbackRoots.slice(0, maxEagerRoots);
             const deferredRoots = fallbackRoots.slice(eagerRoots.length);
             this.observeLazyRoots(deferredRoots, false);
@@ -253,10 +259,10 @@ export class PageTranslationSession {
               dynamicRuns: 0,
               lastError: undefined,
             });
-            if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
+            if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false, this.batchProfile("first-wave"));
             else if (fallbackRoots.length === 0) {
               const rootElement = root instanceof HTMLElement ? root : root instanceof Document ? root.body : undefined;
-              if (rootElement) void this.translateRoots([rootElement], false);
+              if (rootElement) void this.translateRoots([rootElement], false, this.batchProfile("first-wave"));
             }
           }
           return this.getStatus();
@@ -273,7 +279,7 @@ export class PageTranslationSession {
           dynamicRuns: 0,
           lastError: undefined,
         });
-        if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false);
+        if (eagerRoots.length > 0) void this.translateRoots(eagerRoots, false, this.batchProfile("first-wave"));
         return this.getStatus();
       }
 
@@ -302,6 +308,7 @@ export class PageTranslationSession {
     this.pendingRoots.clear();
     this.pendingVisibleLazyRoots.clear();
     this.pendingVisibleLazyDynamicRun = false;
+    this.pendingVisibleLazyBatchProfile = "normal";
     this.dynamicSuspended = false;
     this.resetMutationWindow();
     this.controller.restorePage();
@@ -327,6 +334,7 @@ export class PageTranslationSession {
     this.pendingRoots.clear();
     this.pendingVisibleLazyRoots.clear();
     this.pendingVisibleLazyDynamicRun = false;
+    this.pendingVisibleLazyBatchProfile = "normal";
   }
 
   private activateDynamicObserver(phase: PageTranslationPhase = this.status.phase): DynamicObservationState {
@@ -516,7 +524,7 @@ export class PageTranslationSession {
       return;
     }
 
-    await this.translateRoots(roots, true);
+    await this.translateRoots(roots, true, this.batchProfile("dynamic"));
   }
 
   private addPendingRoot(
@@ -606,7 +614,7 @@ export class PageTranslationSession {
       const { eagerRoots, deferredRoots } = this.partitionDynamicLazyRoots(roots);
       this.observeLazyRoots(deferredRoots, true);
       if (eagerRoots.length > 0) {
-        await this.translateRoots(eagerRoots, true);
+        await this.translateRoots(eagerRoots, true, this.batchProfile("dynamic"));
         return;
       }
       if (this.pendingRoots.size > 0) this.scheduleFlush();
@@ -614,7 +622,7 @@ export class PageTranslationSession {
       return;
     }
 
-    await this.translateRoots(roots, true);
+    await this.translateRoots(roots, true, this.batchProfile("dynamic"));
   }
 
   private observeLazyRoots(roots: HTMLElement[], countDynamicRun: boolean): void {
@@ -658,10 +666,22 @@ export class PageTranslationSession {
       }
       return true;
     });
+    if (this.options.eagerTranslateRest) {
+      const maxBackgroundRoots = normalizeInteger(this.options.backgroundEagerMaxRoots, 360, 1, 1000);
+      const backgroundRoots = initialRoots.slice(0, maxBackgroundRoots);
+      const overflowRoots = initialRoots.slice(backgroundRoots.length);
+      this.observeLazyRoots(overflowRoots, false);
+      if (backgroundRoots.length > 0) {
+        void this.translateRoots(backgroundRoots, false, this.batchProfile("normal"));
+        return;
+      }
+      this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
+      return;
+    }
     const { eagerRoots, deferredRoots } = this.partitionInitialLazyRoots(initialRoots);
     this.observeLazyRoots(deferredRoots, false);
     if (eagerRoots.length > 0) {
-      void this.translateRoots(eagerRoots, false);
+      void this.translateRoots(eagerRoots, false, this.batchProfile("normal"));
       return;
     }
     this.setStatus({ ...this.status, observation: this.activateDynamicObserver(this.status.phase) });
@@ -718,14 +738,19 @@ export class PageTranslationSession {
       visibleRoots.push(root);
     }
 
-    if (visibleRoots.length > 0) void this.translateRoots(visibleRoots, countDynamicRun);
+    if (visibleRoots.length > 0) void this.translateRoots(visibleRoots, countDynamicRun, this.batchProfile(countDynamicRun ? "dynamic" : "normal"));
   }
 
-  private async translateRoots(roots: HTMLElement[], countDynamicRun: boolean): Promise<void> {
+  private async translateRoots(
+    roots: HTMLElement[],
+    countDynamicRun: boolean,
+    batchProfile: BatchProfile = this.batchProfile(countDynamicRun ? "dynamic" : "normal"),
+  ): Promise<void> {
     if (this.flushing) {
       if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
         for (const root of roots) this.pendingVisibleLazyRoots.add(root);
         this.pendingVisibleLazyDynamicRun = this.pendingVisibleLazyDynamicRun || countDynamicRun;
+        this.pendingVisibleLazyBatchProfile = mergeBatchProfiles(this.pendingVisibleLazyBatchProfile, batchProfile);
       } else {
         for (const root of roots) this.addPendingRoot(root, false);
       }
@@ -753,7 +778,7 @@ export class PageTranslationSession {
         });
       };
 
-      const dynamicSummary = await this.controller.translateNewContents(roots, reportProgress);
+      const dynamicSummary = await this.controller.translateNewContents(roots, reportProgress, { batchProfile });
 
       if (operationId !== this.operationId) return;
       const summary = mergeSummary(this.status, subtractSummary(dynamicSummary, reportedSummary));
@@ -781,6 +806,7 @@ export class PageTranslationSession {
       if (operationId !== this.operationId) return;
 
       const pendingVisibleDynamicRun = this.pendingVisibleLazyDynamicRun;
+      const pendingVisibleBatchProfile = this.pendingVisibleLazyBatchProfile;
       const pendingVisibleRoots = [...this.pendingVisibleLazyRoots].filter(
         (root) =>
           root.isConnected &&
@@ -788,9 +814,10 @@ export class PageTranslationSession {
       );
       this.pendingVisibleLazyRoots.clear();
       this.pendingVisibleLazyDynamicRun = false;
+      this.pendingVisibleLazyBatchProfile = "normal";
 
       if (pendingVisibleRoots.length > 0 && this.canHandleDynamicMutations()) {
-        void this.translateRoots(pendingVisibleRoots, pendingVisibleDynamicRun);
+        void this.translateRoots(pendingVisibleRoots, pendingVisibleDynamicRun, pendingVisibleBatchProfile);
         return;
       }
 
@@ -806,6 +833,10 @@ export class PageTranslationSession {
     return (canSupplement(this.status.phase) || this.status.phase === "updating") &&
       this.dynamicMode() !== "off" &&
       !this.dynamicSuspended;
+  }
+
+  private batchProfile(profile: BatchProfile): BatchProfile {
+    return this.options.useBatchProfiles ? profile : "normal";
   }
 
   private recordMutationVolume(count: number): boolean {
@@ -1128,6 +1159,22 @@ function parseRootMarginPx(rootMargin: string): number {
   if (!match) return 0;
   const value = Number(match[1]);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : Number.NaN;
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.min(Math.max(Math.round(numberValue), min), max);
+}
+
+function mergeBatchProfiles(left: BatchProfile, right: BatchProfile): BatchProfile {
+  return batchProfileRank(right) > batchProfileRank(left) ? right : left;
+}
+
+function batchProfileRank(profile: BatchProfile): number {
+  if (profile === "dynamic") return 2;
+  if (profile === "first-wave") return 1;
+  return 0;
 }
 
 function errorMessage(error: unknown): string {

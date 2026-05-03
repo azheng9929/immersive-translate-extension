@@ -275,6 +275,49 @@ describe("PageController", () => {
     expect(document.querySelector("#second .imt-translation-block")?.textContent).toBe("[zh-Hans] Second paragraph.");
   });
 
+  it("uses smaller first-wave and dynamic batch profiles without shrinking normal batches", async () => {
+    async function translateWithProfile(batchProfile: "first-wave" | "normal" | "dynamic") {
+      document.body.innerHTML = `
+        <main>
+          <p>Alpha paragraph.</p>
+          <p>Bravo paragraph.</p>
+          <p>Charlie paragraph.</p>
+          <p>Delta paragraph.</p>
+          <p>Echo paragraph.</p>
+        </main>
+      `;
+      const batchSizes: number[] = [];
+      const controller = new PageController({
+        targetLang: "zh-Hans",
+        firstWaveBatchItems: 2,
+        firstWaveBatchChars: 1000,
+        firstWaveConcurrentBatches: 1,
+        progressiveBatchItems: 5,
+        progressiveBatchChars: 5000,
+        progressiveConcurrentBatches: 1,
+        dynamicBatchItems: 3,
+        dynamicBatchChars: 1600,
+        dynamicConcurrentBatches: 1,
+        translateBatch: async (items) => {
+          batchSizes.push(items.length);
+          return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+        },
+      });
+
+      await controller.translateNewContents(
+        Array.from(document.querySelectorAll("p")),
+        undefined,
+        { batchProfile },
+      );
+
+      return batchSizes;
+    }
+
+    await expect(translateWithProfile("first-wave")).resolves.toEqual([2, 2, 1]);
+    await expect(translateWithProfile("normal")).resolves.toEqual([5]);
+    await expect(translateWithProfile("dynamic")).resolves.toEqual([3, 2]);
+  });
+
   it("collects only near-viewport roots for the first translation wave", () => {
     document.body.innerHTML = `
       <main>

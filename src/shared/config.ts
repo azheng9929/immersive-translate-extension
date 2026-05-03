@@ -198,8 +198,8 @@ const REQUEST_PROFILE_PRESETS: Record<RequestProfile, {
   fast: {
     dynamicMode: "normal",
     maxConcurrentRequests: 6,
-    maxBatchItems: 4,
-    maxBatchChars: 1200,
+    maxBatchItems: 10,
+    maxBatchChars: 3500,
     requestTimeoutMs: 45000,
   },
   "high-dynamic": {
