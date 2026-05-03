@@ -48,8 +48,8 @@ describe("real-site regression selection", () => {
       deepseekApiKey: "deepseek-secret",
       deepseekModel: "deepseek-v4-flash",
       deepseekMaxConcurrentRequests: 4,
-      deepseekMaxBatchItems: 4,
-      deepseekMaxBatchChars: 1200,
+      deepseekMaxBatchItems: 6,
+      deepseekMaxBatchChars: 2400,
       deepseekRequestTimeoutMs: 45000,
       siteDynamicModes: {
         "www.youtube.com": "normal",
