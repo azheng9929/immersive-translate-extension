@@ -16,8 +16,8 @@ export function ensureRuntimeStyle(): void {
       border-inline-start: 2px solid currentColor;
       border-inline-start-color: color-mix(in srgb, currentColor 18%, transparent);
       background: transparent;
-      color: currentColor;
-      color: color-mix(in srgb, currentColor 76%, transparent);
+      color: var(--imt-source-color, currentColor);
+      color: color-mix(in srgb, var(--imt-source-color, currentColor) 76%, transparent);
       font: inherit;
       font-size: 0.93em;
       font-weight: 400;
@@ -34,8 +34,8 @@ export function ensureRuntimeStyle(): void {
       padding-inline-start: 0;
       border-inline-start: 0;
       background: transparent;
-      color: currentColor;
-      color: color-mix(in srgb, currentColor 70%, transparent);
+      color: var(--imt-source-color, currentColor);
+      color: color-mix(in srgb, var(--imt-source-color, currentColor) 70%, transparent);
       font: inherit;
       font-size: 0.82em;
       line-height: 1.32;
@@ -47,7 +47,7 @@ export function ensureRuntimeStyle(): void {
       display: inline;
       box-sizing: border-box;
       max-width: 100%;
-      color: currentColor;
+      color: var(--imt-source-color, currentColor);
       font: inherit;
       line-height: inherit;
       letter-spacing: 0;
@@ -59,7 +59,8 @@ export function ensureRuntimeStyle(): void {
       height: 0.78em;
       margin-inline-start: 0.38em;
       vertical-align: -0.08em;
-      color: color-mix(in srgb, currentColor 68%, transparent);
+      color: var(--imt-source-color, currentColor);
+      color: color-mix(in srgb, var(--imt-source-color, currentColor) 68%, transparent);
       opacity: 0.78;
       pointer-events: none;
       contain: layout style paint;

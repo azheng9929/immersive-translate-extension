@@ -19,6 +19,7 @@ export function renderTranslationLoading(unit: TranslationUnit): RestoreRecord[]
   loading.setAttribute("aria-label", "Translating");
   loading.setAttribute("role", "status");
   loading.className = "imt-translation-loading";
+  applySourceTextStyle(loading, unit);
   unit.root.appendChild(loading);
 
   return [{ type: "inserted-node", unitId: unit.id, node: loading }];
@@ -73,6 +74,7 @@ export function renderTranslation(unit: TranslationUnit, translatedText: string)
     unit.renderMode === "compact-bilingual" ? "imt-translation-compact" : "imt-translation-block",
     ...(unit.translationClasses ?? []),
   ].filter(Boolean).join(" ");
+  applySourceTextStyle(span, unit);
   appendTranslatedContent(span, unit, translatedText);
   unit.root.appendChild(span);
   return [{ type: "inserted-node", unitId: unit.id, node: span }];
@@ -99,6 +101,7 @@ function renderRichTextReplacement(unit: TranslationUnit, translatedText: string
   replacement.className = ["imt-translation-replacement", ...(unit.translationClasses ?? [])]
     .filter(Boolean)
     .join(" ");
+  applySourceTextStyle(replacement, unit);
   appendTranslatedContent(replacement, unit, translatedText);
 
   unit.root.insertBefore(replacement, unit.root.firstChild);
@@ -134,6 +137,7 @@ function renderRichInlineReplacement(unit: TranslationUnit, translatedText: stri
   replacement.className = ["imt-translation-replacement", ...(unit.translationClasses ?? [])]
     .filter(Boolean)
     .join(" ");
+  applySourceTextStyle(replacement, unit);
   appendTranslatedContent(replacement, unit, translatedText);
 
   unit.root.insertBefore(replacement, unit.root.firstChild);
@@ -177,6 +181,19 @@ function appendTranslatedContent(parent: HTMLElement, unit: TranslationUnit, tra
   if (unit.wrapperPrefix) parent.append(document.createTextNode(unit.wrapperPrefix));
   for (const node of richNodes) parent.append(node);
   if (unit.wrapperSuffix) parent.append(document.createTextNode(unit.wrapperSuffix));
+}
+
+function applySourceTextStyle(target: HTMLElement, unit: TranslationUnit): void {
+  const sourceElement = sourceTextElement(unit);
+  if (!sourceElement) return;
+  const color = window.getComputedStyle(sourceElement).color;
+  if (!color || color === "transparent" || color === "rgba(0, 0, 0, 0)") return;
+  target.style.setProperty("--imt-source-color", color);
+}
+
+function sourceTextElement(unit: TranslationUnit): HTMLElement | undefined {
+  const textNode = unit.textNodes.find((node) => (node.textContent ?? "").trim().length > 0);
+  return textNode?.parentElement ?? unit.root;
 }
 
 function translatedNodesFromPieces(unit: TranslationUnit, translatedText: string): Node[] | undefined {

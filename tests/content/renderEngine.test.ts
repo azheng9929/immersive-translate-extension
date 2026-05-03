@@ -38,6 +38,29 @@ describe("renderTranslation", () => {
     expect(document.body.innerHTML).toBe("<p>Hello world</p>");
   });
 
+  it("uses the original text element color for inserted translations", () => {
+    document.body.innerHTML = `
+      <ul>
+        <li style="color: rgb(0, 0, 0); background: rgb(0, 0, 0)">
+          <span id="source" style="color: rgb(255, 255, 255)">x402 Payment Protocol</span>
+        </li>
+      </ul>
+    `;
+    const root = document.querySelector("li")!;
+    const sourceText = document.querySelector("#source")!.firstChild as Text;
+    const unit = {
+      ...baseUnit(root, "bilingual-inside"),
+      textNodes: [sourceText],
+      originalText: "x402 Payment Protocol",
+      normalizedText: "x402 payment protocol",
+    };
+
+    renderTranslation(unit, "x402 支付协议");
+
+    const translated = document.querySelector<HTMLElement>(".imt-translation-block")!;
+    expect(translated.style.getPropertyValue("--imt-source-color")).toBe("rgb(255, 255, 255)");
+  });
+
   it("replaces button text, exposes original text for hover, and restores it", () => {
     document.body.innerHTML = "<button>Submit</button>";
     const unit = baseUnit(document.querySelector("button")!, "replace-text");
