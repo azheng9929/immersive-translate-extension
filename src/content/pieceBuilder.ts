@@ -1,6 +1,7 @@
 import { normalizeVisibleText } from "../shared/normalize";
 import { isSkippableElement } from "../shared/skipRules";
 import type { TranslationPiecePlaceholder, TranslationPiecePlan } from "../shared/types";
+import { isSafeHrefAttribute } from "../shared/urlSafety";
 import {
   classifyElementForTranslation,
   isStayOriginalElement,
@@ -297,7 +298,10 @@ function hasInteractiveDescendant(element: HTMLElement): boolean {
 
 function placeholderAttributes(element: HTMLElement): { attributes?: Readonly<Record<string, string>> } {
   const attributes: Record<string, string> = {};
-  if (element instanceof HTMLAnchorElement && element.href) attributes.href = element.getAttribute("href") ?? element.href;
+  if (element instanceof HTMLAnchorElement && element.href) {
+    const href = element.getAttribute("href") ?? element.href;
+    if (isSafeHrefAttribute(href)) attributes.href = href;
+  }
   for (const name of ["title", "lang", "dir", "class"]) {
     const value = element.getAttribute(name);
     if (value) attributes[name] = value;

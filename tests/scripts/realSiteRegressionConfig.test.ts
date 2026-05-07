@@ -177,6 +177,20 @@ describe("real-site regression selection", () => {
     ).toBe("unavailable page");
   });
 
+  it("treats Etsy 403 empty pages as an external access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "etsy.com" },
+        {
+          title: "etsy.com",
+          url: "https://www.etsy.com/search?q=planner",
+          bodyTextLength: 0,
+          bodyTextPreview: "",
+        },
+      ),
+    ).toBe("access denied page");
+  });
+
   it("lets explicit env filters override profile site selection", () => {
     const selection = resolveRegressionSelection({
       argv: ["--profile=all"],

@@ -578,6 +578,7 @@ export function siteAccessGateReason(site, metrics) {
   if (isCloudflareChallenge(metrics)) return "cloudflare challenge";
   if (isAmazonRobotCheck(site, metrics)) return "robot check";
   if (isAmazonUnavailablePage(site, metrics)) return "unavailable page";
+  if (isEtsyAccessDeniedPage(site, metrics)) return "access denied page";
   return undefined;
 }
 
@@ -632,6 +633,12 @@ function isAmazonUnavailablePage(site, metrics) {
     /page not found|sorry! something went wrong/i.test(metrics.title ?? "") ||
     (metrics.bodyTextLength === 0 && /\/dp\/|\/gp\/product\//i.test(metrics.url ?? ""))
   );
+}
+
+function isEtsyAccessDeniedPage(site, metrics) {
+  return site.host === "etsy.com" &&
+    metrics.bodyTextLength === 0 &&
+    /etsy\.com/i.test(`${metrics.title ?? ""} ${metrics.url ?? ""}`);
 }
 
 function isRedditSite(site) {

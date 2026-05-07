@@ -829,11 +829,7 @@ describe("PageTranslationSession", () => {
     setElementRect(dynamicCard, { top: 80, bottom: 160, left: 0, right: 240 });
     document.querySelector("main")?.append(dynamicCard);
     await Promise.resolve();
-    for (let attempt = 0; attempt < 5 && !requestedTexts.includes("Dynamic visible card copy."); attempt += 1) {
-      await vi.advanceTimersByTimeAsync(20);
-      await Promise.resolve();
-    }
-    await waitFor(() => requestedTexts.includes("Dynamic visible card copy."));
+    await waitForWithTimers(() => requestedTexts.includes("Dynamic visible card copy."));
 
     expect(requestedTexts).toEqual(["Initial visible paragraph.", "Dynamic visible card copy."]);
     expect(document.querySelector("#dynamic-card .imt-translation-block")?.textContent).toBe("[zh-Hans] Dynamic visible card copy.");
@@ -873,11 +869,7 @@ describe("PageTranslationSession", () => {
     tooltip.textContent = "Dynamic tooltip description.";
     document.body.append(tooltip);
     await Promise.resolve();
-    for (let attempt = 0; attempt < 5 && !requestedTexts.includes("Dynamic tooltip description."); attempt += 1) {
-      await vi.advanceTimersByTimeAsync(20);
-      await Promise.resolve();
-    }
-    await waitFor(() => requestedTexts.includes("Dynamic tooltip description."));
+    await waitForWithTimers(() => requestedTexts.includes("Dynamic tooltip description."));
 
     expect(requestedTexts).toEqual(["Initial visible paragraph.", "Dynamic tooltip description."]);
     expect(tooltip.textContent).toContain("[zh-Hans] Dynamic tooltip description.");
@@ -922,7 +914,7 @@ describe("PageTranslationSession", () => {
     });
 
     await session.translatePage();
-    await waitFor(() => session!.getStatus().translated === 1);
+    await waitForWithTimers(() => session!.getStatus().translated === 1, 0);
 
     expect(fullDiscoveryCount).toBe(0);
     expect(requestedTexts).toEqual(["Visible first wave."]);
@@ -1156,9 +1148,25 @@ function setElementRect(element: Element, rect: Pick<DOMRect, "top" | "bottom" |
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let index = 0; index < 20; index += 1) {
+  for (let index = 0; index < 50; index += 1) {
     if (predicate()) return;
-    await Promise.resolve();
+    await flushMicrotasks();
   }
   expect(predicate()).toBe(true);
+}
+
+async function waitForWithTimers(predicate: () => boolean, stepMs = 20): Promise<void> {
+  for (let index = 0; index < 50; index += 1) {
+    if (predicate()) return;
+    await flushMicrotasks();
+    await vi.advanceTimersByTimeAsync(stepMs);
+    await flushMicrotasks();
+  }
+  expect(predicate()).toBe(true);
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }

@@ -104,6 +104,8 @@ const NON_WEB_RULE_TEXT_PATTERN = /immersive-translate-(pdf|ebook|subtitle)|appl
 const BROAD_PAGE_STYLE_SELECTOR_PATTERN = /^\s*(?:html|body|\*|:root)\s*$/i;
 const PAGE_HIDING_STYLE_PATTERN = /(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0\b|position\s*:\s*fixed|pointer-events\s*:\s*none|z-index\s*:|overflow\s*:\s*hidden)/i;
 const UNSAFE_GLOBAL_ATTRIBUTE_PATTERN = /^on/i;
+const SAFE_GLOBAL_ATTRIBUTE_PATTERN = /^(?:class|translate|lang|dir|title|data-[\w:-]+|aria-[\w:-]+)$/i;
+const CSS_NETWORK_LOAD_PATTERN = /(?:@import\b|url\s*\()/i;
 
 const STABLE_RUNTIME_FIELDS = [
   "selectors",
@@ -318,6 +320,7 @@ function sanitizeGlobalStyles(styles: Readonly<Record<string, string>>): Readonl
   const output: Record<string, string> = {};
   for (const [selector, style] of Object.entries(styles)) {
     if (!selector.trim() || BROAD_PAGE_STYLE_SELECTOR_PATTERN.test(selector)) continue;
+    if (CSS_NETWORK_LOAD_PATTERN.test(style)) continue;
     output[selector] = style;
   }
   return output;
@@ -330,6 +333,7 @@ function sanitizeInjectedCssList(cssRules: readonly string[]): readonly string[]
 }
 
 function hasBroadPageStyleMutation(css: string): boolean {
+  if (CSS_NETWORK_LOAD_PATTERN.test(css)) return true;
   return css.split("}").some((block) => {
     const [selectorText, styleText] = block.split("{");
     if (!selectorText || !styleText || !PAGE_HIDING_STYLE_PATTERN.test(styleText)) return false;
@@ -345,6 +349,7 @@ function sanitizeGlobalAttributes(attributes: WebTranslationGlobalAttributes): W
     const safeAttributes: Record<string, string | null> = {};
     for (const [attribute, value] of Object.entries(selectorAttributes)) {
       if (UNSAFE_GLOBAL_ATTRIBUTE_PATTERN.test(attribute)) continue;
+      if (!SAFE_GLOBAL_ATTRIBUTE_PATTERN.test(attribute)) continue;
       safeAttributes[attribute] = value;
     }
     if (Object.keys(safeAttributes).length > 0) output[selector] = safeAttributes;

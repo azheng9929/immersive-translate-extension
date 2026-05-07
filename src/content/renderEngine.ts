@@ -1,4 +1,5 @@
 import type { RestoreRecord, TranslationPiecePlaceholder, TranslationUnit } from "../shared/types";
+import { isSafeHrefAttribute } from "../shared/urlSafety";
 import { ensureRuntimeStyle } from "./style";
 
 const ORIGINAL_TEXT_ATTRIBUTE = "data-imt-original-text";
@@ -226,7 +227,7 @@ function nodeForPlaceholder(placeholder: TranslationPiecePlaceholder, translated
   const tagName = safePlaceholderTagName(placeholder.tagName);
   const element = document.createElement(tagName.toLowerCase());
   for (const [name, value] of Object.entries(placeholder.attributes ?? {})) {
-    if (!isSafePlaceholderAttribute(tagName, name)) continue;
+    if (!isSafePlaceholderAttribute(tagName, name, value)) continue;
     element.setAttribute(name, value);
   }
   element.textContent = placeholder.kind === "stay-original"
@@ -245,8 +246,8 @@ function safePlaceholderTagName(tagName: string): string {
   return "SPAN";
 }
 
-function isSafePlaceholderAttribute(tagName: string, name: string): boolean {
-  if (name === "href") return tagName === "A";
+function isSafePlaceholderAttribute(tagName: string, name: string, value: string): boolean {
+  if (name === "href") return tagName === "A" && isSafeHrefAttribute(value);
   return name === "title" || name === "lang" || name === "dir" || name === "class";
 }
 

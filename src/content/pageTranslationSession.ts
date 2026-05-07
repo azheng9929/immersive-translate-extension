@@ -338,23 +338,32 @@ export class PageTranslationSession {
   }
 
   private activateDynamicObserver(phase: PageTranslationPhase = this.status.phase): DynamicObservationState {
-    this.disconnectMutationObserver();
+    const pendingMutations = this.collectPendingMutationRecords();
     this.removeUrlChangeListener();
     this.updateViewportSupplementListener(canSupplement(phase) && this.dynamicMode() !== "off" && !this.dynamicSuspended);
-    if (this.dynamicSuspended) return "suspended";
+    if (this.dynamicSuspended) {
+      this.disconnectMutationObserver();
+      return "suspended";
+    }
     if (!canSupplement(phase) || this.dynamicMode() === "off") {
+      this.disconnectMutationObserver();
       this.removeVisibilityListener();
       this.removeViewportSupplementListener();
       return "inactive";
     }
     this.addVisibilityListener();
     this.addUrlChangeListener();
-    if (!this.isPageVisible()) return "paused";
+    if (!this.isPageVisible()) {
+      this.disconnectMutationObserver();
+      return "paused";
+    }
     if (!this.connectMutationObserver()) return "inactive";
+    if (pendingMutations.length > 0) this.handleMutations(pendingMutations);
     return this.pendingRoots.size > 0 ? "queued" : "observing";
   }
 
   private connectMutationObserver(): boolean {
+    if (this.observer) return true;
     const root = this.options.observeRoot ?? document.body;
     if (!root || typeof MutationObserver === "undefined") return false;
 
@@ -369,9 +378,15 @@ export class PageTranslationSession {
     return true;
   }
 
+  private collectPendingMutationRecords(): MutationRecord[] {
+    return this.observer?.takeRecords() ?? [];
+  }
+
   private disconnectMutationObserver(): void {
-    this.observer?.disconnect();
-    this.observer?.takeRecords();
+    const observer = this.observer;
+    if (!observer) return;
+    observer.disconnect();
+    observer.takeRecords();
     this.observer = undefined;
   }
 

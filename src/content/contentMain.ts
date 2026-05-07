@@ -451,6 +451,7 @@ function applySitePolicyGlobalAttributes(sitePolicy: SitePolicy): () => void {
     try {
       document.querySelectorAll(selector).forEach((element) => {
         for (const [attribute, value] of Object.entries(attributes)) {
+          if (!isSafeSitePolicyGlobalAttribute(attribute)) continue;
           records.push({ element, attribute, originalValue: element.getAttribute(attribute) });
           if (value === null) element.removeAttribute(attribute);
           else element.setAttribute(attribute, value);
@@ -467,6 +468,10 @@ function applySitePolicyGlobalAttributes(sitePolicy: SitePolicy): () => void {
       else record.element.setAttribute(record.attribute, record.originalValue);
     }
   };
+}
+
+function isSafeSitePolicyGlobalAttribute(attribute: string): boolean {
+  return /^(?:class|translate|lang|dir|title|data-[\w:-]+|aria-[\w:-]+)$/i.test(attribute);
 }
 
 function createSelectionTranslator(config: ExtensionConfig): SelectionTranslator {

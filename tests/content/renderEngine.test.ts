@@ -129,18 +129,65 @@ describe("renderTranslation", () => {
 
     const records = renderTranslation(
       unit,
-      '阅读 <x id="p1">文档</x> 并完成 <x id="p2">生产发布</x>，保留 <x id="p3"/>。',
+      'Read <x id="p1">docs</x> and finish <x id="p2">rollout</x> while keeping <x id="p3"/>.',
     );
 
     const replacement = document.querySelector<HTMLElement>(".imt-translation-replacement")!;
     expect(replacement.querySelector("a")?.getAttribute("href")).toBe("/docs");
-    expect(replacement.querySelector("a")?.textContent).toBe("文档");
-    expect(replacement.querySelector("strong")?.textContent).toBe("生产发布");
+    expect(replacement.querySelector("a")?.textContent).toBe("docs");
+    expect(replacement.querySelector("strong")?.textContent).toBe("rollout");
     expect(replacement.querySelector("code")?.textContent).toBe("useEffect");
-    expect(replacement.textContent).toBe("阅读 文档 并完成 生产发布，保留 useEffect。");
+    expect(replacement.textContent).toBe("Read docs and finish rollout while keeping useEffect.");
 
     restoreAll(records);
     expect(document.body.innerHTML).toBe('<p>Read the <a href="/docs">documentation</a> for <strong>production rollout</strong> with <code>useEffect</code>.</p>');
+  });
+
+  it("does not recreate unsafe inline-rich link schemes in managed translations", () => {
+    document.body.innerHTML = '<p>Open <a href="java&#10;script:alert(1)">dangerous docs</a>.</p>';
+    const unit = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    })[0]!;
+    unit.renderMode = "replace-rich-inline";
+
+    renderTranslation(unit, 'Translated <x id="p1">safe docs</x>.');
+
+    const replacement = document.querySelector<HTMLElement>(".imt-translation-replacement")!;
+    const link = replacement.querySelector("a")!;
+    expect(link.textContent).toBe("safe docs");
+    expect(link.hasAttribute("href")).toBe(false);
+  });
+
+  it("drops unsafe placeholder href values even if a provider echoes them into the render plan", () => {
+    document.body.innerHTML = "<p>Open docs.</p>";
+    const root = document.querySelector("p")!;
+    const unit = {
+      ...baseUnit(root, "replace-rich-inline"),
+      piecePlan: {
+        kind: "inline-rich",
+        modelText: 'Open <x id="p1">docs</x>.',
+        displayText: "Open docs.",
+        placeholders: [
+          {
+            id: "p1",
+            kind: "inline",
+            tagName: "A",
+            text: "docs",
+            attributes: { href: "data:text/html,<script>alert(1)</script>" },
+          },
+        ],
+      },
+    } satisfies TranslationUnit;
+
+    renderTranslation(unit, 'Open <x id="p1">safe docs</x>.');
+
+    const link = document.querySelector(".imt-translation-replacement a")!;
+    expect(link.textContent).toBe("safe docs");
+    expect(link.hasAttribute("href")).toBe(false);
   });
 
   it("parses placeholders in compact bilingual fallback for complex roots", () => {
@@ -159,13 +206,13 @@ describe("renderTranslation", () => {
       },
     } satisfies TranslationUnit;
 
-    renderTranslation(unit, '阅读 <x id="p1">文档</x> 并保留 <x id="p2"/>。');
+    renderTranslation(unit, 'Read <x id="p1">docs</x> and keep <x id="p2"/>.');
 
     const compact = document.querySelector<HTMLElement>(".imt-translation-compact")!;
     expect(compact.querySelector("a")?.getAttribute("href")).toBe("/docs");
-    expect(compact.querySelector("a")?.textContent).toBe("文档");
+    expect(compact.querySelector("a")?.textContent).toBe("docs");
     expect(compact.querySelector("code")?.textContent).toBe("code");
-    expect(compact.textContent).toBe("阅读 文档 并保留 code。");
+    expect(compact.textContent).toBe("Read docs and keep code.");
   });
 
   it("replaces attributes, exposes original text for hover, and restores them", () => {
@@ -192,8 +239,8 @@ describe("renderTranslation", () => {
     const unit = {
       ...baseUnit(document.querySelector("p")!, "bilingual-inside"),
       translationClasses: ["imt-user-style", "site-translation"],
-      wrapperPrefix: "「",
-      wrapperSuffix: "」",
+      wrapperPrefix: "[",
+      wrapperSuffix: "]",
     };
     renderTranslation(unit, "Translated hello");
 
@@ -201,6 +248,6 @@ describe("renderTranslation", () => {
     expect(translated?.classList.contains("imt-translation-block")).toBe(true);
     expect(translated?.classList.contains("imt-user-style")).toBe(true);
     expect(translated?.classList.contains("site-translation")).toBe(true);
-    expect(translated?.textContent).toBe("「Translated hello」");
+    expect(translated?.textContent).toBe("[Translated hello]");
   });
 });

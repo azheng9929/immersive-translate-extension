@@ -59,12 +59,14 @@ describe("importedWebRuleRuntime", () => {
         globalStyles: {
           ".post-title": "-webkit-line-clamp: unset; max-height: unset; overflow: visible;",
           ".mobile-promo": "display:none",
+          ".remote-bg": "background-image:url(https://example.com/pixel.png)",
           body: "overflow:hidden",
         },
         injectedCss: [
           ".post-title { -webkit-line-clamp: unset !important; }",
           ".immersive-translate-target-wrapper br { display: none; }",
           "[class^='Original_section_title'] { overflow:hidden!important; }",
+          "@import url(https://example.com/rules.css);",
           "body { display: none; }",
         ],
       },
@@ -125,7 +127,7 @@ describe("importedWebRuleRuntime", () => {
     });
   });
 
-  it("preserves imported global attribute repairs while dropping event handlers", () => {
+  it("preserves safe imported global attribute repairs while dropping behavior-changing attributes", () => {
     const rules: WebTranslationRule[] = [
       {
         id: "site",
@@ -135,8 +137,11 @@ describe("importedWebRuleRuntime", () => {
           ".expandable": {
             class: "expanded",
             "data-expanded": "true",
+            "aria-expanded": "true",
             title: null,
             onclick: "alert(1)",
+            href: "javascript:alert(1)",
+            srcdoc: "<script>alert(1)</script>",
             style: "height:unset",
           },
         },
@@ -149,7 +154,7 @@ describe("importedWebRuleRuntime", () => {
       ".expandable": {
         class: "expanded",
         "data-expanded": "true",
-        style: "height:unset",
+        "aria-expanded": "true",
         title: null,
       },
     });
