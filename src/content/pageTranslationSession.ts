@@ -625,7 +625,7 @@ export class PageTranslationSession {
       return;
     }
 
-    if (this.options.lazy && typeof IntersectionObserver !== "undefined") {
+    if (this.options.lazy && !this.options.eagerTranslateRest && typeof IntersectionObserver !== "undefined") {
       const { eagerRoots, deferredRoots } = this.partitionDynamicLazyRoots(roots);
       this.observeLazyRoots(deferredRoots, true);
       if (eagerRoots.length > 0) {

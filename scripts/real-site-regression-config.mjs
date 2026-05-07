@@ -577,6 +577,7 @@ export function siteAccessGateReason(site, metrics) {
   if (isRedditNetworkSecurityBlock(site, metrics)) return "network security block";
   if (isCloudflareChallenge(metrics)) return "cloudflare challenge";
   if (isAmazonRobotCheck(site, metrics)) return "robot check";
+  if (isGoogleRobotCheck(site, metrics)) return "robot check";
   if (isAmazonUnavailablePage(site, metrics)) return "unavailable page";
   if (isEtsyAccessDeniedPage(site, metrics)) return "access denied page";
   return undefined;
@@ -628,6 +629,12 @@ function isAmazonRobotCheck(site, metrics) {
   return isAmazonSite(site) && /enter the characters you see below|not a robot|robot check/i.test(metrics.bodyTextPreview ?? "");
 }
 
+function isGoogleRobotCheck(site, metrics) {
+  if (!isGoogleSite(site)) return false;
+  const text = `${metrics.title ?? ""} ${metrics.url ?? ""} ${metrics.bodyTextPreview ?? ""}`;
+  return /\/sorry\/index|unusual traffic|not a robot|automated queries|异常流量|自动程序/i.test(text);
+}
+
 function isAmazonUnavailablePage(site, metrics) {
   return isAmazonSite(site) && (
     /page not found|sorry! something went wrong/i.test(metrics.title ?? "") ||
@@ -647,4 +654,8 @@ function isRedditSite(site) {
 
 function isAmazonSite(site) {
   return site.host === "amazon.com" || site.host.endsWith(".amazon.com");
+}
+
+function isGoogleSite(site) {
+  return site.host === "google.com" || site.host.endsWith(".google.com");
 }

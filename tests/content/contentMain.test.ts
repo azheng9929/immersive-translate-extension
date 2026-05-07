@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isFastFullPageMode,
   progressivePageBatchOptions,
+  shouldEagerTranslateRest,
 } from "@/content/contentMain";
 import { DEFAULT_EXTENSION_CONFIG } from "@/shared/config";
 import type { SitePolicy } from "@/content/sitePolicy";
@@ -15,6 +16,25 @@ function sitePolicy(overrides: Partial<SitePolicy> = {}): SitePolicy {
 }
 
 describe("contentMain fast full-page mode", () => {
+  it("eagerly translates bounded search and video result pages even in balanced mode", () => {
+    expect(shouldEagerTranslateRest(
+      { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "balanced" },
+      sitePolicy({ ruleId: "google-search", siteKey: "google.com", fallbackProfile: "generic" }),
+    )).toBe(true);
+    expect(shouldEagerTranslateRest(
+      { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "balanced" },
+      sitePolicy({ ruleId: "youtube", siteKey: "youtube.com", fallbackProfile: "video", isHighDynamic: true }),
+    )).toBe(true);
+    expect(shouldEagerTranslateRest(
+      { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "balanced" },
+      sitePolicy({ ruleId: "mobalytics-tft", siteKey: "mobalytics.gg", fallbackProfile: "generic", isHighDynamic: true }),
+    )).toBe(false);
+    expect(shouldEagerTranslateRest(
+      { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "stable" },
+      sitePolicy({ ruleId: "bing-search", siteKey: "bing.com", fallbackProfile: "generic" }),
+    )).toBe(false);
+  });
+
   it("enables fast full-page eager translation only for the fast request profile outside social feeds", () => {
     expect(isFastFullPageMode(
       { ...DEFAULT_EXTENSION_CONFIG, requestProfile: "fast" },

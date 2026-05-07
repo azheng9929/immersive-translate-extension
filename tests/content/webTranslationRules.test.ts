@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { scanDocumentText } from "@/content/domScanner";
+import { buildTranslationUnits } from "@/content/unitBuilder";
 import {
   BUILTIN_WEB_TRANSLATION_RULES,
   compileRulePolicy,
@@ -582,6 +584,75 @@ describe("webTranslationRules", () => {
     expect(policy.excludeSelectors).toContain("#content .mozaique .thumb-under p.metadata");
     expect(policy.filterRule.extraBlockSelectors).toEqual(["#content .mozaique .thumb-under p.title"]);
     expect(policy.injectedCss.join("\n")).toContain(".thumb-under p.title");
+  });
+
+  it("does not let dense dashboard ad excludes swallow leaderboard content", () => {
+    document.body.innerHTML = `
+      <main class="leaderboard-layout">
+        <h1>TFT Meta Comps in Set 17</h1>
+        <p>Find out the strongest and most reliable meta Teamfight Tactics comps and builds.</p>
+        <section class="team-comp-card">
+          <h2>Shieldmaiden</h2>
+          <p>A durable frontline composition with reliable late game damage.</p>
+        </section>
+      </main>
+    `;
+    const policy = resolveWebTranslationPolicy("https://mobalytics.gg/tft/team-comps", "normal");
+    const units = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body, {
+        contentSelectors: policy.contentSelectors,
+        excludeSelectors: policy.excludeSelectors,
+        filterRule: policy.filterRule,
+      }),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+      contentSelectors: policy.contentSelectors,
+      excludeSelectors: policy.excludeSelectors,
+      filterRule: policy.filterRule,
+    });
+
+    expect(policy.excludeSelectors).not.toContain("[class*='ad' i]");
+    expect(units.map((unit) => unit.originalText)).toContain("TFT Meta Comps in Set 17");
+    expect(units.map((unit) => unit.originalText)).toContain("Shieldmaiden");
+  });
+
+  it("uses explicit dense dashboard selectors for tactics, mobalytics, and opgg", () => {
+    const tactics = resolveWebTranslationPolicy("https://tactics.tools/team-compositions", "normal");
+    const mobalytics = resolveWebTranslationPolicy("https://mobalytics.gg/tft/team-comps", "normal");
+    const opgg = resolveWebTranslationPolicy("https://www.op.gg/champions", "normal");
+
+    expect(tactics.excludeSelectors).toContain("nav");
+    expect(tactics.contentSelectors).toContainEqual({
+      selector: "[role='tooltip'], .tooltip, [class*='tooltip' i], [data-popper-placement]",
+      category: "card-text",
+    });
+    expect(mobalytics.preferredScanRootSelectors).toContain("main [class*='comp' i] h2");
+    expect(mobalytics.contentSelectors).toContainEqual({
+      selector: "main p, [class*='description' i], [class*='summary' i]",
+      category: "content-block",
+    });
+    expect(opgg.preferredScanRootSelectors).toContain("main a[href*='/champions/']");
+    expect(opgg.contentSelectors).toContainEqual({
+      selector: "main a[href*='/champions/'], main [class*='champion' i] [class*='name' i]",
+      category: "card-text",
+    });
+  });
+
+  it("keeps dynamic search and video list probes inside content-ready policies", () => {
+    const duckduckgo = resolveWebTranslationPolicy("https://duckduckgo.com/?q=openai", "normal");
+    const dailymotion = resolveWebTranslationPolicy("https://www.dailymotion.com/us", "normal");
+
+    expect(duckduckgo.contentSelectors).toContainEqual({
+      selector: "article [data-testid='result-snippet'], article p, article li, .result p",
+      category: "card-text",
+    });
+    expect(dailymotion.ruleCapability).toBe("content-ready");
+    expect(dailymotion.contentSelectors).toContainEqual({
+      selector: "#video-title, .regression-dynamic-title, h1, h2, [class*='video-title' i], [class*='VideoTitle']",
+      category: "heading",
+    });
   });
 
   it("promotes high-value imported review candidates into explicit core webpage rules", () => {

@@ -163,6 +163,20 @@ describe("real-site regression selection", () => {
     ).toBe("robot check");
   });
 
+  it("treats Google unusual traffic pages as an access gate", () => {
+    expect(
+      siteAccessGateReason(
+        { host: "google.com" },
+        {
+          title: "https://www.google.com/search?q=openai",
+          url: "https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dopenai",
+          bodyTextLength: 480,
+          bodyTextPreview: "关于此网页 我们的系统检测到您的计算机网络中存在异常流量。此网页用于确认这些请求是由您而不是自动程序发出的。",
+        },
+      ),
+    ).toBe("robot check");
+  });
+
   it("treats unavailable Amazon pages as an external access gate", () => {
     expect(
       siteAccessGateReason(

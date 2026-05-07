@@ -315,6 +315,9 @@ function createPageSession(
   onUrlChange?: PageTranslationUrlChangeHandler,
 ): PageTranslationSession {
   const fastFullPage = isFastFullPageMode(config, sitePolicy);
+  const eagerTranslateRest = shouldEagerTranslateRest(config, sitePolicy);
+  const firstWaveMaxRoots = fastFullPage ? 28 : eagerTranslateRest ? 36 : sitePolicy.maxEagerLazyRoots;
+  const backgroundEagerMaxRoots = fastFullPage ? 420 : eagerTranslateRest ? 260 : 0;
   return new PageTranslationSession(createController(config, sitePolicy), {
     observeRoot: document.body,
     debounceMs: sitePolicy.debounceMs,
@@ -323,17 +326,17 @@ function createPageSession(
     lazyRootMargin: sitePolicy.lazyRootMargin,
     lazyThreshold: sitePolicy.lazyThreshold,
     eagerLazy: true,
-    eagerLazyRootMargin: fastFullPage ? "1600px" : sitePolicy.eagerLazyRootMargin,
-    maxEagerLazyRoots: fastFullPage ? 28 : sitePolicy.maxEagerLazyRoots,
-    firstWaveMaxRoots: fastFullPage ? 28 : sitePolicy.maxEagerLazyRoots,
-    eagerTranslateRest: fastFullPage,
-    backgroundEagerMaxRoots: fastFullPage ? 420 : 0,
-    useBatchProfiles: fastFullPage,
+    eagerLazyRootMargin: eagerTranslateRest ? "1600px" : sitePolicy.eagerLazyRootMargin,
+    maxEagerLazyRoots: firstWaveMaxRoots,
+    firstWaveMaxRoots,
+    eagerTranslateRest,
+    backgroundEagerMaxRoots,
+    useBatchProfiles: eagerTranslateRest,
     viewportSupplement: sitePolicy.viewportSupplement,
     viewportSupplementDebounceMs: sitePolicy.viewportSupplementDebounceMs,
     viewportSupplementRootMargin: sitePolicy.viewportSupplementRootMargin,
     viewportSupplementMaxRoots: sitePolicy.viewportSupplementMaxRoots,
-    lazyDiscoveryDelayMs: fastFullPage ? 0 : sitePolicy.isHighDynamic ? 180 : 80,
+    lazyDiscoveryDelayMs: eagerTranslateRest ? 0 : sitePolicy.isHighDynamic ? 180 : 80,
     dynamicMode: sitePolicy.dynamicMode,
     excludedDynamicSelectors: sitePolicy.excludedDynamicSelectors,
     maxQueueSize: sitePolicy.maxQueueSize,
@@ -598,8 +601,27 @@ export function isFastFullPageMode(config: ExtensionConfig, sitePolicy: SitePoli
   return true;
 }
 
+export function shouldEagerTranslateRest(config: ExtensionConfig, sitePolicy: SitePolicy): boolean {
+  if (isFastFullPageMode(config, sitePolicy)) return true;
+  if (config.requestProfile === "stable") return false;
+  if (sitePolicy.isHighDynamic && sitePolicy.fallbackProfile === "social") return false;
+  return isBoundedListTranslationPolicy(sitePolicy);
+}
+
+function isBoundedListTranslationPolicy(sitePolicy: SitePolicy): boolean {
+  const ruleId = (sitePolicy.ruleId ?? "").toLowerCase();
+  const siteKey = (sitePolicy.siteKey ?? "").toLowerCase();
+  if (sitePolicy.fallbackProfile === "video") return true;
+  if (ruleId.includes("search")) return true;
+  return (
+    siteKey.includes("youtube.") ||
+    siteKey.includes("dailymotion.") ||
+    siteKey.includes("vimeo.")
+  );
+}
+
 export function progressivePageBatchOptions(config: ExtensionConfig, sitePolicy: SitePolicy) {
-  const fastFullPage = isFastFullPageMode(config, sitePolicy);
+  const fastFullPage = shouldEagerTranslateRest(config, sitePolicy);
 
   if (config.provider === "openai-compatible") {
     return providerBatchProfileOptions({

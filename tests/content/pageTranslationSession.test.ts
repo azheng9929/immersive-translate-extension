@@ -1000,6 +1000,52 @@ describe("PageTranslationSession", () => {
     );
   });
 
+  it("does not wait for intersection before translating dynamic roots in eager rest mode", async () => {
+    vi.useFakeTimers();
+    const FakeIntersectionObserver = createFakeIntersectionObserver();
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+    document.body.innerHTML = `<main><p id="visible">Visible first wave.</p></main>`;
+    setElementRect(document.querySelector("#visible")!, { top: 20, bottom: 60, left: 0, right: 200 });
+    const requestedTexts: string[] = [];
+    const controller = new PageController({
+      targetLang: "zh-Hans",
+      translateBatch: async (items) => {
+        requestedTexts.push(...items.map((item) => item.text));
+        return items.map((item) => ({ id: item.id, text: `[zh-Hans] ${item.text}`, status: "ok" as const }));
+      },
+    });
+    session = new PageTranslationSession(controller, {
+      observeRoot: document.body,
+      debounceMs: 20,
+      lazy: true,
+      eagerLazy: true,
+      viewportFirst: true,
+      eagerTranslateRest: true,
+      firstWaveMaxRoots: 1,
+      backgroundEagerMaxRoots: 10,
+      lazyDiscoveryDelayMs: 0,
+    });
+
+    await session.translatePage();
+    await waitFor(() => requestedTexts.includes("Visible first wave."));
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => session!.getStatus().observation === "observing");
+
+    const dynamicRoot = document.createElement("section");
+    dynamicRoot.id = "dynamic-result";
+    dynamicRoot.innerHTML = `<p>Offscreen dynamic search result.</p>`;
+    setElementRect(dynamicRoot, { top: 2400, bottom: 2460, left: 0, right: 300 });
+    document.querySelector("main")?.append(dynamicRoot);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(20);
+    await waitForWithTimers(() => requestedTexts.includes("Offscreen dynamic search result."));
+
+    expect(document.querySelector("#dynamic-result .imt-translation-block")?.textContent).toBe(
+      "[zh-Hans] Offscreen dynamic search result.",
+    );
+    expect(session.getStatus()).toMatchObject({ dynamicRuns: 1 });
+  });
+
   it("falls back to eager lazy roots when viewport-first discovery finds no first wave", async () => {
     const FakeIntersectionObserver = createFakeIntersectionObserver();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
