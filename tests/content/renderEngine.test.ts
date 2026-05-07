@@ -61,6 +61,22 @@ describe("renderTranslation", () => {
     expect(translated.style.getPropertyValue("--imt-source-color")).toBe("rgb(255, 255, 255)");
   });
 
+  it("uses a readable fallback color when the source color has poor contrast", () => {
+    document.body.innerHTML = `
+      <section style="background: rgb(8, 12, 20)">
+        <p style="color: rgb(0, 0, 0)">x402 Payment Protocol</p>
+      </section>
+    `;
+    const root = document.querySelector("p")!;
+    const unit = baseUnit(root, "bilingual-inside");
+
+    renderTranslation(unit, "x402 支付协议");
+
+    const translated = document.querySelector<HTMLElement>(".imt-translation-block")!;
+    expect(translated.style.getPropertyValue("--imt-source-color")).toBe("rgb(255, 255, 255)");
+    expect(translated.style.getPropertyPriority("color")).toBe("important");
+  });
+
   it("replaces button text, exposes original text for hover, and restores it", () => {
     document.body.innerHTML = "<button>Submit</button>";
     const unit = baseUnit(document.querySelector("button")!, "replace-text");
@@ -141,6 +157,43 @@ describe("renderTranslation", () => {
 
     restoreAll(records);
     expect(document.body.innerHTML).toBe('<p>Read the <a href="/docs">documentation</a> for <strong>production rollout</strong> with <code>useEffect</code>.</p>');
+  });
+
+  it("parses provider placeholders that come back with smart quotes", () => {
+    document.body.innerHTML = '<p>Use the <a href="/docs">Responses API</a> with <code>client.responses.create</code>.</p>';
+    const unit = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    })[0]!;
+    unit.renderMode = "replace-rich-inline";
+
+    renderTranslation(unit, "使用 <x id=“p1”>Responses API</x> 并保留 <x id=“p2”/>。");
+
+    const replacement = document.querySelector<HTMLElement>(".imt-translation-replacement")!;
+    expect(replacement.textContent).toBe("使用 Responses API 并保留 client.responses.create。");
+    expect(replacement.innerHTML).not.toContain("<x");
+    expect(replacement.querySelector("a")?.getAttribute("href")).toBe("/docs");
+    expect(replacement.querySelector("code")?.textContent).toBe("client.responses.create");
+  });
+
+  it("strips leaked placeholder markup instead of showing it when a provider mangles an id", () => {
+    document.body.innerHTML = '<p>Read the <a href="/docs">documentation</a>.</p>';
+    const unit = buildTranslationUnits({
+      scannedTexts: scanDocumentText(document.body),
+      attributes: [],
+      sessionId: "s1",
+      revision: 1,
+      targetLang: "zh-Hans",
+    })[0]!;
+
+    renderTranslation(unit, "阅读 <x id=“unknown”>文档</x> 并继续。");
+
+    const translated = document.querySelector<HTMLElement>(".imt-translation-block")!;
+    expect(translated.textContent).toBe("阅读 文档 并继续。");
+    expect(translated.textContent).not.toContain("<x");
   });
 
   it("does not recreate unsafe inline-rich link schemes in managed translations", () => {

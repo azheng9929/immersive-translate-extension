@@ -175,7 +175,7 @@ function shouldUseRichTextReplacement(unit: TranslationUnit): boolean {
 function appendTranslatedContent(parent: HTMLElement, unit: TranslationUnit, translatedText: string): void {
   const richNodes = translatedNodesFromPieces(unit, translatedText);
   if (!richNodes) {
-    parent.textContent = withWrapperText(unit, translatedText);
+    parent.textContent = withWrapperText(unit, sanitizeLeakedPiecePlaceholders(translatedText));
     return;
   }
 
@@ -189,7 +189,9 @@ function applySourceTextStyle(target: HTMLElement, unit: TranslationUnit): void 
   if (!sourceElement) return;
   const color = window.getComputedStyle(sourceElement).color;
   if (!color || color === "transparent" || color === "rgba(0, 0, 0, 0)") return;
-  target.style.setProperty("--imt-source-color", color);
+  const readableColor = readableTextColor(color, sourceElement);
+  target.style.setProperty("--imt-source-color", readableColor);
+  target.style.setProperty("color", "var(--imt-source-color, currentColor)", "important");
 }
 
 function sourceTextElement(unit: TranslationUnit): HTMLElement | undefined {
@@ -201,26 +203,36 @@ function translatedNodesFromPieces(unit: TranslationUnit, translatedText: string
   if (!unit.piecePlan || unit.piecePlan.placeholders.length === 0) return undefined;
   const placeholders = new Map(unit.piecePlan.placeholders.map((placeholder) => [placeholder.id, placeholder]));
   const nodes: Node[] = [];
-  const pattern = /<x\s+id=["']([^"']+)["']\s*\/>|<x\s+id=["']([^"']+)["']\s*>([\s\S]*?)<\/x>/g;
+  const pattern = /<x\b(?=[^>]*\bid\s*=\s*["'\u201c\u201d\u2018\u2019]([^"'\u201c\u201d\u2018\u2019>\s]+)["'\u201c\u201d\u2018\u2019])[^>]*(?:\/>|>([\s\S]*?)<\/x>)/gi;
   let lastIndex = 0;
   let matchedKnownPlaceholder = false;
+  let matchedAnyPlaceholder = false;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(translatedText)) !== null) {
     if (match.index > lastIndex) nodes.push(document.createTextNode(translatedText.slice(lastIndex, match.index)));
-    const id = match[1] ?? match[2];
+    matchedAnyPlaceholder = true;
+    const id = match[1];
     const placeholder = id ? placeholders.get(id) : undefined;
     if (!placeholder) {
-      nodes.push(document.createTextNode(match[0]));
+      const fallbackText = sanitizeLeakedPiecePlaceholders(match[2] ?? "");
+      if (fallbackText) nodes.push(document.createTextNode(fallbackText));
     } else {
       matchedKnownPlaceholder = true;
-      nodes.push(nodeForPlaceholder(placeholder, match[3]));
+      nodes.push(nodeForPlaceholder(placeholder, match[2]));
     }
     lastIndex = pattern.lastIndex;
   }
 
   if (lastIndex < translatedText.length) nodes.push(document.createTextNode(translatedText.slice(lastIndex)));
-  return matchedKnownPlaceholder ? nodes : undefined;
+  return matchedKnownPlaceholder || matchedAnyPlaceholder ? nodes : undefined;
+}
+
+function sanitizeLeakedPiecePlaceholders(text: string): string {
+  return text
+    .replace(/<x\b(?=[^>]*\bid\s*=\s*["'\u201c\u201d\u2018\u2019][^"'\u201c\u201d\u2018\u2019>\s]+["'\u201c\u201d\u2018\u2019])[^>]*>([\s\S]*?)<\/x>/gi, "$1")
+    .replace(/<x\b(?=[^>]*\bid\s*=\s*["'\u201c\u201d\u2018\u2019][^"'\u201c\u201d\u2018\u2019>\s]+["'\u201c\u201d\u2018\u2019])[^>]*\/>/gi, "")
+    .replace(/<\/?x\b[^>]*>/gi, "");
 }
 
 function nodeForPlaceholder(placeholder: TranslationPiecePlaceholder, translatedInnerText: string | undefined): Node {
@@ -266,4 +278,95 @@ function textNodesForReplacement(unit: TranslationUnit): Text[] {
 
 function withWrapperText(unit: TranslationUnit, translatedText: string): string {
   return `${unit.wrapperPrefix ?? ""}${translatedText}${unit.wrapperSuffix ?? ""}`;
+}
+
+type RgbColor = {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+};
+
+function readableTextColor(color: string, sourceElement: HTMLElement): string {
+  const foreground = parseCssRgb(color);
+  const background = nearestBackgroundColor(sourceElement) ?? { r: 255, g: 255, b: 255, a: 1 };
+  if (!foreground || contrastRatio(foreground, background) >= 3) return color;
+
+  const white = { r: 255, g: 255, b: 255, a: 1 };
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  return contrastRatio(white, background) >= contrastRatio(black, background)
+    ? "rgb(255, 255, 255)"
+    : "rgb(0, 0, 0)";
+}
+
+function nearestBackgroundColor(element: HTMLElement): RgbColor | undefined {
+  for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+    const color = parseCssRgb(window.getComputedStyle(current).backgroundColor);
+    if (color && color.a > 0.05) return color;
+  }
+  return undefined;
+}
+
+function parseCssRgb(value: string): RgbColor | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "transparent") return undefined;
+
+  const match = normalized.match(/^rgba?\((.+)\)$/);
+  if (!match) return undefined;
+
+  const parts = match[1]!
+    .replace(/\s*\/\s*/g, " ")
+    .split(/[,\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 3) return undefined;
+
+  const [r, g, b] = parts.slice(0, 3).map(parseCssColorChannel);
+  if (r === undefined || g === undefined || b === undefined) return undefined;
+
+  const alpha = parts[3] === undefined ? 1 : parseCssAlpha(parts[3]!);
+  return {
+    r,
+    g,
+    b,
+    a: alpha ?? 1,
+  };
+}
+
+function parseCssColorChannel(value: string): number | undefined {
+  const parsed = value.endsWith("%")
+    ? Number(value.slice(0, -1)) * 2.55
+    : Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return clampColorChannel(parsed);
+}
+
+function parseCssAlpha(value: string): number | undefined {
+  const parsed = value.endsWith("%")
+    ? Number(value.slice(0, -1)) / 100
+    : Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.max(0, Math.min(1, parsed));
+}
+
+function clampColorChannel(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function contrastRatio(foreground: RgbColor, background: RgbColor): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function relativeLuminance(color: RgbColor): number {
+  const [r, g, b] = [color.r, color.g, color.b].map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
